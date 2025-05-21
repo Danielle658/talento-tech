@@ -13,32 +13,26 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; // For Caderneta Digital
-import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; // For Sales Record
+import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
+import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
+import type { ProductEntry } from "@/app/(app)/dashboard/products/page"; // Import ProductEntry
 import Image from "next/image";
 
-interface Product {
+// Interface for products within the PDV, compatible with ProductEntry
+interface PDVProduct {
   id: string;
   code: string;
   name: string;
   price: number;
 }
 
-interface CartItem extends Product {
+interface CartItem extends PDVProduct {
   quantity: number;
 }
 
-// Sample products - in a real app, this would come from a DB or localStorage (Products page)
-const sampleProducts: Product[] = [
-  { id: "prod001", code: "123", name: "Refrigerante Lata", price: 5.50 },
-  { id: "prod002", code: "456", name: "Salgadinho Pacote", price: 8.75 },
-  { id: "prod003", code: "789", name: "Chocolate Barra", price: 6.25 },
-  { id: "prod004", code: "101", name: "Água Mineral 500ml", price: 3.00 },
-  { id: "prod005", code: "202", name: "Suco Caixa 1L", price: 7.90 },
-];
-
 const STORAGE_KEY_NOTEBOOK = "moneywise-transactions";
 const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
+const STORAGE_KEY_PRODUCTS = "moneywise-products"; // For loading products
 
 export default function SalesPage() {
   const { toast } = useToast();
@@ -51,10 +45,18 @@ export default function SalesPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraScannedCode, setCameraScannedCode] = useState("");
   const [isMounted, setIsMounted] = useState(false);
+  const [availableProducts, setAvailableProducts] = useState<ProductEntry[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
-    // In a real app, you might load active products from localStorage here if Products page is implemented
+    const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
+    if (storedProducts) {
+      try {
+        setAvailableProducts(JSON.parse(storedProducts));
+      } catch (error) {
+        console.error("Failed to parse products from localStorage for PDV", error);
+      }
+    }
   }, []);
 
 
@@ -63,8 +65,8 @@ export default function SalesPage() {
       toast({ title: "Código Inválido", description: "Por favor, insira um código de produto.", variant: "destructive" });
       return false;
     }
-    // TODO: Replace sampleProducts with products loaded from localStorage if Products page is implemented
-    const product = sampleProducts.find(p => p.code === code.trim());
+    
+    const product = availableProducts.find(p => p.code === code.trim());
     if (product) {
       setCart(prevCart => {
         const existingItem = prevCart.find(item => item.id === product.id);
@@ -73,12 +75,14 @@ export default function SalesPage() {
             item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
           );
         }
-        return [...prevCart, { ...product, quantity: 1 }];
+        // Adapt ProductEntry to PDVProduct for the cart
+        const productForCart: PDVProduct = { id: product.id, code: product.code, name: product.name, price: product.price };
+        return [...prevCart, { ...productForCart, quantity: 1 }];
       });
       toast({ title: "Produto Adicionado", description: `${product.name} foi adicionado ao carrinho.`, className: "bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-700" });
       return true;
     } else {
-      toast({ title: "Produto não encontrado", description: `Nenhum produto encontrado com o código ${code}.`, variant: "destructive" });
+      toast({ title: "Produto não encontrado", description: `Nenhum produto encontrado com o código ${code}. Verifique o catálogo.`, variant: "destructive" });
       return false;
     }
   };
@@ -92,7 +96,7 @@ export default function SalesPage() {
   const handleAddProductFromCameraDialog = () => {
     if (addProductToCartByCode(cameraScannedCode)) {
       setCameraScannedCode("");
-      setIsCameraScanDialogOpen(false); // Close dialog on successful add
+      setIsCameraScanDialogOpen(false); 
     }
   };
 
@@ -179,7 +183,6 @@ export default function SalesPage() {
 
     const saleDate = new Date();
 
-    // 1. Add to Caderneta Digital (Notebook)
     const incomeTransaction: Transaction = {
       id: `T-SALE-${Date.now().toString().slice(-6)}`,
       description: `Venda PDV - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`,
@@ -197,8 +200,6 @@ export default function SalesPage() {
         toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital.", variant: "destructive"})
     }
 
-
-    // 2. Add to Sales Record
     const salesRecordEntry: SalesRecordEntry = {
       id: `SR-${Date.now().toString().slice(-6)}`,
       items: cart.map(item => ({ productId: item.id, name: item.name, quantity: item.quantity, unitPrice: item.price })),
@@ -217,7 +218,6 @@ export default function SalesPage() {
         console.error("Error updating sales records in localStorage", e);
         toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas.", variant: "destructive"})
     }
-
 
     toast({
       title: "Venda Finalizada!",
@@ -246,7 +246,6 @@ export default function SalesPage() {
           <CardDescription>Registre vendas rapidamente escaneando produtos e processando pagamentos. Os dados são salvos localmente.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Coluna Esquerda: Entrada de Produto e Carrinho */}
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
@@ -380,9 +379,8 @@ export default function SalesPage() {
             </Card>
           </div>
 
-          {/* Coluna Direita: Resumo e Pagamento */}
           <div className="lg:col-span-1 space-y-6">
-            <Card className="sticky top-20"> {/* Make payment summary sticky */}
+            <Card className="sticky top-20">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2"><DollarSign className="h-5 w-5"/> Pagamento</CardTitle>
               </CardHeader>
@@ -416,7 +414,6 @@ export default function SalesPage() {
                     value={amountPaidInput}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
                         const value = e.target.value;
-                        // Allow only numbers and a single comma for decimals, up to 2 decimal places
                         if (/^[0-9]*[,]?[0-9]{0,2}$/.test(value) || value === "") {
                             setAmountPaidInput(value);
                         }
