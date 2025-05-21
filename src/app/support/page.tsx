@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, LifeBuoy, Mail, Phone } from "lucide-react";
+import { ArrowLeft, LifeBuoy, Mail } from "lucide-react";
 
 export default function SupportPage() {
   return (
@@ -32,15 +32,7 @@ export default function SupportPage() {
                 <div>
                   <h3 className="font-medium">E-mail</h3>
                   <p className="text-muted-foreground">Para dúvidas gerais, sugestões ou problemas técnicos.</p>
-                  <a href="mailto:suporte@moneywise.example.com" className="text-primary hover:underline">suporte@moneywise.example.com</a>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Phone className="h-6 w-6 text-primary mt-1"/>
-                <div>
-                  <h3 className="font-medium">Telefone</h3>
-                  <p className="text-muted-foreground">Para suporte urgente (horário comercial: 09:00 - 18:00, Seg-Sex).</p>
-                  <p className="font-semibold">+55 (XX) XXXX-XXXX</p>
+                  <a href="mailto:moneywise057@gmail.com" className="text-primary hover:underline">moneywise057@gmail.com</a>
                 </div>
               </div>
             </div>

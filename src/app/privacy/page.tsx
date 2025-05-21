@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
           <p>Podemos atualizar nossa Política de Privacidade de tempos em tempos. Notificaremos você sobre quaisquer alterações publicando a nova Política de Privacidade nesta página.</p>
 
           <h2>8. Contato</h2>
-          <p>Se você tiver alguma dúvida sobre esta Política de Privacidade, entre em contato conosco em: privacidade@moneywise.example.com.</p>
+          <p>Se você tiver alguma dúvida sobre esta Política de Privacidade, entre em contato conosco em: moneywise057@gmail.com.</p>
         </CardContent>
       </Card>
     </div>
