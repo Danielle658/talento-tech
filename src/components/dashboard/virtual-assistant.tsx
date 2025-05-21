@@ -1,98 +1,177 @@
 
 "use client";
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useRef } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Bot, Mic, Send, Loader2 } from 'lucide-react';
 import { interpretTextCommands, InterpretTextCommandsOutput } from '@/ai/flows/interpret-text-commands';
-import { interpretVoiceCommand, InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands'; // Assuming voice input as text for now
+import { interpretVoiceCommand, InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  text?: string;
+  response?: InterpretTextCommandsOutput | InterpretVoiceCommandOutput;
+  timestamp: Date;
+}
 
 export function VirtualAssistant() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [assistantResponse, setAssistantResponse] = useState<InterpretTextCommandsOutput | InterpretVoiceCommandOutput | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const { toast } = useToast();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Scroll to bottom when new messages are added
+    if (scrollAreaRef.current) {
+      const scrollViewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
+      if (scrollViewport) {
+        scrollViewport.scrollTop = scrollViewport.scrollHeight;
+      }
+    }
+  }, [chatMessages]);
+
+  const addMessage = (sender: ChatMessage['sender'], text?: string, response?: ChatMessage['response']) => {
+    setChatMessages(prev => [...prev, { id: Date.now().toString(), sender, text, response, timestamp: new Date() }]);
+  };
 
   const handleTextCommand = async () => {
     if (!inputText.trim()) return;
+    const commandText = inputText;
+    addMessage('user', commandText);
+    setInputText('');
     setIsLoading(true);
-    setAssistantResponse(null);
+
     try {
-      const response = await interpretTextCommands({ command: inputText });
-      setAssistantResponse(response);
-      toast({ title: "Comando Processado", description: `Ação: ${response.action}` });
+      const response = await interpretTextCommands({ command: commandText });
+      addMessage('assistant', undefined, response);
     } catch (error) {
       console.error("Error interpreting text command:", error);
+      addMessage('assistant', `Desculpe, ocorreu um erro ao processar: "${commandText}"`);
       toast({ title: "Erro", description: "Não foi possível processar o comando.", variant: "destructive" });
     }
     setIsLoading(false);
-    setInputText('');
   };
-  
+
   const handleVoiceCommand = async () => {
-    // This is a placeholder. Real voice input would require microphone access and Speech-to-Text.
-    // We'll use the current inputText as if it were a voice command.
     if (!inputText.trim()) {
-        toast({ title: "Comando de Voz", description: "Digite um comando para simular a voz.", variant: "default" });
+        toast({ title: "Comando de Voz", description: "Digite um comando no campo para simular a entrada de voz.", variant: "default" });
         return;
     }
+    const commandText = inputText;
+    addMessage('user', commandText);
+    setInputText(''); // Clear input after simulating voice command submission
     setIsLoading(true);
-    setAssistantResponse(null);
+
     try {
-      const response = await interpretVoiceCommand({ voiceCommand: inputText });
-      setAssistantResponse(response);
-      toast({ title: "Comando de Voz Processado", description: `Ação: ${response.action}` });
+      const response = await interpretVoiceCommand({ voiceCommand: commandText });
+      addMessage('assistant', undefined, response);
     } catch (error) {
       console.error("Error interpreting voice command:", error);
+      addMessage('assistant', `Desculpe, ocorreu um erro ao processar o comando de voz: "${commandText}"`);
       toast({ title: "Erro", description: "Não foi possível processar o comando de voz.", variant: "destructive" });
     }
     setIsLoading(false);
-    setInputText('');
   };
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader className="flex flex-row items-center gap-2">
-        <Bot className="h-6 w-6 text-primary" />
-        <div>
-          <CardTitle>Assistente Virtual</CardTitle>
-          <CardDescription>Use comandos de texto ou voz para navegar.</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <Input
-            type="text"
-            placeholder="Ex: 'Mostrar vendas do mês passado'"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleTextCommand()}
-            disabled={isLoading}
-          />
-          <Button onClick={handleTextCommand} disabled={isLoading} aria-label="Enviar comando de texto">
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-          <Button variant="outline" onClick={handleVoiceCommand} disabled={isLoading} aria-label="Enviar comando de voz (simulado)">
-            <Mic className="h-4 w-4" />
-          </Button>
-        </div>
-        {assistantResponse && (
-          <div className="mt-4 p-3 bg-muted rounded-md text-sm">
-            <p><strong>Ação Interpretada:</strong> {assistantResponse.action}</p>
-            {assistantResponse.parameters && Object.keys(assistantResponse.parameters).length > 0 && (
-              <p><strong>Parâmetros:</strong> {JSON.stringify(assistantResponse.parameters)}</p>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="w-full justify-start shadow-md hover:shadow-lg transition-shadow duration-200 text-base py-6">
+          <Bot className="mr-3 h-6 w-6 text-primary" />
+          Assistente Virtual
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl p-0 flex flex-col h-[80vh] max-h-[700px] min-h-[400px]">
+        <DialogHeader className="p-6 pb-4 border-b">
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Bot className="h-6 w-6 text-primary" /> Assistente Virtual
+          </DialogTitle>
+          <DialogDescription>
+            Use comandos de texto ou voz. Ex: 'Mostrar painel'.
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="flex-grow w-full p-6 pt-2" ref={scrollAreaRef}>
+          <div className="space-y-4 mb-4">
+            {chatMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-lg px-4 py-3 text-sm shadow ${
+                    msg.sender === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-card-foreground'
+                  }`}
+                >
+                  {msg.sender === 'user' && msg.text}
+                  {msg.sender === 'assistant' && msg.text && <p>{msg.text}</p>}
+                  {msg.sender === 'assistant' && msg.response && (
+                    <div>
+                      <p><strong>Ação:</strong> {msg.response.action}</p>
+                      {msg.response.parameters && Object.keys(msg.response.parameters).length > 0 && (
+                        <p className="break-all"><strong>Parâmetros:</strong> {JSON.stringify(msg.response.parameters)}</p>
+                      )}
+                    </div>
+                  )}
+                  <div className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-primary-foreground/80 text-right' : 'text-muted-foreground text-left'}`}>
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                 <div className="max-w-[75%] rounded-lg px-3 py-2 text-sm bg-muted text-card-foreground shadow">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                 </div>
+              </div>
             )}
           </div>
-        )}
-      </CardContent>
-      <CardFooter>
-        <p className="text-xs text-muted-foreground">
-          O assistente pode ajudar com navegação e busca de informações.
-        </p>
-      </CardFooter>
-    </Card>
+        </ScrollArea>
+
+        <div className="p-4 border-t bg-background">
+          <div className="flex gap-2 items-center">
+            <Input
+              type="text"
+              placeholder="Digite seu comando..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !isLoading && inputText.trim()) {
+                  handleTextCommand();
+                }
+              }}
+              disabled={isLoading}
+              className="flex-1 h-10 text-base"
+              aria-label="Entrada de comando"
+            />
+            <Button onClick={handleTextCommand} disabled={isLoading || !inputText.trim()} aria-label="Enviar comando de texto" size="icon" className="h-10 w-10">
+              <Send className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" onClick={handleVoiceCommand} disabled={isLoading} aria-label="Enviar comando de voz (simulado)" size="icon" className="h-10 w-10">
+              <Mic className="h-5 w-5" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            O assistente pode ajudar com navegação e busca de informações. Pressione Enter para enviar.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
