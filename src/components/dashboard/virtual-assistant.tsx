@@ -18,14 +18,18 @@ import { interpretTextCommands } from '@/ai/flows/interpret-text-commands';
 import { interpretVoiceCommand } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format, parseISO, isValid } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+// import { format, parseISO, isValid } from 'date-fns'; // Not directly used here, but useful for display if needed
+// import { ptBR } from 'date-fns/locale'; // Not directly used here
 
 // Import storage keys and types
-import { Transaction, STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
-import { ProductEntry, STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
-import { CreditEntry, STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page';
-import { CustomerEntry, STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page';
+import type { Transaction } from '@/app/(app)/dashboard/notebook/page'; // Type needed for query
+import { STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
+import type { ProductEntry } from '@/app/(app)/dashboard/products/page'; // Type needed for query
+import { STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
+import type { CreditEntry } from '@/app/(app)/dashboard/credit-notebook/page'; // Type needed for query
+import { STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page';
+import type { CustomerEntry } from '@/app/(app)/dashboard/customers/page'; // Type needed for query
+import { STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page';
 
 
 interface ChatMessage {
@@ -127,7 +131,7 @@ export function VirtualAssistant() {
   const speak = (textToSpeak: string) => {
     if (!supportedFeatures.speechSynthesis || !textToSpeak || isSpeaking) return;
 
-    speechSynthesis.cancel();
+    speechSynthesis.cancel(); // Cancel any ongoing speech
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'pt-BR';
     utterance.onstart = () => setIsSpeaking(true);
@@ -147,6 +151,13 @@ export function VirtualAssistant() {
   const executeActionAndSpeak = (action: string, parameters: any): string => {
     let navigationPath: string | null = null;
     let messageForChat: string = "Ação não reconhecida.";
+    const customerNameParam = parameters?.customerName || parameters?.nomeCliente || "";
+    const productNameParam = parameters?.productName || parameters?.nomeProduto || "";
+    const transactionType = parameters?.type || "";
+    const transactionDesc = parameters?.description || "";
+    const transactionAmount = parameters?.amount || "";
+    const whatsappNumberParam = parameters?.whatsappNumber || "";
+
 
     switch (action?.toLowerCase()) {
       // Navigation
@@ -182,7 +193,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/settings';
         messageForChat = "Certo, indo para as configurações.";
         break;
-      case 'navigatetotebook':
+      case 'navigatetotebook': // Corrected from 'navigatetotebook'
          navigationPath = '/dashboard/notebook';
          messageForChat = "Ok, abrindo a caderneta digital.";
          break;
@@ -191,7 +202,7 @@ export function VirtualAssistant() {
       case 'querytotalrevenue':
         try {
           const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
-          const transactions: Transaction[] = storedTransactions ? JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})) : [];
+          const transactions: Transaction[] = storedTransactions ? JSON.parse(storedTransactions) : [];
           const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
           messageForChat = `Sua receita total registrada na caderneta digital é de R$ ${totalIncome.toFixed(2)}.`;
         } catch (e) {
@@ -210,7 +221,7 @@ export function VirtualAssistant() {
       case 'querytotalduefiados':
         try {
           const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries).map((e: any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate) : undefined})) : [];
+          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries) : [];
           const totalDue = creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
           messageForChat = `O total pendente na caderneta de fiados é de R$ ${totalDue.toFixed(2)}.`;
         } catch (e) {
@@ -220,7 +231,7 @@ export function VirtualAssistant() {
       case 'querypendingfiadoscount':
         try {
           const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries).map((e: any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate) : undefined})) : [];
+          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries) : [];
           const pendingCount = creditEntries.filter(entry => !entry.paid).length;
           messageForChat = `Você tem ${pendingCount} fiados pendentes de pagamento.`;
         } catch (e) {
@@ -241,31 +252,71 @@ export function VirtualAssistant() {
         }
         break;
       
+      // Initiate Actions
+      case 'initiateaddcustomer':
+        navigationPath = '/dashboard/customers';
+        messageForChat = `Certo! Indo para a página de clientes. Clique em 'Adicionar Novo Cliente' para continuar.`;
+        if (customerNameParam) {
+          messageForChat += ` Você pode adicionar o cliente ${customerNameParam}.`;
+        }
+        break;
+      case 'initiateaddcreditentry':
+        navigationPath = '/dashboard/credit-notebook';
+        messageForChat = `Ok! Indo para a Caderneta de Fiados. Clique em 'Adicionar Novo Fiado' para registrar.`;
+        if (customerNameParam) {
+          messageForChat += ` Você pode registrar um fiado para ${customerNameParam}.`;
+        }
+        break;
+      case 'initiateaddtransaction':
+        navigationPath = '/dashboard/notebook';
+        messageForChat = `Entendido. Indo para a Caderneta Digital. Clique em 'Adicionar Transação'.`;
+        if (transactionType) {
+            messageForChat += ` Você pode registrar uma ${transactionType === 'income' ? 'receita' : 'despesa'}`;
+            if (transactionDesc) messageForChat += ` para "${transactionDesc}"`;
+            if (transactionAmount) messageForChat += ` no valor de R$ ${transactionAmount}`;
+            messageForChat += `.`;
+        }
+        break;
+      case 'initiateaddproduct':
+        navigationPath = '/dashboard/products';
+        messageForChat = `Certo! Indo para a página de Produtos. Clique em 'Adicionar Novo' para cadastrar.`;
+        if (productNameParam) {
+          messageForChat += ` Você pode cadastrar o produto ${productNameParam}.`;
+        }
+        break;
+      case 'initiatesendmonthlyreport':
+        navigationPath = '/dashboard/monthly-report';
+        messageForChat = `Ok! Indo para a página de Relatório Mensal.`;
+        if (whatsappNumberParam) {
+            messageForChat += ` Você pode inserir o número ${whatsappNumberParam} e clicar em 'Gerar e Enviar Relatório para WhatsApp'.`;
+        } else {
+            messageForChat += ` Por favor, insira o número de WhatsApp e clique em 'Gerar e Enviar Relatório para WhatsApp'.`;
+        }
+        break;
+
       // Legacy/General
-      case 'displaykpis': // This could be made more specific by querying dashboard data elements too
+      case 'displaykpis':
         messageForChat = "Os principais indicadores (KPIs) são exibidos no Painel Central. Estou te levando para lá!";
         navigationPath = '/dashboard';
         break;
-      case 'showsakes': // from text commands, mapped to navigateToSalesRecord
+      case 'showsakes': 
         navigationPath = '/dashboard/sales-record';
         messageForChat = "Ok, abrindo o histórico de vendas.";
         break;
-      case 'gotocustomeraccounts': // from text commands, mapped to navigateToCustomers
+      case 'gotocustomeraccounts': 
         navigationPath = '/dashboard/customers';
         messageForChat = "Certo, indo para as contas de clientes.";
         break;
-
       case 'createnewinvoice':
         messageForChat = "Entendido! A funcionalidade de criar nova fatura ainda está em desenvolvimento.";
         break;
       case 'viewcustomerdetails':
-        const customerNameParam = parameters?.customerName || parameters?.name || 'um cliente específico';
-        messageForChat = `Entendido! Para ver detalhes do cliente ${customerNameParam}, por favor, vá para a seção Contas de Clientes e utilize a busca.`;
+        messageForChat = `Para ver detalhes do cliente ${customerNameParam || 'específico'}, por favor, vá para a seção Contas de Clientes e utilize a busca.`;
         navigationPath = '/dashboard/customers';
         break;
       case 'searchtransactions':
         const searchTerm = parameters?.term || 'algo específico';
-        messageForChat = `Entendido! Para buscar transações por '${searchTerm}', por favor, vá para a Caderneta Digital. A busca detalhada lá ainda está em desenvolvimento.`;
+        messageForChat = `Para buscar transações por '${searchTerm}', por favor, vá para a Caderneta Digital. A busca detalhada lá ainda está em desenvolvimento.`;
         navigationPath = '/dashboard/notebook';
         break;
 
@@ -285,7 +336,7 @@ export function VirtualAssistant() {
 
     if (navigationPath) {
       router.push(navigationPath);
-      setIsDialogOpen(false); 
+      // setIsDialogOpen(false); // Keep dialog open for continuity unless specifically closed by user or explicit action
     }
     return messageForChat;
   };
@@ -359,9 +410,11 @@ export function VirtualAssistant() {
       setIsDialogOpen(open);
       if (!open && recognition && isListening) {
         recognition.stop();
+        setIsListening(false);
       }
       if (!open && window.speechSynthesis && isSpeaking) {
         window.speechSynthesis.cancel();
+        setIsSpeaking(false);
       }
     }}>
       <DialogTrigger asChild>
@@ -373,12 +426,12 @@ export function VirtualAssistant() {
       <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl p-0 flex flex-col h-[80vh] max-h-[700px] min-h-[400px]">
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Bot className="h-6 w-6 text-primary" /> Assistente Virtual
+            <Bot className="h-6 w-6 text-primary" /> Assistente Virtual MoneyWise
           </DialogTitle>
           <DialogDescription>
-            Use comandos de texto ou voz. Ex: 'Mostrar painel', 'Qual minha receita total?'.
-            {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs">Reconhecimento de voz não suportado.</span>}
-            {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs">Síntese de voz não suportada.</span>}
+            Use comandos de texto ou voz. Ex: 'Abrir painel', 'Adicionar cliente Maria', 'Qual minha receita?'.
+            {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs">Reconhecimento de voz não suportado neste navegador.</span>}
+            {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs">Síntese de voz não suportada neste navegador.</span>}
           </DialogDescription>
         </DialogHeader>
 
@@ -396,7 +449,7 @@ export function VirtualAssistant() {
                       : 'bg-muted text-card-foreground'
                   }`}
                 >
-                  {msg.text && <p>{msg.text}</p>}
+                  {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
                   <div className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-primary-foreground/80 text-right' : 'text-muted-foreground text-left'}`}>
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
@@ -413,7 +466,7 @@ export function VirtualAssistant() {
              {isListening && userInputForVoice && ( 
               <div className="flex justify-end">
                 <div className="max-w-[80%] rounded-lg px-4 py-3 text-sm shadow bg-primary/80 text-primary-foreground italic">
-                  <p>🎤: {userInputForVoice}...</p>
+                  <p className="whitespace-pre-wrap">🎤: {userInputForVoice}...</p>
                 </div>
               </div>
             )}
@@ -439,16 +492,18 @@ export function VirtualAssistant() {
             <Button onClick={handleTextCommand} disabled={isLoading || !inputText.trim() || isListening} aria-label="Enviar comando de texto" size="icon" className="h-10 w-10">
               <Send className="h-5 w-5" />
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleToggleListening} 
-              disabled={isLoading || !supportedFeatures.speechRecognition || isSpeaking} 
-              aria-label={isListening ? "Parar de ouvir" : "Começar a ouvir"} 
-              size="icon" 
-              className={`h-10 w-10 ${isListening ? 'border-destructive text-destructive hover:bg-destructive/10' : ''}`}
-            >
-              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            </Button>
+            {supportedFeatures.speechRecognition && (
+              <Button 
+                variant="outline" 
+                onClick={handleToggleListening} 
+                disabled={isLoading || isSpeaking} 
+                aria-label={isListening ? "Parar de ouvir" : "Começar a ouvir"} 
+                size="icon" 
+                className={`h-10 w-10 ${isListening ? 'border-destructive text-destructive hover:bg-destructive/10' : ''}`}
+              >
+                {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              </Button>
+            )}
              {isSpeaking && <Volume2 className="h-5 w-5 text-primary animate-pulse" />}
           </div>
            <p className="text-xs text-muted-foreground mt-2 text-center">
