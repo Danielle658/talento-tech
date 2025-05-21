@@ -1,14 +1,16 @@
 
 "use client";
 
-import { useState, useMemo, ChangeEvent } from "react";
+import { useState, useMemo, ChangeEvent, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -37,13 +39,17 @@ export default function SalesPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [amountPaidInput, setAmountPaidInput] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string | undefined>(undefined);
+  const [isCameraScanDialogOpen, setIsCameraScanDialogOpen] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraScannedCode, setCameraScannedCode] = useState("");
 
-  const handleAddProductToCart = () => {
-    if (!productCodeInput.trim()) {
+  const addProductToCartByCode = (code: string) => {
+    if (!code.trim()) {
       toast({ title: "Código Inválido", description: "Por favor, insira um código de produto.", variant: "destructive" });
-      return;
+      return false;
     }
-    const product = sampleProducts.find(p => p.code === productCodeInput.trim());
+    const product = sampleProducts.find(p => p.code === code.trim());
     if (product) {
       setCart(prevCart => {
         const existingItem = prevCart.find(item => item.id === product.id);
@@ -55,11 +61,56 @@ export default function SalesPage() {
         return [...prevCart, { ...product, quantity: 1 }];
       });
       toast({ title: "Produto Adicionado", description: `${product.name} foi adicionado ao carrinho.`, className: "bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-700" });
-      setProductCodeInput("");
+      return true;
     } else {
-      toast({ title: "Produto não encontrado", description: `Nenhum produto encontrado com o código ${productCodeInput}.`, variant: "destructive" });
+      toast({ title: "Produto não encontrado", description: `Nenhum produto encontrado com o código ${code}.`, variant: "destructive" });
+      return false;
     }
   };
+
+  const handleAddProductFromInput = () => {
+    if (addProductToCartByCode(productCodeInput)) {
+      setProductCodeInput("");
+    }
+  };
+  
+  const handleAddProductFromCameraDialog = () => {
+    if (addProductToCartByCode(cameraScannedCode)) {
+      setCameraScannedCode("");
+      setIsCameraScanDialogOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isCameraScanDialogOpen) {
+      const getCameraPermission = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setHasCameraPermission(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Acesso à Câmera Negado',
+            description: 'Por favor, habilite a permissão da câmera nas configurações do seu navegador para usar esta funcionalidade.',
+          });
+        }
+      };
+      getCameraPermission();
+
+      return () => { // Cleanup: stop video stream when dialog closes
+        if (videoRef.current && videoRef.current.srcObject) {
+          const stream = videoRef.current.srcObject as MediaStream;
+          stream.getTracks().forEach(track => track.stop());
+        }
+      };
+    }
+  }, [isCameraScanDialogOpen, toast]);
+
 
   const handleUpdateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -91,11 +142,11 @@ export default function SalesPage() {
   }, [amountPaidInput]);
   
   const changeDue = useMemo(() => {
-    if (amountPaid >= cartTotal) {
+    if (amountPaid >= cartTotal && cart.length > 0) { // Ensure cart is not empty for change calculation
       return amountPaid - cartTotal;
     }
     return 0; 
-  }, [amountPaid, cartTotal]);
+  }, [amountPaid, cartTotal, cart.length]);
 
   const handleFinalizeSale = () => {
     if (cart.length === 0) {
@@ -106,12 +157,11 @@ export default function SalesPage() {
       toast({ title: "Forma de Pagamento", description: "Selecione uma forma de pagamento.", variant: "destructive" });
       return;
     }
-    if (amountPaid < cartTotal) {
+    if (amountPaid < cartTotal && paymentMethod === "Dinheiro") { // Only enforce if payment method requires exact or more
       toast({ title: "Valor Insuficiente", description: "O valor pago é menor que o total da compra.", variant: "destructive" });
       return;
     }
 
-    // Here you would typically send data to a backend
     console.log("Venda Finalizada:", {
       cart,
       cartTotal,
@@ -122,7 +172,7 @@ export default function SalesPage() {
 
     toast({
       title: "Venda Finalizada!",
-      description: `Venda de R$ ${cartTotal.toFixed(2)} paga com ${paymentMethod}. Troco: R$ ${changeDue.toFixed(2)}.`,
+      description: `Venda de R$ ${cartTotal.toFixed(2)} paga com ${paymentMethod}. ${paymentMethod === "Dinheiro" ? `Troco: R$ ${changeDue.toFixed(2)}.` : ''}`,
       className: "bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-700"
     });
 
@@ -157,10 +207,54 @@ export default function SalesPage() {
                     placeholder="Digite ou escaneie o código"
                     value={productCodeInput}
                     onChange={(e) => setProductCodeInput(e.target.value)}
-                    onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductToCart(); }}
+                    onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductFromInput(); }}
                   />
                 </div>
-                <Button onClick={handleAddProductToCart} size="lg">Adicionar</Button>
+                <Button onClick={handleAddProductFromInput} className="px-4">Adicionar</Button>
+                <Dialog open={isCameraScanDialogOpen} onOpenChange={setIsCameraScanDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon" title="Escanear com Câmera">
+                      <Camera className="h-5 w-5" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Escanear Código de Barras</DialogTitle>
+                      <DialogDescription>
+                        Aponte a câmera para o código de barras do produto.
+                        Ou digite o código abaixo se a leitura falhar.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="w-full aspect-video bg-muted rounded-md overflow-hidden flex items-center justify-center">
+                         <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                        </div>
+                        {hasCameraPermission === false && (
+                            <Alert variant="destructive">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Acesso à Câmera Negado</AlertTitle>
+                                <AlertDescription>
+                                Habilite a permissão da câmera para escanear.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                         <Input
+                            placeholder="Ou digite o código aqui..."
+                            value={cameraScannedCode}
+                            onChange={(e) => setCameraScannedCode(e.target.value)}
+                            onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductFromCameraDialog();}}
+                            disabled={hasCameraPermission === null}
+                        />
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline">Cancelar</Button>
+                      </DialogClose>
+                      <Button type="button" onClick={handleAddProductFromCameraDialog} disabled={!cameraScannedCode.trim()}>Adicionar do Scanner</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
               </CardContent>
             </Card>
 
@@ -245,7 +339,7 @@ export default function SalesPage() {
                 
                 <div>
                   <Label htmlFor="paymentMethod">Forma de Pagamento</Label>
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={cart.length === 0}>
                     <SelectTrigger id="paymentMethod">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
@@ -267,14 +361,14 @@ export default function SalesPage() {
                     value={amountPaidInput}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
                         const value = e.target.value;
-                        // Allow only numbers and one comma
                         if (/^[0-9]*[,]?[0-9]{0,2}$/.test(value) || value === "") {
                             setAmountPaidInput(value);
                         }
                     }}
-                    className={cn(amountPaid < cartTotal && cart.length > 0 && amountPaidInput !== "" && "border-destructive focus-visible:ring-destructive")}
+                    className={cn(paymentMethod === "Dinheiro" && amountPaid < cartTotal && cart.length > 0 && amountPaidInput !== "" && "border-destructive focus-visible:ring-destructive")}
+                    disabled={cart.length === 0 || !paymentMethod || paymentMethod !== "Dinheiro"}
                   />
-                  {amountPaid < cartTotal && cart.length > 0 && amountPaidInput !== "" && (
+                  {paymentMethod === "Dinheiro" && amountPaid < cartTotal && cart.length > 0 && amountPaidInput !== "" && (
                      <p className="text-xs text-destructive mt-1 flex items-center gap-1"><AlertTriangle className="h-3 w-3"/> Valor menor que o total.</p>
                   )}
                 </div>
@@ -282,7 +376,7 @@ export default function SalesPage() {
                 <div>
                   <Label className="text-sm text-muted-foreground">Troco</Label>
                   <p className={cn("text-2xl font-semibold", changeDue > 0 ? "text-green-600" : "text-muted-foreground")}>
-                    R$ {changeDue.toFixed(2)}
+                    R$ {paymentMethod === "Dinheiro" ? changeDue.toFixed(2) : "0.00"}
                   </p>
                 </div>
               </CardContent>
@@ -291,7 +385,7 @@ export default function SalesPage() {
                     onClick={handleFinalizeSale} 
                     className="w-full text-lg py-6" 
                     size="lg"
-                    disabled={cart.length === 0 || !paymentMethod || amountPaid < cartTotal}
+                    disabled={cart.length === 0 || !paymentMethod || (paymentMethod === "Dinheiro" && amountPaid < cartTotal)}
                 >
                   <CheckCircle className="mr-2 h-5 w-5"/> Finalizar Venda
                 </Button>
@@ -303,3 +397,7 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    
+
+    
