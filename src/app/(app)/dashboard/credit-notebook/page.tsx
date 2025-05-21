@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2 } from "lucide-react";
+import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -32,7 +32,7 @@ const creditEntrySchema = z.object({
   notes: z.string().optional(),
 });
 
-type CreditEntryFormValues = z.infer<typeof creditEntrySchema>;
+export type CreditEntryFormValues = z.infer<typeof creditEntrySchema>;
 
 export interface CreditEntry extends CreditEntryFormValues {
   id: string;
@@ -40,7 +40,7 @@ export interface CreditEntry extends CreditEntryFormValues {
   paymentDate?: string; // Store as ISO string for localStorage
 }
 
-const STORAGE_KEY = "moneywise-creditEntries";
+export const STORAGE_KEY_CREDIT_NOTEBOOK = "moneywise-creditEntries";
 
 export default function CreditNotebookPage() {
   const { toast } = useToast();
@@ -50,7 +50,7 @@ export default function CreditNotebookPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    const storedEntries = localStorage.getItem(STORAGE_KEY);
+    const storedEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
     if (storedEntries) {
       try {
         const parsedEntries: CreditEntry[] = JSON.parse(storedEntries).map((entry: any) => ({
@@ -59,17 +59,17 @@ export default function CreditNotebookPage() {
           dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
           // paymentDate remains a string, or parse if needed for display logic immediately
         }));
-        setCreditEntries(parsedEntries);
+        setCreditEntries(parsedEntries.sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
       } catch (error) {
         console.error("Failed to parse credit entries from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY); // Clear corrupted data
+        localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); // Clear corrupted data
       }
     }
   }, []);
 
   useEffect(() => {
     if (isMounted) { // Only save to localStorage after initial mount & load
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(creditEntries.map(entry => ({
+      localStorage.setItem(STORAGE_KEY_CREDIT_NOTEBOOK, JSON.stringify(creditEntries.map(entry => ({
         ...entry,
         saleDate: entry.saleDate.toISOString(), // Store dates as ISO strings
         dueDate: entry.dueDate ? entry.dueDate.toISOString() : undefined,
@@ -95,7 +95,7 @@ export default function CreditNotebookPage() {
       id: `CF${String(Date.now()).slice(-6)}`, // More unique ID
       paid: false,
     };
-    setCreditEntries(prev => [newEntry, ...prev].sort((a,b) => b.saleDate.getTime() - a.saleDate.getTime()));
+    setCreditEntries(prev => [newEntry, ...prev].sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
     toast({
       title: "Fiado Registrado!",
       description: `Nova venda a prazo para ${data.customerName} no valor de R$ ${data.amount.toFixed(2)} registrada.`,
@@ -211,7 +211,7 @@ export default function CreditNotebookPage() {
   }, [creditEntries, isMounted]);
 
   if (!isMounted) {
-    return <div className="flex justify-center items-center h-screen"><PlusCircle className="h-8 w-8 animate-spin text-primary" /></div>; // Or a proper skeleton loader
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return (

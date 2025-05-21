@@ -8,23 +8,17 @@ import { DollarSign, Users, FileText, Archive, BarChartBig, TrendingUp, AlertCir
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link'; // Added import for Link
+import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Transaction, STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
 import { ProductEntry, STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
 import { SalesRecordEntry, STORAGE_KEY_SALES_RECORD } from '@/app/(app)/dashboard/sales-record/page';
+import { CreditEntry, STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page.tsx';
+import { CustomerEntry, STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page.tsx';
 import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-
-
-const kpis = [
-  { title: "Receita Total", value: "R$ 45.231,89", icon: DollarSign, description: "+20.1% do último mês" },
-  { title: "Novos Clientes", value: "+230", icon: Users, description: "+180.1% do último mês" },
-  { title: "Faturas Pendentes", value: "12", icon: FileText, description: "R$ 12.580,00" },
-  { title: "Produtos em Estoque Baixo", value: "5", icon: Archive, description: "Reposição necessária" },
-];
 
 interface DisplayTransaction {
   id: string;
@@ -43,19 +37,23 @@ interface DisplayProduct {
   stock: string | number;
 }
 
-
-const placeholderNotifications = [
-  { id: 'notif1', icon: DollarSign, iconBg: 'bg-green-100 dark:bg-green-700/30', iconColor: 'text-green-600 dark:text-green-400', title: 'Nova venda de R$ 150,00 registrada.', time: '2 minutos atrás' },
-  { id: 'notif2', icon: AlertTriangle, iconBg: 'bg-yellow-100 dark:bg-yellow-700/30', iconColor: 'text-yellow-600 dark:text-yellow-400', title: 'Produto "Cabo USB-C" com estoque baixo (2 unidades).', time: '1 hora atrás' },
-  { id: 'notif3', icon: FileClock, iconBg: 'bg-red-100 dark:bg-red-700/30', iconColor: 'text-red-600 dark:text-red-400', title: 'Fatura #F2300 para "Empresa Sol" vence amanhã.', time: '1 dia atrás' },
+const kpiConfigurations = [
+  { id: "totalRevenue", title: "Receita Total", icon: DollarSign, defaultDescription: "Calculando..." },
+  { id: "totalCustomers", title: "Total de Clientes", icon: Users, defaultDescription: "Aguardando dados" },
+  { id: "pendingInvoices", title: "Faturas Pendentes", icon: FileText, defaultDescription: "R$ 0,00" },
+  { id: "lowStockProducts", title: "Estoque Baixo", icon: Archive, defaultDescription: "Aguardando dados" },
 ];
 
+const placeholderNotifications: any[] = []; // Cleared placeholder notifications
 
 export default function DashboardPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [allSalesRecords, setAllSalesRecords] = useState<SalesRecordEntry[]>([]);
   const [productCatalog, setProductCatalog] = useState<ProductEntry[]>([]);
+  const [allCreditEntries, setAllCreditEntries] = useState<CreditEntry[]>([]);
+  const [allCustomers, setAllCustomers] = useState<CustomerEntry[]>([]);
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -88,6 +86,29 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error("Error loading product catalog from localStorage", error);
+      }
+
+      try {
+        const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+        if (storedCreditEntries) {
+          const parsedEntries: CreditEntry[] = JSON.parse(storedCreditEntries).map((entry: any) => ({
+            ...entry,
+            saleDate: parseISO(entry.saleDate),
+            dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
+          }));
+          setAllCreditEntries(parsedEntries);
+        }
+      } catch (error) {
+        console.error("Error loading credit entries from localStorage", error);
+      }
+
+      try {
+        const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
+        if (storedCustomers) {
+          setAllCustomers(JSON.parse(storedCustomers));
+        }
+      } catch (error) {
+        console.error("Error loading customers from localStorage", error);
       }
     }
   }, [isMounted]);
@@ -156,6 +177,53 @@ export default function DashboardPage() {
     return [];
   }, [isMounted, allSalesRecords, productCatalog]);
 
+  // Dynamic KPI Calculations
+  const totalRevenueKPI = useMemo(() => {
+    if (!isMounted || !allTransactions) return { value: "R$ 0,00", description: "Calculando..." };
+    const income = allTransactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    return { value: `R$ ${income.toFixed(2)}`, description: allTransactions.length > 0 ? `Baseado em ${allTransactions.filter(t=>t.type === 'income').length} receitas` : "Nenhuma receita registrada" };
+  }, [isMounted, allTransactions]);
+
+  const totalCustomersKPI = useMemo(() => {
+    if (!isMounted || !allCustomers) return { value: "0", description: "Aguardando dados" };
+    return { value: `${allCustomers.length}`, description: "Total de clientes cadastrados" };
+  }, [isMounted, allCustomers]);
+
+  const pendingInvoicesKPI = useMemo(() => {
+    if (!isMounted || !allCreditEntries) return { count: "0", amount: "R$ 0,00" };
+    const pending = allCreditEntries.filter(entry => !entry.paid && isValid(entry.saleDate));
+    const totalDue = pending.reduce((sum, entry) => sum + entry.amount, 0);
+    return { count: `${pending.length}`, amount: `R$ ${totalDue.toFixed(2)}` };
+  }, [isMounted, allCreditEntries]);
+
+  const lowStockThreshold = 5;
+  const lowStockProductsKPI = useMemo(() => {
+    if (!isMounted || !productCatalog) return { value: "0", description: "Aguardando dados do catálogo" };
+    const lowStockCount = productCatalog.filter(p => {
+      const stockNumber = parseInt(p.stock || "0", 10);
+      return !isNaN(stockNumber) && stockNumber <= lowStockThreshold && stockNumber > 0;
+    }).length;
+    return { value: `${lowStockCount}`, description: `Produtos com ${lowStockThreshold} ou menos unidades` };
+  }, [isMounted, productCatalog]);
+
+  const dynamicKpis = kpiConfigurations.map(kpiConfig => {
+    switch (kpiConfig.id) {
+      case 'totalRevenue':
+        return { ...kpiConfig, value: totalRevenueKPI.value, description: totalRevenueKPI.description };
+      case 'totalCustomers':
+        return { ...kpiConfig, value: totalCustomersKPI.value, description: totalCustomersKPI.description };
+      case 'pendingInvoices':
+        return { ...kpiConfig, value: pendingInvoicesKPI.count, description: `${pendingInvoicesKPI.count} pendentes (${pendingInvoicesKPI.amount})` };
+      case 'lowStockProducts':
+        return { ...kpiConfig, value: lowStockProductsKPI.value, description: lowStockProductsKPI.description };
+      default:
+        return { ...kpiConfig, value: "N/A", description: "Erro" };
+    }
+  });
+
+
   if (!isMounted) {
     return (
       <div className="flex h-[calc(100vh-8rem)] w-full items-center justify-center">
@@ -175,8 +243,8 @@ export default function DashboardPage() {
 
       {/* KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {kpis.map((kpi) => (
-          <KpiCard key={kpi.title} {...kpi} />
+        {dynamicKpis.map((kpi) => (
+          <KpiCard key={kpi.title} title={kpi.title} value={kpi.value} icon={kpi.icon} description={kpi.description} />
         ))}
       </div>
 
@@ -302,12 +370,8 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <p className="text-sm">Novos clientes este mês</p>
-                    <p className="text-sm font-semibold">+15</p> {/* Placeholder */}
-                </div>
-                <div className="flex items-center justify-between">
-                    <p className="text-sm">Clientes ativos</p>
-                    <p className="text-sm font-semibold">128</p> {/* Placeholder */}
+                    <p className="text-sm">Total de clientes</p>
+                    <p className="text-sm font-semibold">{totalCustomersKPI.value}</p>
                 </div>
                  <Button className="w-full mt-2" variant="outline" asChild><Link href="/dashboard/customers">Gerenciar Clientes</Link></Button>
             </CardContent>
@@ -318,10 +382,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-    
-
-    
-
-    
