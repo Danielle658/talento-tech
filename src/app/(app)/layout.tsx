@@ -14,23 +14,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+// Sheet components are not directly used here anymore for sidebar, but Sidebar component might use them internally if needed.
+// import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; 
 import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
   SidebarContent,
   SidebarFooter,
-  SidebarTrigger,
+  SidebarTrigger, // Keep this for controlling the sidebar
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
+  // SidebarMenuSub,
+  // SidebarMenuSubItem,
+  // SidebarMenuSubButton,
   SidebarInset,
-  SidebarGroup,
-  SidebarGroupLabel
+  // SidebarGroup,
+  // SidebarGroupLabel
 } from "@/components/ui/sidebar";
 import { Logo } from '@/components/shared/logo';
 import Link from 'next/link';
@@ -47,8 +48,8 @@ import {
   UserCircle,
   LifeBuoy,
   Loader2,
-  Bot,
-  PanelLeft
+  // Bot, // Not used here
+  PanelLeft // Icon for SidebarTrigger
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
 
@@ -123,19 +124,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset>
           <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
-            <div className="md:hidden">
-              <SidebarTrigger><PanelLeft /></SidebarTrigger>
-            </div>
-            <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
-              <form className="ml-auto flex-1 sm:flex-initial">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Pesquisar..."
-                    className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
-                  />
-                </div>
+            {/* SidebarTrigger now visible on all screen sizes */}
+            <SidebarTrigger>
+              <PanelLeft className="h-5 w-5" />
+              <span className="sr-only">Alternar menu</span>
+            </SidebarTrigger>
+            
+            {/* Search, Bell, User Menu - adjusted for flex layout */}
+            <div className="flex flex-1 items-center justify-end gap-2 md:gap-4">
+              <form className="relative flex-1 sm:flex-initial max-w-xs md:max-w-sm lg:max-w-md">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Pesquisar..."
+                  className="pl-8 w-full"
+                />
               </form>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Bell className="h-5 w-5" />

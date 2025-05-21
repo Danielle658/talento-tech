@@ -44,15 +44,15 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Sidebar specific variables */
-    --sidebar-background: 220 15% 15%; /* Dark Blueish Gray */
-    --sidebar-foreground: 220 15% 85%; /* Light Gray text */
-    --sidebar-primary: 46 70% 49%; /* Gold for active/highlighted items */
-    --sidebar-primary-foreground: 46 70% 5%; /* Dark text on Gold */
-    --sidebar-accent: 220 15% 25%; /* Hover background */
-    --sidebar-accent-foreground: 220 15% 95%; /* Hover text */
-    --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 46 70% 49%; /* Gold for focus rings in sidebar */
+    /* Sidebar specific variables - Aligned with main theme */
+    --sidebar-background: 60 56% 91%; /* Mapped to --background */
+    --sidebar-foreground: 0 0% 10%;    /* Mapped to --foreground */
+    --sidebar-primary: 80 25% 48%;      /* Mapped to --primary */
+    --sidebar-primary-foreground: 80 25% 95%; /* Mapped to --primary-foreground */
+    --sidebar-accent: 80 25% 48%;        /* Mapped to --primary for active/hover */
+    --sidebar-accent-foreground: 80 25% 95%; /* Mapped to --primary-foreground for active/hover */
+    --sidebar-border: 60 20% 80%;      /* Mapped to --border */
+    --sidebar-ring: 80 25% 48%;        /* Mapped to --ring */
   }
 
   .dark {
@@ -84,15 +84,15 @@ body {
     --input: 0 0% 20%;
     --ring: 80 25% 55%;
 
-    /* Sidebar specific variables for dark mode */
-    --sidebar-background: 0 0% 8%; /* Even darker for sidebar */
-    --sidebar-foreground: 0 0% 80%; 
-    --sidebar-primary: 46 70% 55%; 
-    --sidebar-primary-foreground: 46 70% 95%;
-    --sidebar-accent: 0 0% 18%; 
-    --sidebar-accent-foreground: 0 0% 90%;
-    --sidebar-border: 0 0% 12%;
-    --sidebar-ring: 46 70% 55%;
+    /* Sidebar specific variables for dark mode - Aligned with main theme */
+    --sidebar-background: 0 0% 10%;   /* Mapped to --background */
+    --sidebar-foreground: 0 0% 90%;   /* Mapped to --foreground */
+    --sidebar-primary: 80 25% 55%;     /* Mapped to --primary */
+    --sidebar-primary-foreground: 80 25% 15%; /* Mapped to --primary-foreground */
+    --sidebar-accent: 80 25% 55%;       /* Mapped to --primary for active/hover */
+    --sidebar-accent-foreground: 80 25% 15%; /* Mapped to --primary-foreground for active/hover */
+    --sidebar-border: 0 0% 30%;       /* Mapped to --border */
+    --sidebar-ring: 80 25% 55%;       /* Mapped to --ring */
   }
 }
 
