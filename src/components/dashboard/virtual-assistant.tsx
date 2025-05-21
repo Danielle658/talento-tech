@@ -14,10 +14,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Bot, Mic, Send, Loader2, Volume2, MicOff } from 'lucide-react';
-import { interpretTextCommands, InterpretTextCommandsOutput } from '@/ai/flows/interpret-text-commands';
-import { interpretVoiceCommand, InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands';
+import { interpretTextCommands } from '@/ai/flows/interpret-text-commands';
+import { interpretVoiceCommand } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, parseISO, isValid } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+// Import storage keys and types
+import { Transaction, STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
+import { ProductEntry, STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
+import { CreditEntry, STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page';
+import { CustomerEntry, STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page';
+
 
 interface ChatMessage {
   id: string;
@@ -30,6 +39,8 @@ interface BrowserSupport {
   speechRecognition: boolean;
   speechSynthesis: boolean;
 }
+
+const LOW_STOCK_THRESHOLD = 5;
 
 export function VirtualAssistant() {
   const [inputText, setInputText] = useState('');
@@ -76,7 +87,7 @@ export function VirtualAssistant() {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        setUserInputForVoice(finalTranscript || interimTranscript); // Update visual feedback
+        setUserInputForVoice(finalTranscript || interimTranscript); 
         if (finalTranscript) {
           processSpokenCommand(finalTranscript);
         }
@@ -101,17 +112,8 @@ export function VirtualAssistant() {
       };
       setRecognition(recognitionInstance);
     }
-
-    return () => {
-      if (recognition) {
-        recognition.abort();
-      }
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, []); 
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -147,36 +149,126 @@ export function VirtualAssistant() {
     let messageForChat: string = "Ação não reconhecida.";
 
     switch (action?.toLowerCase()) {
-      case 'showsales':
-        navigationPath = '/dashboard/sales-record';
-        messageForChat = "Ok, abrindo o histórico de vendas.";
+      // Navigation
+      case 'navigatetodashboard':
+        navigationPath = '/dashboard';
+        messageForChat = "Ok, abrindo o painel central.";
         break;
-      case 'gotocustomeraccounts':
+      case 'navigatetocustomers':
         navigationPath = '/dashboard/customers';
         messageForChat = "Certo, indo para as contas de clientes.";
         break;
-      case 'navigatetodashboard':
-        navigationPath = '/dashboard';
-        messageForChat = "Redirecionando para o painel central.";
+      case 'navigatetosales': // PDV
+        navigationPath = '/dashboard/sales';
+        messageForChat = "Entendido. Abrindo o Ponto de Venda.";
         break;
-      case 'generatereport':
+      case 'navigatetoproducts':
+        navigationPath = '/dashboard/products';
+        messageForChat = "Ok, abrindo o catálogo de produtos.";
+        break;
+      case 'navigatetocreditnotebook':
+        navigationPath = '/dashboard/credit-notebook';
+        messageForChat = "Certo, indo para a caderneta de fiados.";
+        break;
+      case 'navigatetosalesrecord':
+        navigationPath = '/dashboard/sales-record';
+        messageForChat = "Entendido. Abrindo o histórico de vendas.";
+        break;
+      case 'navigatetomonthlyreport':
         navigationPath = '/dashboard/monthly-report';
-        messageForChat = "Entendido. Abrindo a página de relatório mensal.";
+        messageForChat = "Ok, abrindo a página de relatório mensal.";
         break;
-      case 'displaykpis':
-        messageForChat = "Entendido! Os KPIs são exibidos no painel principal.";
+      case 'navigatetosettings':
+        navigationPath = '/dashboard/settings';
+        messageForChat = "Certo, indo para as configurações.";
         break;
+      case 'navigatetotebook':
+         navigationPath = '/dashboard/notebook';
+         messageForChat = "Ok, abrindo a caderneta digital.";
+         break;
+
+      // Data Queries
+      case 'querytotalrevenue':
+        try {
+          const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
+          const transactions: Transaction[] = storedTransactions ? JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})) : [];
+          const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+          messageForChat = `Sua receita total registrada na caderneta digital é de R$ ${totalIncome.toFixed(2)}.`;
+        } catch (e) {
+          messageForChat = "Desculpe, não consegui calcular a receita total. Verifique os dados na Caderneta Digital.";
+        }
+        break;
+      case 'querytotalcustomers':
+        try {
+          const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
+          const customers: CustomerEntry[] = storedCustomers ? JSON.parse(storedCustomers) : [];
+          messageForChat = `Você tem ${customers.length} clientes cadastrados.`;
+        } catch (e) {
+          messageForChat = "Desculpe, não consegui contar os clientes. Verifique os dados em Contas de Clientes.";
+        }
+        break;
+      case 'querytotalduefiados':
+        try {
+          const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries).map((e: any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate) : undefined})) : [];
+          const totalDue = creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
+          messageForChat = `O total pendente na caderneta de fiados é de R$ ${totalDue.toFixed(2)}.`;
+        } catch (e) {
+          messageForChat = "Desculpe, não consegui calcular o total de fiados. Verifique os dados na Caderneta de Fiados.";
+        }
+        break;
+      case 'querypendingfiadoscount':
+        try {
+          const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries).map((e: any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate) : undefined})) : [];
+          const pendingCount = creditEntries.filter(entry => !entry.paid).length;
+          messageForChat = `Você tem ${pendingCount} fiados pendentes de pagamento.`;
+        } catch (e) {
+          messageForChat = "Desculpe, não consegui contar os fiados pendentes.";
+        }
+        break;
+      case 'querylowstockproductscount':
+        try {
+          const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
+          const products: ProductEntry[] = storedProducts ? JSON.parse(storedProducts) : [];
+          const lowStockCount = products.filter(p => {
+            const stockNumber = parseInt(p.stock || "0", 10);
+            return !isNaN(stockNumber) && stockNumber > 0 && stockNumber <= LOW_STOCK_THRESHOLD;
+          }).length;
+          messageForChat = `Você tem ${lowStockCount} produtos com estoque baixo (igual ou inferior a ${LOW_STOCK_THRESHOLD} unidades).`;
+        } catch (e) {
+          messageForChat = "Desculpe, não consegui verificar o estoque dos produtos.";
+        }
+        break;
+      
+      // Legacy/General
+      case 'displaykpis': // This could be made more specific by querying dashboard data elements too
+        messageForChat = "Os principais indicadores (KPIs) são exibidos no Painel Central. Estou te levando para lá!";
+        navigationPath = '/dashboard';
+        break;
+      case 'showsakes': // from text commands, mapped to navigateToSalesRecord
+        navigationPath = '/dashboard/sales-record';
+        messageForChat = "Ok, abrindo o histórico de vendas.";
+        break;
+      case 'gotocustomeraccounts': // from text commands, mapped to navigateToCustomers
+        navigationPath = '/dashboard/customers';
+        messageForChat = "Certo, indo para as contas de clientes.";
+        break;
+
       case 'createnewinvoice':
-        messageForChat = "Entendido! Simulando a abertura do formulário para criar uma nova fatura...";
+        messageForChat = "Entendido! A funcionalidade de criar nova fatura ainda está em desenvolvimento.";
         break;
       case 'viewcustomerdetails':
         const customerNameParam = parameters?.customerName || parameters?.name || 'um cliente específico';
-        messageForChat = `Entendido! Exibindo detalhes para: ${customerNameParam}.`;
+        messageForChat = `Entendido! Para ver detalhes do cliente ${customerNameParam}, por favor, vá para a seção Contas de Clientes e utilize a busca.`;
+        navigationPath = '/dashboard/customers';
         break;
       case 'searchtransactions':
         const searchTerm = parameters?.term || 'algo específico';
-        messageForChat = `Entendido! Buscando transações por: ${searchTerm}.`;
+        messageForChat = `Entendido! Para buscar transações por '${searchTerm}', por favor, vá para a Caderneta Digital. A busca detalhada lá ainda está em desenvolvimento.`;
+        navigationPath = '/dashboard/notebook';
         break;
+
       case 'unknown':
       case 'unknowncommand':
         messageForChat = "Desculpe, não entendi o comando. Pode tentar de outra forma ou ser mais específico?";
@@ -193,7 +285,7 @@ export function VirtualAssistant() {
 
     if (navigationPath) {
       router.push(navigationPath);
-      setIsDialogOpen(false);
+      setIsDialogOpen(false); 
     }
     return messageForChat;
   };
@@ -221,8 +313,8 @@ export function VirtualAssistant() {
 
   const processSpokenCommand = async (commandText: string) => {
     if (!commandText.trim()) return;
-    addMessage('user', `🎤: ${commandText}`); // Indicate voice input
-    setUserInputForVoice(""); // Clear visual feedback
+    addMessage('user', `🎤: ${commandText}`); 
+    setUserInputForVoice(""); 
     setIsLoading(true);
 
     try {
@@ -284,7 +376,7 @@ export function VirtualAssistant() {
             <Bot className="h-6 w-6 text-primary" /> Assistente Virtual
           </DialogTitle>
           <DialogDescription>
-            Use comandos de texto ou voz. Ex: 'Mostrar painel', 'Ir para clientes'.
+            Use comandos de texto ou voz. Ex: 'Mostrar painel', 'Qual minha receita total?'.
             {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs">Reconhecimento de voz não suportado.</span>}
             {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs">Síntese de voz não suportada.</span>}
           </DialogDescription>
@@ -311,14 +403,14 @@ export function VirtualAssistant() {
                 </div>
               </div>
             ))}
-            {isLoading && ( // General loading for AI processing
+            {isLoading && ( 
               <div className="flex justify-start">
                  <div className="max-w-[75%] rounded-lg px-3 py-2 text-sm bg-muted text-card-foreground shadow">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                  </div>
               </div>
             )}
-             {isListening && userInputForVoice && ( // Visual feedback for ongoing speech input
+             {isListening && userInputForVoice && ( 
               <div className="flex justify-end">
                 <div className="max-w-[80%] rounded-lg px-4 py-3 text-sm shadow bg-primary/80 text-primary-foreground italic">
                   <p>🎤: {userInputForVoice}...</p>
