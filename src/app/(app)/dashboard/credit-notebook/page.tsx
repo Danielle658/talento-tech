@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, DollarSign } from "lucide-react";
+import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, DollarSign, Printer, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -36,12 +36,13 @@ type CreditEntryFormValues = z.infer<typeof creditEntrySchema>;
 interface CreditEntry extends CreditEntryFormValues {
   id: string;
   paid: boolean;
+  paymentDate?: Date;
 }
 
 const sampleCreditEntries: CreditEntry[] = [
   { id: "CF001", customerName: "Maria Silva", amount: 150.75, saleDate: new Date("2024-07-10"), dueDate: new Date("2024-08-10"), whatsappNumber: "5511999998888", notes: "Pagamento prometido para o dia 10.", paid: false },
   { id: "CF002", customerName: "João Santos", amount: 85.00, saleDate: new Date("2024-06-20"), dueDate: new Date("2024-07-20"), whatsappNumber: "5521988887777", notes: "Já passou do vencimento.", paid: false },
-  { id: "CF003", customerName: "Ana Pereira", amount: 230.50, saleDate: new Date("2024-07-01"), paid: true },
+  { id: "CF003", customerName: "Ana Pereira", amount: 230.50, saleDate: new Date("2024-07-01"), paid: true, paymentDate: new Date("2024-07-15") },
 ];
 
 
@@ -80,7 +81,7 @@ export default function CreditNotebookPage() {
   const handleMarkAsPaid = (id: string) => {
     setCreditEntries(prev =>
       prev.map(entry =>
-        entry.id === id ? { ...entry, paid: !entry.paid } : entry
+        entry.id === id ? { ...entry, paid: !entry.paid, paymentDate: !entry.paid ? new Date() : undefined } : entry
       )
     );
     const entry = creditEntries.find(e => e.id === id);
@@ -99,6 +100,77 @@ export default function CreditNotebookPage() {
     const whatsappUrl = `https://wa.me/${entry.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
   };
+
+  const handlePrintReceipt = (entry: CreditEntry) => {
+    const paymentDate = entry.paymentDate || new Date();
+    const receiptWindow = window.open('', '_blank');
+    if (receiptWindow) {
+      receiptWindow.document.write(`
+        <html>
+          <head>
+            <title>Comprovante de Pagamento</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+              .container { max-width: 450px; margin: auto; border: 1px solid #ccc; padding: 25px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+              .header { text-align: center; margin-bottom: 25px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
+              .header h1 { margin: 0 0 5px 0; font-size: 1.8em; color: #333; }
+              .header p { margin: 0; font-size: 1.1em; font-weight: bold; }
+              .details p { margin-bottom: 12px; line-height: 1.6; font-size: 1em; }
+              .details strong { color: #555; }
+              .footer { text-align: center; font-size: 0.9em; margin-top: 30px; color: #777; }
+              @media print {
+                body { margin: 0; color: #000; }
+                .container { border: none; box-shadow: none; max-width: 100%; padding: 0; }
+                .header p { font-size: 1.2em; }
+                .details p { font-size: 1em; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>Comprovante de Pagamento</h1>
+                <p>Sua Empresa</p>
+              </div>
+              <div class="details">
+                <p><strong>Cliente:</strong> ${entry.customerName}</p>
+                <p><strong>Valor Pago:</strong> R$ ${entry.amount.toFixed(2)}</p>
+                <p><strong>Data do Pagamento:</strong> ${format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+                <p><strong>Referente à Venda de:</strong> ${format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR })}</p>
+                ${entry.notes ? `<p><strong>Observações da Venda:</strong> ${entry.notes}</p>` : ''}
+              </div>
+              <div class="footer">
+                <p>Obrigado pela preferência!</p>
+                <p>Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</p>
+              </div>
+            </div>
+            <script>
+              setTimeout(() => {
+                window.print();
+                window.onafterprint = () => window.close();
+              }, 250); // Timeout to ensure content is rendered
+            </script>
+          </body>
+        </html>
+      `);
+      receiptWindow.document.close();
+    } else {
+      toast({ title: "Erro ao Abrir Comprovante", description: "Não foi possível abrir a janela para impressão. Verifique as configurações do seu navegador.", variant: "destructive" });
+    }
+  };
+
+  const handleSendWhatsAppReceipt = (entry: CreditEntry) => {
+    if (!entry.whatsappNumber) {
+      toast({ title: "WhatsApp não informado", description: "Não é possível enviar comprovante pois o número de WhatsApp do cliente não foi cadastrado.", variant: "destructive"});
+      return;
+    }
+    const paymentDate = entry.paymentDate || new Date();
+    const message = `🧾 *Comprovante de Pagamento - Sua Empresa*\n\nOlá ${entry.customerName},\nConfirmamos o recebimento de *R$${entry.amount.toFixed(2)}* referente à sua compra de ${format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR })}.\n\nPagamento confirmado em: ${format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}\n\nObrigado!`;
+    const whatsappUrl = `https://wa.me/${entry.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, "_blank");
+     toast({ title: "Redirecionando para WhatsApp", description: "O comprovante de pagamento está pronto para ser enviado."});
+  };
+
 
   const totalDue = useMemo(() => {
     return creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
@@ -276,7 +348,7 @@ export default function CreditNotebookPage() {
                 </TableHeader>
                 <TableBody>
                   {creditEntries.map((entry) => (
-                    <TableRow key={entry.id} className={cn(entry.paid ? "bg-green-500/10" : new Date(entry.dueDate || 0) < new Date() && !entry.paid ? "bg-red-500/10" : "")}>
+                    <TableRow key={entry.id} className={cn(entry.paid ? "bg-green-500/10" : (entry.dueDate && new Date(entry.dueDate) < new Date() && !entry.paid) ? "bg-red-500/10" : "")}>
                       <TableCell className="font-medium">{entry.customerName}</TableCell>
                       <TableCell className="text-right">{entry.amount.toFixed(2)}</TableCell>
                       <TableCell>{format(entry.saleDate, "dd/MM/yy", { locale: ptBR })}</TableCell>
@@ -290,15 +362,27 @@ export default function CreditNotebookPage() {
                         )}
                       </TableCell>
                       <TableCell className="max-w-xs truncate" title={entry.notes}>{entry.notes || "-"}</TableCell>
-                      <TableCell className="text-center space-x-1 md:space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(entry.id)} title={entry.paid ? "Marcar como Pendente" : "Marcar como Pago"}>
-                          {entry.paid ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                        </Button>
-                        {!entry.paid && (
-                        <Button variant="outline" size="sm" onClick={() => handleSendWhatsAppReminder(entry)} title="Cobrar via WhatsApp" disabled={!entry.whatsappNumber}>
-                            <MessageSquare className="h-4 w-4" />
-                        </Button>
-                        )}
+                      <TableCell className="text-center">
+                        <div className="flex justify-center items-center space-x-1 md:space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(entry.id)} title={entry.paid ? "Marcar como Pendente" : "Marcar como Pago"}>
+                            {entry.paid ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                          </Button>
+                          {!entry.paid && (
+                            <Button variant="outline" size="sm" onClick={() => handleSendWhatsAppReminder(entry)} title="Cobrar via WhatsApp" disabled={!entry.whatsappNumber}>
+                                <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {entry.paid && (
+                            <>
+                              <Button variant="outline" size="sm" onClick={() => handlePrintReceipt(entry)} title="Imprimir Comprovante">
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => handleSendWhatsAppReceipt(entry)} title="Enviar Comprovante via WhatsApp" disabled={!entry.whatsappNumber}>
+                                <Share2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
