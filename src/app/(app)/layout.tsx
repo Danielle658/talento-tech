@@ -49,7 +49,10 @@ import {
   LifeBuoy,
   Loader2,
   // Bot, // Not used here
-  PanelLeft // Icon for SidebarTrigger
+  PanelLeft, // Icon for SidebarTrigger
+  BookUser,
+  FilePlus2,
+  BarChart3
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
 
@@ -59,6 +62,9 @@ const navItems = [
   { href: "/dashboard/customers", icon: Users, label: "Contas de Clientes", tooltip: "Clientes" },
   { href: "/dashboard/sales", icon: ShoppingCart, label: "Vendas", tooltip: "Vendas" },
   { href: "/dashboard/products", icon: Briefcase, label: "Produtos", tooltip: "Produtos" },
+  { href: "/dashboard/credit-notebook", icon: BookUser, label: "Caderneta de Fiados", tooltip: "Fiados" },
+  { href: "/dashboard/sales-record", icon: FilePlus2, label: "Registro de Vendas", tooltip: "Registrar Venda" },
+  { href: "/dashboard/monthly-report", icon: BarChart3, label: "Relatório Mensal", tooltip: "Relatório" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
