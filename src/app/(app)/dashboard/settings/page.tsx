@@ -45,9 +45,9 @@ const accountDetailsSchema = z.object({
     .refine(value => isValidCPF(value.replace(/[^\d]+/g, '')), { message: "CPF inválido." }),
 });
 
-type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>;
+export type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>; // Export the type
 
-const ACCOUNT_DETAILS_STORAGE_KEY = "moneywise-accountDetails";
+export const ACCOUNT_DETAILS_STORAGE_KEY = "moneywise-accountDetails"; // Export the key
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -217,3 +217,6 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+
+    
