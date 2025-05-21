@@ -32,7 +32,7 @@ const InterpretTextCommandsOutputSchema = z.object({
       'The action to perform based on the command. Examples: \'navigateToDashboard\', \'navigateToNotebook\', \'navigateToCustomers\', \'navigateToSales\', \'navigateToProducts\', \'navigateToCreditNotebook\', \'navigateToSalesRecord\', \'navigateToMonthlyReport\', \'navigateToSettings\', \'queryTotalRevenue\', \'queryTotalCustomers\', \'queryTotalDueFiados\', \'queryPendingFiadosCount\', \'queryLowStockProductsCount\', \'initiateAddCustomer\', \'initiateAddCreditEntry\', \'initiateAddTransaction\', \'initiateAddProduct\', \'initiateSendMonthlyReport\', \'displayKPIs\'. If the command is not understood, return \'unknown\''
     ),
   parameters: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown()) // Changed z.any() to z.unknown()
     .optional()
     .describe(
       'A JSON object containing parameters for the action. For example, if the action is \'showSales\', the parameters might include a date range. For \'initiateAddCustomer\', it might include \'customerName\'. For \'initiateAddTransaction\', it might include \'type\', \'description\', \'amount\'.'

@@ -24,7 +24,7 @@ const InterpretVoiceCommandOutputSchema = z.object({
       'The action to perform based on the voice command. Examples: \'navigateToDashboard\', \'navigateToNotebook\', \'navigateToCustomers\', \'navigateToSales\', \'navigateToProducts\', \'navigateToCreditNotebook\', \'navigateToSalesRecord\', \'navigateToMonthlyReport\', \'navigateToSettings\', \'queryTotalRevenue\', \'queryTotalCustomers\', \'queryTotalDueFiados\', \'queryPendingFiadosCount\', \'queryLowStockProductsCount\', \'initiateAddCustomer\', \'initiateAddCreditEntry\', \'initiateAddTransaction\', \'initiateAddProduct\', \'initiateSendMonthlyReport\', \'displayKPIs\'. If the command is not understood, return \'unknownCommand\''
     ),
   parameters: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown()) // Changed z.any() to z.unknown()
     .optional()
     .describe(
       'A JSON object containing parameters for the action. For example, for \'initiateAddCustomer\', parameters might be { customerName: "Maria" }.'
