@@ -16,10 +16,14 @@ import { ProductEntry, STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/produc
 import { SalesRecordEntry, STORAGE_KEY_SALES_RECORD } from '@/app/(app)/dashboard/sales-record/page';
 import { CreditEntry, STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page.tsx';
 import { CustomerEntry, STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page.tsx';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, subDays, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import type { ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+
 
 interface DisplayTransaction {
   id: string;
@@ -31,7 +35,7 @@ interface DisplayTransaction {
 }
 
 interface DisplayProduct {
-  id: string;
+  id:string;
   name: string;
   sales: number | string;
   revenue: string;
@@ -45,7 +49,14 @@ const kpiConfigurations = [
   { id: "lowStockProducts", title: "Estoque Baixo", icon: Archive, defaultDescription: "Aguardando dados" },
 ];
 
-const placeholderNotifications: any[] = []; 
+const placeholderNotifications: any[] = [];
+
+const salesChartConfig = {
+  Vendas: {
+    label: "Vendas (R$)",
+    color: "hsl(var(--chart-1))",
+  },
+} satisfies ChartConfig;
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -65,11 +76,7 @@ export default function DashboardPage() {
     if (isMounted) {
       try {
         const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
-        if (storedTransactions) {
-          setAllTransactions(JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})));
-        } else {
-          setAllTransactions([]);
-        }
+        setAllTransactions(storedTransactions ? JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})) : []);
       } catch (error) {
         console.error("Error loading transactions from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
@@ -79,11 +86,7 @@ export default function DashboardPage() {
 
       try {
         const storedSales = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
-        if (storedSales) {
-          setAllSalesRecords(JSON.parse(storedSales));
-        } else {
-          setAllSalesRecords([]);
-        }
+        setAllSalesRecords(storedSales ? JSON.parse(storedSales) : []);
       } catch (error) {
         console.error("Error loading sales records from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
@@ -93,11 +96,7 @@ export default function DashboardPage() {
 
       try {
         const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-        if (storedProducts) {
-          setProductCatalog(JSON.parse(storedProducts));
-        } else {
-          setProductCatalog([]);
-        }
+        setProductCatalog(storedProducts ? JSON.parse(storedProducts) : []);
       } catch (error) {
         console.error("Error loading product catalog from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_PRODUCTS);
@@ -107,16 +106,11 @@ export default function DashboardPage() {
 
       try {
         const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-        if (storedCreditEntries) {
-          const parsedEntries: CreditEntry[] = JSON.parse(storedCreditEntries).map((entry: any) => ({
+        setAllCreditEntries(storedCreditEntries ? JSON.parse(storedCreditEntries).map((entry: any) => ({
             ...entry,
             saleDate: parseISO(entry.saleDate),
             dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
-          }));
-          setAllCreditEntries(parsedEntries);
-        } else {
-          setAllCreditEntries([]);
-        }
+          })) : []);
       } catch (error) {
         console.error("Error loading credit entries from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
@@ -126,11 +120,7 @@ export default function DashboardPage() {
 
       try {
         const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
-        if (storedCustomers) {
-          setAllCustomers(JSON.parse(storedCustomers));
-        } else {
-          setAllCustomers([]);
-        }
+        setAllCustomers(storedCustomers ? JSON.parse(storedCustomers) : []);
       } catch (error) {
         console.error("Error loading customers from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
@@ -247,6 +237,27 @@ export default function DashboardPage() {
         return { ...kpiConfig, value: "N/A", description: "Erro" };
     }
   });
+
+  const dailySalesChartData = useMemo(() => {
+    if (!isMounted || !allSalesRecords) return [];
+
+    const today = startOfDay(new Date());
+    const data = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const currentDate = subDays(today, i);
+      const salesForDay = allSalesRecords.filter(sale => {
+        const saleDate = parseISO(sale.date);
+        return isValid(saleDate) && isSameDay(saleDate, currentDate);
+      }).reduce((sum, sale) => sum + sale.totalAmount, 0);
+
+      data.push({
+        date: format(currentDate, "dd/MM", { locale: ptBR }),
+        Vendas: salesForDay,
+      });
+    }
+    return data;
+  }, [isMounted, allSalesRecords]);
 
 
   if (!isMounted) {
@@ -378,28 +389,53 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><BarChartBig className="h-5 w-5 text-primary" /> Visão Geral das Vendas</CardTitle>
-              <CardDescription>Comparativo de vendas mensais.</CardDescription>
+              <CardDescription>Vendas diárias nos últimos 7 dias.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-center py-4">Gráfico de vendas será exibido aqui.</p>
+            <CardContent className="pl-2">
+              {dailySalesChartData.length > 0 ? (
+                <ChartContainer config={salesChartConfig} className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dailySalesChartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis 
+                        dataKey="date" 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickMargin={8}
+                        fontSize={12}
+                      />
+                      <YAxis 
+                        tickFormatter={(value) => `R$${value/1000}k`} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickMargin={8}
+                        width={40}
+                        fontSize={12}
+                      />
+                      <Tooltip
+                        cursor={false}
+                        content={<ChartTooltipContent 
+                                  formatter={(value, name) => (
+                                    <div className="flex flex-col">
+                                      <span className="text-xs text-muted-foreground">{name}</span>
+                                      <span className="font-bold">R$ {Number(value).toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  indicator="dot" 
+                                />}
+                      />
+                      <Bar dataKey="Vendas" fill="var(--color-Vendas)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">Nenhuma venda registrada nos últimos 7 dias.</p>
+              )}
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Atividade de Clientes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <p className="text-sm">Total de clientes</p>
-                    <p className="text-sm font-semibold">{totalCustomersKPI.value}</p>
-                </div>
-                 <Button className="w-full mt-2" variant="outline" asChild><Link href="/dashboard/customers">Gerenciar Clientes</Link></Button>
-            </CardContent>
-          </Card>
-
         </div>
       </div>
     </div>
   );
 }
+
