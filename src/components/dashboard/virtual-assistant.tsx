@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Bot, Mic, Send, Loader2 } from 'lucide-react';
+import { Bot, Mic, Send, Loader2, Volume2, MicOff } from 'lucide-react';
 import { interpretTextCommands, InterpretTextCommandsOutput } from '@/ai/flows/interpret-text-commands';
 import { interpretVoiceCommand, InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
@@ -23,9 +23,12 @@ interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text?: string;
-  response?: InterpretTextCommandsOutput | InterpretVoiceCommandOutput; // Keep this for potential direct display
-  processedMessage?: string; // For messages processed by executeAction
   timestamp: Date;
+}
+
+interface BrowserSupport {
+  speechRecognition: boolean;
+  speechSynthesis: boolean;
 }
 
 export function VirtualAssistant() {
@@ -35,7 +38,80 @@ export function VirtualAssistant() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const router = useRouter(); // Initialize router
+  const router = useRouter();
+
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [supportedFeatures, setSupportedFeatures] = useState<BrowserSupport>({
+    speechRecognition: false,
+    speechSynthesis: false,
+  });
+  const [userInputForVoice, setUserInputForVoice] = useState("");
+
+
+  useEffect(() => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const hasSpeechRecognition = !!SpeechRecognitionAPI;
+    const hasSpeechSynthesis = 'speechSynthesis' in window;
+
+    setSupportedFeatures({
+      speechRecognition: hasSpeechRecognition,
+      speechSynthesis: hasSpeechSynthesis,
+    });
+
+    if (hasSpeechRecognition) {
+      const recognitionInstance = new SpeechRecognitionAPI();
+      recognitionInstance.continuous = false;
+      recognitionInstance.interimResults = true;
+      recognitionInstance.lang = 'pt-BR';
+
+      recognitionInstance.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        setUserInputForVoice(finalTranscript || interimTranscript); // Update visual feedback
+        if (finalTranscript) {
+          processSpokenCommand(finalTranscript);
+        }
+      };
+
+      recognitionInstance.onerror = (event) => {
+        console.error("Speech recognition error", event);
+        let errorMessage = "Ocorreu um erro no reconhecimento de voz.";
+        if (event.error === 'no-speech') {
+          errorMessage = "Nenhuma fala detectada. Tente novamente.";
+        } else if (event.error === 'audio-capture') {
+          errorMessage = "Erro ao capturar áudio. Verifique seu microfone.";
+        } else if (event.error === 'not-allowed') {
+          errorMessage = "Permissão para usar o microfone negada.";
+        }
+        toast({ title: "Erro de Voz", description: errorMessage, variant: "destructive" });
+        setIsListening(false);
+      };
+
+      recognitionInstance.onend = () => {
+        setIsListening(false);
+      };
+      setRecognition(recognitionInstance);
+    }
+
+    return () => {
+      if (recognition) {
+        recognition.abort();
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -46,15 +122,31 @@ export function VirtualAssistant() {
     }
   }, [chatMessages]);
 
-  const addMessage = (sender: ChatMessage['sender'], text?: string, response?: ChatMessage['response'], processedMessage?: string) => {
-    setChatMessages(prev => [...prev, { id: Date.now().toString(), sender, text, response, processedMessage, timestamp: new Date() }]);
+  const speak = (textToSpeak: string) => {
+    if (!supportedFeatures.speechSynthesis || !textToSpeak || isSpeaking) return;
+
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = 'pt-BR';
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = (event) => {
+      console.error("Speech synthesis error:", event);
+      setIsSpeaking(false);
+      toast({ title: "Erro na Fala", description: "Não foi possível reproduzir a resposta.", variant: "destructive" });
+    };
+    speechSynthesis.speak(utterance);
   };
 
-  const executeAction = (action: string, parameters: any) => {
-    let navigationPath: string | null = null;
-    let messageForChat: string | null = null;
+  const addMessage = (sender: ChatMessage['sender'], text?: string) => {
+    setChatMessages(prev => [...prev, { id: Date.now().toString(), sender, text, timestamp: new Date() }]);
+  };
 
-    switch (action?.toLowerCase()) { // Normalize action string
+  const executeActionAndSpeak = (action: string, parameters: any): string => {
+    let navigationPath: string | null = null;
+    let messageForChat: string = "Ação não reconhecida.";
+
+    switch (action?.toLowerCase()) {
       case 'showsales':
         navigationPath = '/dashboard/sales-record';
         messageForChat = "Ok, abrindo o histórico de vendas.";
@@ -72,18 +164,14 @@ export function VirtualAssistant() {
         messageForChat = "Entendido. Abrindo a página de relatório mensal.";
         break;
       case 'displaykpis':
-        messageForChat = "Entendido! Os KPIs seriam exibidos no painel principal.";
-        // In a real scenario, this might involve a state change or event
+        messageForChat = "Entendido! Os KPIs são exibidos no painel principal.";
         break;
       case 'createnewinvoice':
         messageForChat = "Entendido! Simulando a abertura do formulário para criar uma nova fatura...";
-        // This would typically open a new page or a modal
-        // e.g., router.push('/dashboard/invoices/new');
         break;
       case 'viewcustomerdetails':
         const customerNameParam = parameters?.customerName || parameters?.name || 'um cliente específico';
         messageForChat = `Entendido! Exibindo detalhes para: ${customerNameParam}.`;
-        // e.g., router.push(`/dashboard/customers/${parameters?.customerId}`);
         break;
       case 'searchtransactions':
         const searchTerm = parameters?.term || 'algo específico';
@@ -94,20 +182,20 @@ export function VirtualAssistant() {
         messageForChat = "Desculpe, não entendi o comando. Pode tentar de outra forma ou ser mais específico?";
         break;
       default:
-        messageForChat = `Recebi a ação '${action}', mas ainda não sei como executá-la diretamente.`;
+        messageForChat = `Recebi a ação '${action}', mas ainda não sei como executá-la.`;
         if (parameters && Object.keys(parameters).length > 0) {
             messageForChat += ` Parâmetros: ${JSON.stringify(parameters)}`;
         }
         break;
     }
 
+    addMessage('assistant', messageForChat);
+
     if (navigationPath) {
-      addMessage('assistant', undefined, undefined, messageForChat || `Navegando para ${action}...`);
       router.push(navigationPath);
-      setIsDialogOpen(false); // Close dialog on navigation
-    } else if (messageForChat) {
-      addMessage('assistant', undefined, undefined, messageForChat);
+      setIsDialogOpen(false);
     }
+    return messageForChat;
   };
 
   const handleTextCommand = async () => {
@@ -119,40 +207,71 @@ export function VirtualAssistant() {
 
     try {
       const response = await interpretTextCommands({ command: commandText });
-      // addMessage('assistant', undefined, response); // Keep original response for debug if needed
-      executeAction(response.action, response.parameters);
+      const messageToSpeak = executeActionAndSpeak(response.action, response.parameters);
+      speak(messageToSpeak);
     } catch (error) {
       console.error("Error interpreting text command:", error);
-      addMessage('assistant', undefined, undefined, `Desculpe, ocorreu um erro ao processar: "${commandText}"`);
+      const errMsg = `Desculpe, ocorreu um erro ao processar: "${commandText}"`;
+      addMessage('assistant', errMsg);
+      speak(errMsg);
       toast({ title: "Erro de Processamento", description: "Não foi possível processar o comando de texto.", variant: "destructive" });
     }
     setIsLoading(false);
   };
 
-  const handleVoiceCommand = async () => {
-    if (!inputText.trim()) {
-        toast({ title: "Comando de Voz (Simulado)", description: "Digite um comando no campo para simular a entrada de voz e tente novamente.", variant: "default" });
-        return;
-    }
-    const commandText = inputText; 
-    addMessage('user', commandText);
-    setInputText('');
+  const processSpokenCommand = async (commandText: string) => {
+    if (!commandText.trim()) return;
+    addMessage('user', `🎤: ${commandText}`); // Indicate voice input
+    setUserInputForVoice(""); // Clear visual feedback
     setIsLoading(true);
 
     try {
       const response = await interpretVoiceCommand({ voiceCommand: commandText });
-      // addMessage('assistant', undefined, response); // Keep original response for debug if needed
-      executeAction(response.action, response.parameters);
+      const messageToSpeak = executeActionAndSpeak(response.action, response.parameters);
+      speak(messageToSpeak);
     } catch (error) {
       console.error("Error interpreting voice command:", error);
-      addMessage('assistant', undefined, undefined, `Desculpe, ocorreu um erro ao processar o comando de voz: "${commandText}"`);
+      const errMsg = `Desculpe, ocorreu um erro ao processar o comando de voz: "${commandText}"`;
+      addMessage('assistant', errMsg);
+      speak(errMsg);
       toast({ title: "Erro de Processamento", description: "Não foi possível processar o comando de voz.", variant: "destructive" });
     }
     setIsLoading(false);
   };
+  
+  const handleToggleListening = () => {
+    if (!supportedFeatures.speechRecognition || !recognition) {
+      toast({ title: "Recurso Indisponível", description: "O reconhecimento de voz não é suportado pelo seu navegador.", variant: "destructive" });
+      return;
+    }
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      setUserInputForVoice(''); 
+      try {
+        recognition.start();
+        setIsListening(true);
+        toast({ title: "Ouvindo...", description: "Fale agora." });
+      } catch (e) {
+        console.error("Error starting recognition:", e);
+        toast({ title: "Erro ao Iniciar", description: "Não foi possível iniciar o reconhecimento de voz. Verifique as permissões do microfone.", variant: "destructive" });
+        setIsListening(false);
+      }
+    }
+  };
+
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+    <Dialog open={isDialogOpen} onOpenChange={(open) => {
+      setIsDialogOpen(open);
+      if (!open && recognition && isListening) {
+        recognition.stop();
+      }
+      if (!open && window.speechSynthesis && isSpeaking) {
+        window.speechSynthesis.cancel();
+      }
+    }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full">
           <Bot className="h-5 w-5" />
@@ -165,7 +284,9 @@ export function VirtualAssistant() {
             <Bot className="h-6 w-6 text-primary" /> Assistente Virtual
           </DialogTitle>
           <DialogDescription>
-            Use comandos de texto. Ex: 'Mostrar painel', 'Ir para clientes'.
+            Use comandos de texto ou voz. Ex: 'Mostrar painel', 'Ir para clientes'.
+            {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs">Reconhecimento de voz não suportado.</span>}
+            {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs">Síntese de voz não suportada.</span>}
           </DialogDescription>
         </DialogHeader>
 
@@ -183,29 +304,25 @@ export function VirtualAssistant() {
                       : 'bg-muted text-card-foreground'
                   }`}
                 >
-                  {msg.sender === 'user' && msg.text}
-                  {msg.sender === 'assistant' && msg.processedMessage && <p>{msg.processedMessage}</p>}
-                  {/* Optionally display raw response for debugging if needed, or remove this block
-                  {msg.sender === 'assistant' && msg.response && !msg.processedMessage && (
-                    <div>
-                      <p><strong>Ação (bruta):</strong> {msg.response.action}</p>
-                      {msg.response.parameters && Object.keys(msg.response.parameters).length > 0 && (
-                        <p className="break-all"><strong>Parâmetros (brutos):</strong> {JSON.stringify(msg.response.parameters)}</p>
-                      )}
-                    </div>
-                  )}
-                  */}
+                  {msg.text && <p>{msg.text}</p>}
                   <div className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-primary-foreground/80 text-right' : 'text-muted-foreground text-left'}`}>
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
               </div>
             ))}
-            {isLoading && (
+            {isLoading && ( // General loading for AI processing
               <div className="flex justify-start">
                  <div className="max-w-[75%] rounded-lg px-3 py-2 text-sm bg-muted text-card-foreground shadow">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                  </div>
+              </div>
+            )}
+             {isListening && userInputForVoice && ( // Visual feedback for ongoing speech input
+              <div className="flex justify-end">
+                <div className="max-w-[80%] rounded-lg px-4 py-3 text-sm shadow bg-primary/80 text-primary-foreground italic">
+                  <p>🎤: {userInputForVoice}...</p>
+                </div>
               </div>
             )}
           </div>
@@ -215,7 +332,7 @@ export function VirtualAssistant() {
           <div className="flex gap-2 items-center">
             <Input
               type="text"
-              placeholder="Digite seu comando..."
+              placeholder={isListening ? "Ouvindo..." : "Digite seu comando..."}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => {
@@ -223,23 +340,31 @@ export function VirtualAssistant() {
                   handleTextCommand();
                 }
               }}
-              disabled={isLoading}
+              disabled={isLoading || isListening}
               className="flex-1 h-10 text-base"
-              aria-label="Entrada de comando"
+              aria-label="Entrada de comando de texto"
             />
-            <Button onClick={handleTextCommand} disabled={isLoading || !inputText.trim()} aria-label="Enviar comando de texto" size="icon" className="h-10 w-10">
+            <Button onClick={handleTextCommand} disabled={isLoading || !inputText.trim() || isListening} aria-label="Enviar comando de texto" size="icon" className="h-10 w-10">
               <Send className="h-5 w-5" />
             </Button>
-            {/* Voice command button can be kept for future real voice integration */}
-            <Button variant="outline" onClick={handleVoiceCommand} disabled={isLoading} aria-label="Enviar comando de voz (simulado com texto)" size="icon" className="h-10 w-10">
-              <Mic className="h-5 w-5" />
+            <Button 
+              variant="outline" 
+              onClick={handleToggleListening} 
+              disabled={isLoading || !supportedFeatures.speechRecognition || isSpeaking} 
+              aria-label={isListening ? "Parar de ouvir" : "Começar a ouvir"} 
+              size="icon" 
+              className={`h-10 w-10 ${isListening ? 'border-destructive text-destructive hover:bg-destructive/10' : ''}`}
+            >
+              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </Button>
+             {isSpeaking && <Volume2 className="h-5 w-5 text-primary animate-pulse" />}
           </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            O assistente pode ajudar com navegação e busca de informações. Pressione Enter para enviar.
+           <p className="text-xs text-muted-foreground mt-2 text-center">
+            {isListening ? "Fale agora. Pressione o microfone novamente para parar." : "Pressione Enter para enviar texto ou clique no microfone para falar."}
           </p>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
