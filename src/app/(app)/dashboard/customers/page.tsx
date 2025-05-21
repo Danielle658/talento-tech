@@ -47,13 +47,18 @@ export default function CustomersPage() {
       } catch (error) {
         console.error("Failed to parse customers from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
+        setCustomers([]); // Reset state on error
       }
+    } else {
+        setCustomers([]); // Ensure default empty state
     }
   }, []);
 
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && customers.length > 0) {
       localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(customers));
+    } else if (isMounted && customers.length === 0) {
+      localStorage.removeItem(STORAGE_KEY_CUSTOMERS); // Clean up if all customers are removed
     }
   }, [customers, isMounted]);
 
@@ -74,11 +79,11 @@ export default function CustomersPage() {
     } else {
       form.reset({ name: "", email: "", phone: "", address: "", notes: "" });
     }
-  }, [editingCustomer, form, isFormDialogOpen]); // Reset form when dialog opens/closes or editingCustomer changes
+  }, [editingCustomer, form, isFormDialogOpen]);
 
   const onSubmit = (data: CustomerFormValues) => {
     if (editingCustomer) {
-      setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c));
+      setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c).sort((a,b) => a.name.localeCompare(b.name)));
       toast({ title: "Cliente Atualizado!", description: `${data.name} foi atualizado com sucesso.` });
     } else {
       const newCustomer: CustomerEntry = {
@@ -115,7 +120,6 @@ export default function CustomersPage() {
   const closeFormDialog = () => {
     setIsFormDialogOpen(false);
     setEditingCustomer(null);
-    // form.reset(); // Resetting is handled by useEffect now
   };
 
   if (!isMounted) {
@@ -234,7 +238,7 @@ export default function CustomersPage() {
                         <Button type="button" variant="outline">Cancelar</Button>
                       </DialogClose>
                       <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting ? "Salvando..." : (editingCustomer ? "Salvar Alterações" : "Adicionar Cliente")}
+                        {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingCustomer ? "Salvar Alterações" : "Adicionar Cliente")}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -270,8 +274,8 @@ export default function CustomersPage() {
                         <TableCell className="font-medium">{customer.name}</TableCell>
                         <TableCell>{customer.email || "-"}</TableCell>
                         <TableCell>{customer.phone || "-"}</TableCell>
-                        <TableCell className="max-w-xs truncate" title={customer.address}>{customer.address || "-"}</TableCell>
-                        <TableCell className="max-w-xs truncate" title={customer.notes}>{customer.notes || "-"}</TableCell>
+                        <TableCell className="max-w-xs truncate" title={customer.address || undefined}>{customer.address || "-"}</TableCell>
+                        <TableCell className="max-w-xs truncate" title={customer.notes || undefined}>{customer.notes || "-"}</TableCell>
                         <TableCell className="text-center space-x-1">
                             <Button variant="outline" size="sm" onClick={() => handleEditCustomer(customer)} title="Editar Cliente">
                                 <Edit3 className="h-4 w-4" />
@@ -291,3 +295,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    

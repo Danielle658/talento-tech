@@ -20,8 +20,8 @@ import { cn } from "@/lib/utils";
 import { format, parseISO, isValid, isToday, isPast, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page"; // Import type
-import { ACCOUNT_DETAILS_STORAGE_KEY } from "@/app/(app)/dashboard/settings/page"; // Import storage key
+import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
+export { ACCOUNT_DETAILS_STORAGE_KEY } from "@/app/(app)/dashboard/settings/page";
 
 
 const creditEntrySchema = z.object({
@@ -42,6 +42,7 @@ export interface CreditEntry extends CreditEntryFormValues {
 }
 
 export const STORAGE_KEY_CREDIT_NOTEBOOK = "moneywise-creditEntries";
+const ACCOUNT_DETAILS_STORAGE_KEY_LOCAL = "moneywise-accountDetails"; // Local alias for clarity
 
 export default function CreditNotebookPage() {
   const { toast } = useToast();
@@ -64,27 +65,36 @@ export default function CreditNotebookPage() {
       } catch (error) {
         console.error("Failed to parse credit entries from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); 
+        setCreditEntries([]); // Reset state on error
       }
+    } else {
+      setCreditEntries([]); // Ensure default empty state
     }
 
-    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY_LOCAL);
     if (storedAccountDetails) {
         try {
             setAccountDetails(JSON.parse(storedAccountDetails));
         } catch (error) {
             console.error("Failed to parse account details from localStorage for credit notebook", error);
+            localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY_LOCAL);
+            setAccountDetails(null); // Reset state on error
         }
     }
   }, []);
 
   useEffect(() => {
-    if (isMounted) { 
+    if (isMounted && creditEntries.length > 0) { 
       localStorage.setItem(STORAGE_KEY_CREDIT_NOTEBOOK, JSON.stringify(creditEntries.map(entry => ({
         ...entry,
         saleDate: entry.saleDate.toISOString(), 
         dueDate: entry.dueDate ? entry.dueDate.toISOString() : undefined,
       }))));
+    } else if (isMounted && creditEntries.length === 0) {
+      localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); // Clean up if all entries are removed
+    }
 
+    if (isMounted) {
       const today = startOfDay(new Date());
       const dueTodayEntries = creditEntries.filter(entry => 
         !entry.paid && 
@@ -94,15 +104,22 @@ export default function CreditNotebookPage() {
       );
 
       if (dueTodayEntries.length > 0) {
-        toast({
-          title: "Lembretes de Fiado",
-          description: `Você tem ${dueTodayEntries.length} fiado(s) vencendo hoje ou já vencido(s). Considere enviar lembretes.`,
-          duration: 7000, // Show for a bit longer
-        });
+        // Check if a toast for this specific day has already been shown
+        const lastToastDate = localStorage.getItem('moneywise-credit-due-toast-date');
+        const todayStr = format(today, 'yyyy-MM-dd');
+
+        if (lastToastDate !== todayStr) {
+            toast({
+                title: "Lembretes de Fiado",
+                description: `Você tem ${dueTodayEntries.length} fiado(s) vencendo hoje ou já vencido(s). Considere enviar lembretes.`,
+                duration: 7000,
+            });
+            localStorage.setItem('moneywise-credit-due-toast-date', todayStr);
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creditEntries, isMounted]); // Removed toast from dependencies as it's stable
+  }, [creditEntries, isMounted]);
 
   const form = useForm<CreditEntryFormValues>({
     resolver: zodResolver(creditEntrySchema),
@@ -378,7 +395,7 @@ export default function CreditNotebookPage() {
                             <Button type="button" variant="outline">Cancelar</Button>
                         </DialogClose>
                         <Button type="submit" disabled={form.formState.isSubmitting}>
-                            {form.formState.isSubmitting ? "Salvando..." : "Salvar Fiado"}
+                            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Fiado"}
                         </Button>
                     </DialogFooter>
                   </form>
@@ -435,7 +452,7 @@ export default function CreditNotebookPage() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate" title={entry.notes}>{entry.notes || "-"}</TableCell>
+                      <TableCell className="max-w-xs truncate" title={entry.notes || undefined}>{entry.notes || "-"}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex justify-center items-center space-x-1 md:space-x-2">
                           <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(entry.id)} title={entry.paid ? "Marcar como Pendente" : "Marcar como Pago"}>
@@ -476,3 +493,5 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
+
+    

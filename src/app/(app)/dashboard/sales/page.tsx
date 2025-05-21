@@ -14,13 +14,15 @@ import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, Cre
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
+import { STORAGE_KEY_NOTEBOOK } from "@/app/(app)/dashboard/notebook/page";
 import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
+import { STORAGE_KEY_SALES_RECORD } from "@/app/(app)/dashboard/sales-record/page";
 import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
-import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page"; // Import CustomerEntry
-import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page"; // Import storage key
+import { STORAGE_KEY_PRODUCTS } from "@/app/(app)/dashboard/products/page";
+import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
+import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page";
 
 
-// Interface for products within the PDV, compatible with ProductEntry
 interface PDVProduct {
   id: string;
   code: string;
@@ -31,10 +33,6 @@ interface PDVProduct {
 interface CartItem extends PDVProduct {
   quantity: number;
 }
-
-const STORAGE_KEY_NOTEBOOK = "moneywise-transactions";
-const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
-const STORAGE_KEY_PRODUCTS = "moneywise-products"; // For loading products
 
 export default function SalesPage() {
   const { toast } = useToast();
@@ -60,15 +58,24 @@ export default function SalesPage() {
         setAvailableProducts(JSON.parse(storedProducts));
       } catch (error) {
         console.error("Failed to parse products from localStorage for PDV", error);
+        localStorage.removeItem(STORAGE_KEY_PRODUCTS);
+        setAvailableProducts([]); // Reset state on error
       }
+    } else {
+        setAvailableProducts([]); // Ensure default empty state
     }
+
     const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
     if (storedCustomers) {
       try {
         setAvailableCustomers(JSON.parse(storedCustomers));
       } catch (error) {
         console.error("Failed to parse customers from localStorage for PDV", error);
+        localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
+        setAvailableCustomers([]); // Reset state on error
       }
+    } else {
+        setAvailableCustomers([]); // Ensure default empty state
     }
   }, []);
 
@@ -88,7 +95,6 @@ export default function SalesPage() {
             item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
           );
         }
-        // Adapt ProductEntry to PDVProduct for the cart
         const productForCart: PDVProduct = { id: product.id, code: product.code, name: product.name, price: product.price };
         return [...prevCart, { ...productForCart, quantity: 1 }];
       });
@@ -225,7 +231,7 @@ export default function SalesPage() {
       date: saleDate.toISOString(),
       amountPaid: paymentMethod === "Dinheiro" ? amountPaid : cartTotal,
       changeGiven: paymentMethod === "Dinheiro" ? changeDue : 0,
-      customerId: selectedCustomerId,
+      customerId: selectedCustomerId === 'default_consumer' ? undefined : selectedCustomerId, // Store undefined if "Cliente Avulso"
       customerName: customerNameForRecord,
     };
 
@@ -248,7 +254,7 @@ export default function SalesPage() {
     setProductCodeInput("");
     setAmountPaidInput("");
     setPaymentMethod(undefined);
-    setSelectedCustomerId(undefined); // Reset selected customer
+    setSelectedCustomerId(undefined);
   };
 
   if (!isMounted) {
@@ -479,7 +485,7 @@ export default function SalesPage() {
                     onClick={handleFinalizeSale} 
                     className="w-full text-lg py-6" 
                     size="lg"
-                    disabled={cart.length === 0 || !paymentMethod || (paymentMethod === "Dinheiro" && amountPaid < cartTotal && amountPaidInput !== "")}
+                    disabled={cart.length === 0 || !paymentMethod || (paymentMethod === "Dinheiro" && amountPaidInput !== "" && amountPaid < cartTotal)}
                 >
                   <CheckCircle className="mr-2 h-5 w-5"/> Finalizar Venda
                 </Button>
@@ -491,3 +497,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    

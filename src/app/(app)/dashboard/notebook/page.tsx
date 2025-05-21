@@ -7,7 +7,6 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label"; // No longer used directly
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -21,7 +20,7 @@ import { format, parseISO, startOfMonth, subMonths, endOfMonth, isValid } from "
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartConfig } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'; // Removed Legend as it's handled by ChartLegendContent
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 
 const transactionSchema = z.object({
@@ -64,21 +63,26 @@ export default function NotebookPage() {
       try {
         const parsedTransactions: Transaction[] = JSON.parse(storedTransactions).map((t: any) => ({
           ...t,
-          date: parseISO(t.date), // Convert ISO string back to Date object
+          date: parseISO(t.date),
         }));
         setTransactions(parsedTransactions.sort((a,b) => b.date.getTime() - a.date.getTime()));
       } catch (error) {
         console.error("Failed to parse transactions from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_NOTEBOOK); // Clear corrupted data
+        localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
+        setTransactions([]); // Reset state on error
       }
+    } else {
+      setTransactions([]); // Ensure default empty state
     }
   }, []);
 
   useEffect(() => {
-    if (isMounted) { // Only save to localStorage after initial mount & load
+    if (isMounted && transactions.length > 0) { 
       localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify(
-        transactions.map(t => ({...t, date: t.date.toISOString() })) // Store dates as ISO strings
+        transactions.map(t => ({...t, date: t.date.toISOString() })) 
       ));
+    } else if (isMounted && transactions.length === 0) {
+      localStorage.removeItem(STORAGE_KEY_NOTEBOOK); // Clean up if all transactions are removed
     }
   }, [transactions, isMounted]);
 
@@ -95,7 +99,7 @@ export default function NotebookPage() {
   const onSubmitTransaction = (data: TransactionFormValues) => {
     const newTransaction: Transaction = {
       ...data,
-      id: `T${String(Date.now()).slice(-6)}`, // More unique ID
+      id: `T${String(Date.now()).slice(-6)}`,
     };
     setTransactions(prev => [newTransaction, ...prev].sort((a,b) => b.date.getTime() - a.date.getTime()));
     toast({
@@ -121,7 +125,7 @@ export default function NotebookPage() {
     if (!isMounted) return [];
     const data: { month: string; income: number; expense: number }[] = [];
     const today = new Date();
-    for (let i = 5; i >= 0; i--) { // Last 6 months including current
+    for (let i = 5; i >= 0; i--) { 
       const targetMonthDate = subMonths(today, i);
       const monthKey = format(targetMonthDate, "MMM/yy", { locale: ptBR });
       const monthStart = startOfMonth(targetMonthDate);
@@ -141,7 +145,7 @@ export default function NotebookPage() {
   }, [transactions, isMounted]);
 
   if (!isMounted) {
-    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>; // Or a proper skeleton loader
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return <div className="space-y-6">
@@ -201,7 +205,7 @@ export default function NotebookPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Tipo</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Selecione o tipo" />
@@ -252,7 +256,7 @@ export default function NotebookPage() {
                             <Button type="button" variant="outline">Cancelar</Button>
                         </DialogClose>
                         <Button type="submit" disabled={form.formState.isSubmitting}>
-                            {form.formState.isSubmitting ? "Salvando..." : "Salvar Transação"}
+                            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Transação"}
                         </Button>
                     </DialogFooter>
                   </form>
@@ -263,7 +267,6 @@ export default function NotebookPage() {
           <CardDescription>Gerencie suas receitas, despesas e acompanhe o fluxo de caixa. Os dados são salvos localmente no seu navegador.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
-          {/* Summary Section */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -296,7 +299,6 @@ export default function NotebookPage() {
             </Card>
           </div>
 
-          {/* Chart Section */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -315,7 +317,7 @@ export default function NotebookPage() {
                       tickLine={false} 
                       axisLine={false} 
                       tickMargin={8}
-                      tickFormatter={(value) => value.slice(0,3)} // Abbreviate month name
+                      tickFormatter={(value) => value.slice(0,3)}
                     />
                     <YAxis 
                       tickFormatter={(value) => `R$${value/1000}k`} 
@@ -336,7 +338,6 @@ export default function NotebookPage() {
             </CardContent>
           </Card>
           
-          {/* Transactions Table Section */}
           <Card>
             <CardHeader>
               <CardTitle>Todas as Transações</CardTitle>
@@ -389,3 +390,5 @@ export default function NotebookPage() {
       </Card>
     </div>;
 }
+
+    

@@ -30,8 +30,8 @@ export interface SalesRecordEntry {
   totalAmount: number;
   paymentMethod: string;
   date: string; // ISO string
-  amountPaid?: number; // For cash transactions
-  changeGiven?: number; // For cash transactions
+  amountPaid?: number; 
+  changeGiven?: number; 
   customerId?: string;
   customerName?: string;
 }
@@ -56,8 +56,11 @@ export default function SalesRecordPage() {
         setSalesHistory(JSON.parse(storedSales).sort((a: SalesRecordEntry, b: SalesRecordEntry) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
       } catch (error) {
         console.error("Failed to parse sales history from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_SALES_RECORD); // Clear corrupted data
+        localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
+        setSalesHistory([]); // Reset state on error
       }
+    } else {
+      setSalesHistory([]); // Ensure default empty state
     }
   }, []);
 
@@ -87,13 +90,15 @@ export default function SalesRecordPage() {
   };
   
   const handleDeleteSale = (saleId: string) => {
-     // Confirm deletion
     if (!window.confirm("Tem certeza que deseja excluir este registro de venda? Esta ação não pode ser desfeita.")) {
       return;
     }
     const updatedSalesHistory = salesHistory.filter(sale => sale.id !== saleId);
     setSalesHistory(updatedSalesHistory);
     localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify(updatedSalesHistory));
+    if(updatedSalesHistory.length === 0){
+      localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
+    }
     toast({
       title: "Registro Excluído",
       description: `O registro de venda ${saleId} foi excluído.`,
@@ -315,3 +320,5 @@ export default function SalesRecordPage() {
     </div>
   );
 }
+
+    

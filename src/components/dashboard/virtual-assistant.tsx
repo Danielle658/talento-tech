@@ -18,17 +18,14 @@ import { interpretTextCommands } from '@/ai/flows/interpret-text-commands';
 import { interpretVoiceCommand } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
-// import { format, parseISO, isValid } from 'date-fns'; // Not directly used here, but useful for display if needed
-// import { ptBR } from 'date-fns/locale'; // Not directly used here
 
-// Import storage keys and types
-import type { Transaction } from '@/app/(app)/dashboard/notebook/page'; // Type needed for query
+import type { Transaction } from '@/app/(app)/dashboard/notebook/page';
 import { STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
-import type { ProductEntry } from '@/app/(app)/dashboard/products/page'; // Type needed for query
+import type { ProductEntry } from '@/app/(app)/dashboard/products/page';
 import { STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
-import type { CreditEntry } from '@/app/(app)/dashboard/credit-notebook/page'; // Type needed for query
+import type { CreditEntry } from '@/app/(app)/dashboard/credit-notebook/page';
 import { STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page';
-import type { CustomerEntry } from '@/app/(app)/dashboard/customers/page'; // Type needed for query
+import type { CustomerEntry } from '@/app/(app)/dashboard/customers/page';
 import { STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page';
 
 
@@ -131,7 +128,7 @@ export function VirtualAssistant() {
   const speak = (textToSpeak: string) => {
     if (!supportedFeatures.speechSynthesis || !textToSpeak || isSpeaking) return;
 
-    speechSynthesis.cancel(); // Cancel any ongoing speech
+    speechSynthesis.cancel(); 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'pt-BR';
     utterance.onstart = () => setIsSpeaking(true);
@@ -160,7 +157,6 @@ export function VirtualAssistant() {
 
 
     switch (action?.toLowerCase()) {
-      // Navigation
       case 'navigatetodashboard':
         navigationPath = '/dashboard';
         messageForChat = "Ok, abrindo o painel central.";
@@ -169,7 +165,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/customers';
         messageForChat = "Certo, indo para as contas de clientes.";
         break;
-      case 'navigatetosales': // PDV
+      case 'navigatetosales': 
         navigationPath = '/dashboard/sales';
         messageForChat = "Entendido. Abrindo o Ponto de Venda.";
         break;
@@ -193,12 +189,11 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/settings';
         messageForChat = "Certo, indo para as configurações.";
         break;
-      case 'navigatetotebook': // Corrected from 'navigatetotebook'
+      case 'navigatetotebook':
          navigationPath = '/dashboard/notebook';
          messageForChat = "Ok, abrindo a caderneta digital.";
          break;
 
-      // Data Queries
       case 'querytotalrevenue':
         try {
           const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
@@ -206,6 +201,7 @@ export function VirtualAssistant() {
           const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
           messageForChat = `Sua receita total registrada na caderneta digital é de R$ ${totalIncome.toFixed(2)}.`;
         } catch (e) {
+          console.error("Error parsing transactions for queryTotalRevenue:", e);
           messageForChat = "Desculpe, não consegui calcular a receita total. Verifique os dados na Caderneta Digital.";
         }
         break;
@@ -215,6 +211,7 @@ export function VirtualAssistant() {
           const customers: CustomerEntry[] = storedCustomers ? JSON.parse(storedCustomers) : [];
           messageForChat = `Você tem ${customers.length} clientes cadastrados.`;
         } catch (e) {
+          console.error("Error parsing customers for queryTotalCustomers:", e);
           messageForChat = "Desculpe, não consegui contar os clientes. Verifique os dados em Contas de Clientes.";
         }
         break;
@@ -225,6 +222,7 @@ export function VirtualAssistant() {
           const totalDue = creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
           messageForChat = `O total pendente na caderneta de fiados é de R$ ${totalDue.toFixed(2)}.`;
         } catch (e) {
+          console.error("Error parsing credit entries for queryTotalDueFiados:", e);
           messageForChat = "Desculpe, não consegui calcular o total de fiados. Verifique os dados na Caderneta de Fiados.";
         }
         break;
@@ -235,6 +233,7 @@ export function VirtualAssistant() {
           const pendingCount = creditEntries.filter(entry => !entry.paid).length;
           messageForChat = `Você tem ${pendingCount} fiados pendentes de pagamento.`;
         } catch (e) {
+          console.error("Error parsing credit entries for queryPendingFiadosCount:", e);
           messageForChat = "Desculpe, não consegui contar os fiados pendentes.";
         }
         break;
@@ -248,11 +247,11 @@ export function VirtualAssistant() {
           }).length;
           messageForChat = `Você tem ${lowStockCount} produtos com estoque baixo (igual ou inferior a ${LOW_STOCK_THRESHOLD} unidades).`;
         } catch (e) {
+          console.error("Error parsing products for queryLowStockProductsCount:", e);
           messageForChat = "Desculpe, não consegui verificar o estoque dos produtos.";
         }
         break;
       
-      // Initiate Actions
       case 'initiateaddcustomer':
         navigationPath = '/dashboard/customers';
         messageForChat = `Certo! Indo para a página de clientes. Clique em 'Adicionar Novo Cliente' para continuar.`;
@@ -294,7 +293,6 @@ export function VirtualAssistant() {
         }
         break;
 
-      // Legacy/General
       case 'displaykpis':
         messageForChat = "Os principais indicadores (KPIs) são exibidos no Painel Central. Estou te levando para lá!";
         navigationPath = '/dashboard';
@@ -336,7 +334,6 @@ export function VirtualAssistant() {
 
     if (navigationPath) {
       router.push(navigationPath);
-      // setIsDialogOpen(false); // Keep dialog open for continuity unless specifically closed by user or explicit action
     }
     return messageForChat;
   };
@@ -515,3 +512,4 @@ export function VirtualAssistant() {
   );
 }
 
+    

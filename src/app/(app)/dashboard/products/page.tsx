@@ -20,7 +20,7 @@ const productSchema = z.object({
   code: z.string().min(1, { message: "Código/Código de Barras é obrigatório." }),
   price: z.coerce.number().min(0.01, { message: "O preço deve ser positivo." }),
   category: z.string().optional(),
-  stock: z.string().optional(),
+  stock: z.string().optional(), // Kept as string to allow "N/A" or numeric values
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -46,13 +46,18 @@ export default function ProductsPage() {
       } catch (error) {
         console.error("Failed to parse products from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_PRODUCTS);
+        setProducts([]); // Reset state on error
       }
+    } else {
+      setProducts([]); // Ensure default empty state
     }
   }, []);
 
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && products.length > 0) {
       localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
+    } else if (isMounted && products.length === 0) {
+        localStorage.removeItem(STORAGE_KEY_PRODUCTS); // Clean up if all products are removed
     }
   }, [products, isMounted]);
 
@@ -200,7 +205,7 @@ export default function ProductsPage() {
                         <Button type="button" variant="outline">Cancelar</Button>
                       </DialogClose>
                       <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting ? "Salvando..." : "Salvar Produto"}
+                        {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Produto"}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -254,3 +259,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
