@@ -17,7 +17,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO, isValid } from "date-fns";
+import { format, parseISO, isValid, isToday, isPast, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page"; // Import type
@@ -84,8 +84,25 @@ export default function CreditNotebookPage() {
         saleDate: entry.saleDate.toISOString(), 
         dueDate: entry.dueDate ? entry.dueDate.toISOString() : undefined,
       }))));
+
+      const today = startOfDay(new Date());
+      const dueTodayEntries = creditEntries.filter(entry => 
+        !entry.paid && 
+        entry.dueDate && 
+        isValid(entry.dueDate) && 
+        (isToday(entry.dueDate) || isPast(entry.dueDate))
+      );
+
+      if (dueTodayEntries.length > 0) {
+        toast({
+          title: "Lembretes de Fiado",
+          description: `Você tem ${dueTodayEntries.length} fiado(s) vencendo hoje ou já vencido(s). Considere enviar lembretes.`,
+          duration: 7000, // Show for a bit longer
+        });
+      }
     }
-  }, [creditEntries, isMounted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creditEntries, isMounted]); // Removed toast from dependencies as it's stable
 
   const form = useForm<CreditEntryFormValues>({
     resolver: zodResolver(creditEntrySchema),
@@ -393,8 +410,17 @@ export default function CreditNotebookPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {creditEntries.map((entry) => (
-                    <TableRow key={entry.id} className={cn(entry.paid ? "bg-green-500/10" : (entry.dueDate && isValid(entry.dueDate) && new Date(entry.dueDate) < new Date() && !entry.paid) ? "bg-red-500/10" : "")}>
+                  {creditEntries.map((entry) => {
+                    const isOverdue = !entry.paid && entry.dueDate && isValid(entry.dueDate) && isPast(startOfDay(entry.dueDate)) && !isToday(startOfDay(entry.dueDate));
+                    const isDueToday = !entry.paid && entry.dueDate && isValid(entry.dueDate) && isToday(startOfDay(entry.dueDate));
+                    return (
+                    <TableRow 
+                        key={entry.id} 
+                        className={cn(
+                            entry.paid ? "bg-green-500/10" : 
+                            (isOverdue || isDueToday) ? "bg-red-500/10 hover:bg-red-500/20" : ""
+                        )}
+                    >
                       <TableCell className="font-medium">{entry.customerName}</TableCell>
                       <TableCell className="text-right">{entry.amount.toFixed(2)}</TableCell>
                       <TableCell>{isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yy", { locale: ptBR }) : "Inválido"}</TableCell>
@@ -403,8 +429,10 @@ export default function CreditNotebookPage() {
                         <Badge variant={entry.paid ? "default" : "destructive"} className={cn(entry.paid ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}>
                           {entry.paid ? "Pago" : "Pendente"}
                         </Badge>
-                        {!entry.paid && entry.dueDate && isValid(entry.dueDate) && new Date(entry.dueDate) < new Date() && (
-                          <Badge variant="destructive" className="ml-2 bg-orange-500 hover:bg-orange-600">Vencido</Badge>
+                        {!entry.paid && (isOverdue || isDueToday) && (
+                          <Badge variant="destructive" className="ml-2 bg-orange-500 hover:bg-orange-600">
+                            {isOverdue ? "Vencido" : "Vence Hoje"}
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell className="max-w-xs truncate" title={entry.notes}>{entry.notes || "-"}</TableCell>
@@ -431,7 +459,7 @@ export default function CreditNotebookPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
             </div>
@@ -448,6 +476,3 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
-
-
-    
