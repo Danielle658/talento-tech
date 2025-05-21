@@ -14,13 +14,13 @@ export default function SalesPage() {
           <CardDescription>Acompanhe e registre suas vendas e transações comerciais.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Conteúdo da seção de Vendas em breve...</p>
+          <p className="text-muted-foreground">Funcionalidade de Vendas em desenvolvimento. Em breve você poderá visualizar um histórico detalhado de todas as suas vendas, filtrar por período, cliente, produto e status.</p>
           <div className="mt-8 flex justify-center">
             <img 
               src="https://placehold.co/600x400.png" 
               alt="Placeholder para Vendas" 
               className="rounded-lg shadow-md"
-              data-ai-hint="sales analytics" 
+              data-ai-hint="sales history analytics" 
             />
           </div>
         </CardContent>
@@ -28,3 +28,5 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    

@@ -14,13 +14,13 @@ export default function CreditNotebookPage() {
           <CardDescription>Gerencie os registros de vendas a prazo e fiados.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Conteúdo da Caderneta de Fiados em breve...</p>
+          <p className="text-muted-foreground">Funcionalidade da Caderneta de Fiados em desenvolvimento. Em breve você poderá registrar vendas a prazo, controlar saldos devedores de clientes e gerenciar pagamentos.</p>
           <div className="mt-8 flex justify-center">
             <img 
               src="https://placehold.co/600x400.png" 
               alt="Placeholder para Caderneta de Fiados" 
               className="rounded-lg shadow-md"
-              data-ai-hint="credit ledger" 
+              data-ai-hint="credit management ledger" 
             />
           </div>
         </CardContent>
@@ -28,3 +28,5 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
+
+    

@@ -14,13 +14,13 @@ export default function MonthlyReportPage() {
           <CardDescription>Visualize o desempenho de suas vendas e finanças mensalmente.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Conteúdo do Relatório Mensal em breve...</p>
+          <p className="text-muted-foreground">Funcionalidade de Relatório Mensal em desenvolvimento. Em breve você poderá visualizar gráficos de desempenho, principais KPIs do mês, comparativos com períodos anteriores e muito mais.</p>
           <div className="mt-8 flex justify-center">
             <img 
               src="https://placehold.co/600x400.png" 
               alt="Placeholder para Relatório Mensal" 
               className="rounded-lg shadow-md"
-              data-ai-hint="monthly report"
+              data-ai-hint="financial report chart"
             />
           </div>
         </CardContent>
@@ -28,3 +28,5 @@ export default function MonthlyReportPage() {
     </div>
   );
 }
+
+    

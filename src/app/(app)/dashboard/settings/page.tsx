@@ -14,13 +14,13 @@ export default function SettingsPage() {
           <CardDescription>Ajuste as configurações da sua conta e da aplicação.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Opções de Configuração em breve...</p>
+          <p className="text-muted-foreground">Funcionalidade de Configurações em desenvolvimento. Em breve você poderá ajustar dados da empresa, preferências de notificação, configurações de segurança e outras opções da aplicação.</p>
           <div className="mt-8 flex justify-center">
             <img 
               src="https://placehold.co/600x400.png" 
               alt="Placeholder para Configurações" 
               className="rounded-lg shadow-md"
-              data-ai-hint="settings interface" 
+              data-ai-hint="application settings interface" 
             />
           </div>
         </CardContent>
@@ -28,3 +28,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

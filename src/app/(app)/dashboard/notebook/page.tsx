@@ -14,13 +14,13 @@ export default function NotebookPage() {
           <CardDescription>Gerencie suas anotações e transações diárias aqui.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Conteúdo da Caderneta Digital em breve...</p>
+          <p className="text-muted-foreground">Funcionalidade de Caderneta Digital em desenvolvimento. Em breve você poderá adicionar, visualizar e gerenciar suas anotações e pequenas transações do dia a dia.</p>
           <div className="mt-8 flex justify-center">
             <img 
               src="https://placehold.co/600x400.png" 
               alt="Placeholder para Caderneta Digital" 
               className="rounded-lg shadow-md"
-              data-ai-hint="digital notebook" 
+              data-ai-hint="digital notebook transactions" 
             />
           </div>
         </CardContent>
@@ -28,3 +28,5 @@ export default function NotebookPage() {
     </div>
   );
 }
+
+    
