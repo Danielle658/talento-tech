@@ -17,12 +17,45 @@ import { useToast } from "@/hooks/use-toast";
 import { Building2, KeyRound, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
 
+// Helper function for CPF validation
+function isValidCPF(cpf: string): boolean {
+  if (typeof cpf !== 'string') return false;
+  cpf = cpf.replace(/[^\d]+/g, '');
+  if (cpf.length !== 11 || !!cpf.match(/(\d)\1{10}/)) return false;
+
+  const digits = cpf.split('').map(Number);
+
+  const calcDigit = (sliceEnd: number, weights: number[]): number => {
+    let sum = 0;
+    for (let i = 0; i < sliceEnd; i++) {
+      sum += digits[i] * weights[i];
+    }
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const dv1Weights = [10, 9, 8, 7, 6, 5, 4, 3, 2];
+  const dv1 = calcDigit(9, dv1Weights);
+  if (digits[9] !== dv1) return false;
+
+  const dv2Weights = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2];
+  const dv2 = calcDigit(10, dv2Weights);
+  if (digits[10] !== dv2) return false;
+
+  return true;
+}
+
+const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; // Adjusted for Brazilian mobile numbers
+
 const registerSchema = z.object({
   companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
   ownerName: z.string().min(2, { message: "Nome do proprietário é obrigatório." }),
   email: z.string().email({ message: "E-mail inválido." }),
-  phone: z.string().min(10, { message: "Número de telefone inválido." }),
-  cpf: z.string().length(11, { message: "CPF deve ter 11 dígitos." }), // Basic validation
+  phone: z.string().regex(phoneRegex, { message: "Número de telefone inválido. Use formato (XX) 9XXXX-XXXX ou similar." }),
+  cpf: z.string()
+    .min(11, { message: "CPF deve ter 11 dígitos." })
+    .max(14, { message: "CPF inválido."}) // Allow for masked input like 000.000.000-00
+    .refine(value => isValidCPF(value.replace(/[^\d]+/g, '')), { message: "CPF inválido." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   confirmPassword: z.string(),
   privacyTerms: z.boolean().refine(val => val === true, { message: "Você deve aceitar os termos de privacidade." }),
@@ -56,7 +89,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Register data:", data);
+    console.log("Register data:", { ...data, cpf: data.cpf.replace(/[^\d]+/g, '') }); // Log cleaned CPF
     toast({ title: "Registro bem-sucedido!", description: "Você pode fazer login agora." });
     registerForm.reset();
     setIsLoading(false);
@@ -133,7 +166,7 @@ export default function RegisterPage() {
                     <FormControl>
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="(XX) XXXXX-XXXX" {...field} className="pl-10" />
+                        <Input placeholder="(XX) 9XXXX-XXXX" {...field} className="pl-10" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -229,3 +262,4 @@ export default function RegisterPage() {
     </Card>
   );
 }
+
