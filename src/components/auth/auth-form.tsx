@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link'; // Adicionado import
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -102,7 +104,7 @@ export function AuthForm() {
               <LogIn className="mr-2 h-4 w-4" /> Login
             </TabsTrigger>
             <TabsTrigger value="register">
-              <UserPlus className="mr-2 h-4 w-4" /> Registro
+              <UserPlus className="mr-2 h-4 w-4" /> Se não possui conta, cadastre-se
             </TabsTrigger>
           </TabsList>
           <TabsContent value="login">
@@ -140,20 +142,25 @@ export function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={loginForm.control}
-                  name="rememberMe"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Lembrar-me</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                <div className="flex items-center justify-between">
+                  <FormField
+                    control={loginForm.control}
+                    name="rememberMe"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <FormLabel className="font-normal">Lembrar-me</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                   <Link href="/auth/forgot-password" // Ou uma rota real se existir
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Esqueceu a senha?
+                  </Link>
+                </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
                   Entrar
@@ -284,16 +291,16 @@ export function AuthForm() {
                   control={registerForm.control}
                   name="privacyTerms"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 pt-2"> {/* Aumentado espaço para melhor visualização */}
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel>
+                        <FormLabel className="font-normal"> 
                           Eu concordo com os <a href="/privacy" target="_blank" className="text-primary hover:underline">termos de privacidade</a>.
                         </FormLabel>
                       </div>
-                      <FormMessage className="col-span-full"/>
+                      <FormMessage /> {/* Movido para dentro do FormItem mas fora do div para melhor posicionamento da mensagem de erro */}
                     </FormItem>
                   )}
                 />
@@ -312,3 +319,5 @@ export function AuthForm() {
     </Card>
   );
 }
+
+    
