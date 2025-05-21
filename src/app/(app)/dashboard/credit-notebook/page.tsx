@@ -136,7 +136,7 @@ export default function CreditNotebookPage() {
 
     const receiptWindow = window.open('', '_blank');
     if (receiptWindow) {
-      receiptWindow.document.write(\`
+      receiptWindow.document.write(`
         <html>
           <head>
             <title>Comprovante de Pagamento</title>
@@ -164,15 +164,15 @@ export default function CreditNotebookPage() {
                 <p>Sua Empresa</p>
               </div>
               <div class="details">
-                <p><strong>Cliente:</strong> \${entry.customerName}</p>
-                <p><strong>Valor Pago:</strong> R$ \${entry.amount.toFixed(2)}</p>
-                <p><strong>Data do Pagamento:</strong> \${paymentDateFormatted}</p>
-                <p><strong>Referente à Venda de:</strong> \${saleDateFormatted}</p>
-                \${entry.notes ? \`<p><strong>Observações da Venda:</strong> \${entry.notes}</p>\` : ''}
+                <p><strong>Cliente:</strong> ${entry.customerName}</p>
+                <p><strong>Valor Pago:</strong> R$ ${entry.amount.toFixed(2)}</p>
+                <p><strong>Data do Pagamento:</strong> ${paymentDateFormatted}</p>
+                <p><strong>Referente à Venda de:</strong> ${saleDateFormatted}</p>
+                ${entry.notes ? `<p><strong>Observações da Venda:</strong> ${entry.notes}</p>` : ''}
               </div>
               <div class="footer">
                 <p>Obrigado pela preferência!</p>
-                <p>Gerado em: \${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</p>
+                <p>Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</p>
               </div>
             </div>
             <script>
@@ -183,7 +183,7 @@ export default function CreditNotebookPage() {
             <\/script>
           </body>
         </html>
-      \`);
+      `);
       receiptWindow.document.close();
     } else {
       toast({ title: "Erro ao Abrir Comprovante", description: "Não foi possível abrir a janela para impressão. Verifique as configurações do seu navegador.", variant: "destructive" });
@@ -199,8 +199,8 @@ export default function CreditNotebookPage() {
     const saleDateFormatted = isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR }) : "Data Inválida";
     const paymentDateFormatted = isValid(paymentDate) ? format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : "Data Inválida";
     
-    const message = \`🧾 *Comprovante de Pagamento - Sua Empresa*\\n\\nOlá \${entry.customerName},\\nConfirmamos o recebimento de *R$\${entry.amount.toFixed(2)}* referente à sua compra de \${saleDateFormatted}.\\n\\nPagamento confirmado em: \${paymentDateFormatted}\\n\\nObrigado!\`;
-    const whatsappUrl = \`https://wa.me/\${entry.whatsappNumber.replace(/\\D/g, '')}?text=\${encodeURIComponent(message)}\`;
+    const message = `🧾 *Comprovante de Pagamento - Sua Empresa*\\n\\nOlá ${entry.customerName},\\nConfirmamos o recebimento de *R$${entry.amount.toFixed(2)}* referente à sua compra de ${saleDateFormatted}.\\n\\nPagamento confirmado em: ${paymentDateFormatted}\\n\\nObrigado!`;
+    const whatsappUrl = `https://wa.me/${entry.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
      toast({ title: "Redirecionando para WhatsApp", description: "O comprovante de pagamento está pronto para ser enviado."});
   };

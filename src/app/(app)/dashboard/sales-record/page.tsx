@@ -106,9 +106,9 @@ export default function SalesRecordPage() {
     }
     const csvContent = "data:text/csv;charset=utf-8,"
       + ["ID da Venda", "Data", "Itens Vendidos", "Qtd Total Itens", "Valor Total (R$)", "Método Pagamento", "Valor Pago (R$)", "Troco (R$)"]
-          .map(header => \`"\${header}"\`).join(",") + "\n"
+          .map(header => `"${header}"`).join(",") + "\n"
       + filteredSales.map(sale => {
-          const itemsString = sale.items.map(item => \`\${item.quantity}x \${item.name} (R$\${item.unitPrice.toFixed(2)})\`).join("; ");
+          const itemsString = sale.items.map(item => `${item.quantity}x ${item.name} (R$${item.unitPrice.toFixed(2)})`).join("; ");
           const totalQuantity = sale.items.reduce((sum, item) => sum + item.quantity, 0);
           return [
             sale.id,
@@ -119,13 +119,13 @@ export default function SalesRecordPage() {
             sale.paymentMethod,
             sale.amountPaid?.toFixed(2) || sale.totalAmount.toFixed(2),
             sale.changeGiven?.toFixed(2) || "0.00"
-          ].map(field => \`"\${String(field).replace(/"/g, '""')}"\`).join(",");
+          ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(",");
         }).join("\n");
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", \`historico_vendas_moneywise_\${format(new Date(), "yyyyMMdd_HHmmss")}.csv\`);
+    link.setAttribute("download", `historico_vendas_moneywise_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -315,3 +315,4 @@ export default function SalesRecordPage() {
     </div>
   );
 }
+
