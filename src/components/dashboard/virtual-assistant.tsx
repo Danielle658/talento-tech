@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -31,7 +32,7 @@ export function VirtualAssistant() {
     setInputText('');
   };
   
-  const handleVoiceCommand = async ()_ => {
+  const handleVoiceCommand = async () => {
     // This is a placeholder. Real voice input would require microphone access and Speech-to-Text.
     // We'll use the current inputText as if it were a voice command.
     if (!inputText.trim()) {
