@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +9,34 @@ import { useToast } from "@/hooks/use-toast";
 import { BarChart3, Send, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
 
 export default function MonthlyReportPage() {
   const { toast } = useToast();
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [accountDetails, setAccountDetails] = useState<AccountDetailsFormValues | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+    if (storedAccountDetails) {
+        try {
+            const parsedDetails: AccountDetailsFormValues = JSON.parse(storedAccountDetails);
+            setAccountDetails(parsedDetails);
+            if (parsedDetails.phone) {
+                setWhatsappNumber(parsedDetails.phone.replace(/\D/g, '')); // Use cleaned phone number
+            }
+        } catch (error) {
+            console.error("Failed to parse account details from localStorage for monthly report", error);
+            localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY);
+            setAccountDetails(null);
+        }
+    }
+  }, []);
+
 
   const handleGenerateAndSendReport = async () => {
     if (!whatsappNumber.trim()) {
@@ -31,7 +54,8 @@ export default function MonthlyReportPage() {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     const currentMonthYear = format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
-    const reportMessage = `Olá! Segue o resumo do seu relatório mensal da MoneyWise para ${currentMonthYear}. Em breve, este relatório incluirá dados financeiros detalhados da sua empresa.`;
+    const companyNameToUse = accountDetails?.companyName || "Sua Empresa";
+    const reportMessage = `Olá! Segue o resumo do seu relatório mensal da MoneyWise (${companyNameToUse}) para ${currentMonthYear}. Em breve, este relatório incluirá dados financeiros detalhados da sua empresa.`;
     
     const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(reportMessage)}`;
 
@@ -39,12 +63,17 @@ export default function MonthlyReportPage() {
 
     toast({
       title: "Relatório Enviado!",
-      description: `O relatório de ${currentMonthYear} está sendo preparado para envio via WhatsApp.`,
+      description: `O relatório de ${currentMonthYear} está sendo preparado para envio via WhatsApp para o número ${whatsappNumber}.`,
     });
 
     setIsProcessing(false);
-    setWhatsappNumber(""); // Clear input after sending
+    // Do not clear whatsappNumber input after sending if it was pre-filled
+    // setWhatsappNumber(""); 
   };
+
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -62,17 +91,20 @@ export default function MonthlyReportPage() {
           <div className="p-4 border rounded-lg bg-card shadow space-y-4">
             <div>
               <label htmlFor="whatsappNumberReport" className="text-sm font-medium block mb-1">
-                Seu WhatsApp para Envio do Relatório (com DDD)
+                WhatsApp para Envio do Relatório (com DDD)
               </label>
               <Input
                 id="whatsappNumberReport"
                 placeholder="Ex: 5511912345678"
                 value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value)}
+                onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))} // Keep it clean
                 disabled={isProcessing}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Este número é pré-preenchido com o telefone das configurações da sua conta, mas você pode alterá-lo se necessário.
+              </p>
             </div>
-            <Button onClick={handleGenerateAndSendReport} disabled={isProcessing} className="w-full sm:w-auto">
+            <Button onClick={handleGenerateAndSendReport} disabled={isProcessing || !whatsappNumber.trim()} className="w-full sm:w-auto">
               {isProcessing ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -86,7 +118,6 @@ export default function MonthlyReportPage() {
             Atualmente, o "relatório" enviado é uma mensagem de texto resumida. Em futuras atualizações, esta seção permitirá visualizar gráficos de desempenho detalhados, principais KPIs do mês, comparativos com períodos anteriores e muito mais.
           </p>
           <div className="mt-8 flex justify-center">
-            {/* Image placeholder removed */}
             <p className="text-muted-foreground text-center py-4">Gráficos de relatório mensal serão exibidos aqui.</p>
           </div>
         </CardContent>
