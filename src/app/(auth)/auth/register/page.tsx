@@ -66,6 +66,8 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
+const ACCOUNT_DETAILS_STORAGE_KEY = "moneywise-accountDetails";
+
 export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -89,8 +91,23 @@ export default function RegisterPage() {
     setIsLoading(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Register data:", { ...data, cpf: data.cpf.replace(/[^\d]+/g, '') }); // Log cleaned CPF
-    toast({ title: "Registro bem-sucedido!", description: "Você pode fazer login agora." });
+    
+    const accountDetails = {
+      companyName: data.companyName,
+      ownerName: data.ownerName,
+      email: data.email,
+      phone: data.phone,
+      cpf: data.cpf.replace(/[^\d]+/g, ''), // Store cleaned CPF
+    };
+
+    try {
+      localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(accountDetails));
+      toast({ title: "Registro bem-sucedido!", description: "Você pode fazer login agora. Seus dados foram salvos." });
+    } catch (error) {
+      console.error("Failed to save account details to localStorage", error);
+      toast({ title: "Registro bem-sucedido (parcial)!", description: "Você pode fazer login, mas houve um erro ao salvar os detalhes da conta localmente.", variant: "destructive" });
+    }
+    
     registerForm.reset();
     setIsLoading(false);
     router.push('/auth'); // Redirect to login page
