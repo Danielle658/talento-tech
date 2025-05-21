@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, Save, Loader2, Building2, User, Mail, Phone, ScanLine } from "lucide-react";
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; // Importar a chave
 
 // Re-using validation logic from register page for consistency, simplified for settings
 const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
@@ -45,9 +46,9 @@ const accountDetailsSchema = z.object({
     .refine(value => isValidCPF(value.replace(/[^\d]+/g, '')), { message: "CPF inválido." }),
 });
 
-export type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>; // Export the type
+export type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>;
 
-export const ACCOUNT_DETAILS_STORAGE_KEY = "moneywise-accountDetails"; // Export the key
+// ACCOUNT_DETAILS_STORAGE_KEY is now imported
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -217,6 +218,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-
-    

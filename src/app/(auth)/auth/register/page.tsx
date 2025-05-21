@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { Building2, KeyRound, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; // Importar a chave
 
 // Helper function for CPF validation
 function isValidCPF(cpf: string): boolean {
@@ -65,8 +66,6 @@ const registerSchema = z.object({
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
-
-const ACCOUNT_DETAILS_STORAGE_KEY = "moneywise-accountDetails";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -279,4 +278,3 @@ export default function RegisterPage() {
     </Card>
   );
 }
-
