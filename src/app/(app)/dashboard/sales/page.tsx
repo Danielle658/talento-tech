@@ -10,12 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2 } from "lucide-react";
+import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
 import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
-import type { ProductEntry } from "@/app/(app)/dashboard/products/page"; // Import ProductEntry
+import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
+import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page"; // Import CustomerEntry
+import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page"; // Import storage key
 
 
 // Interface for products within the PDV, compatible with ProductEntry
@@ -46,6 +48,9 @@ export default function SalesPage() {
   const [cameraScannedCode, setCameraScannedCode] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [availableProducts, setAvailableProducts] = useState<ProductEntry[]>([]);
+  const [availableCustomers, setAvailableCustomers] = useState<CustomerEntry[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -55,6 +60,14 @@ export default function SalesPage() {
         setAvailableProducts(JSON.parse(storedProducts));
       } catch (error) {
         console.error("Failed to parse products from localStorage for PDV", error);
+      }
+    }
+    const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
+    if (storedCustomers) {
+      try {
+        setAvailableCustomers(JSON.parse(storedCustomers));
+      } catch (error) {
+        console.error("Failed to parse customers from localStorage for PDV", error);
       }
     }
   }, []);
@@ -182,10 +195,14 @@ export default function SalesPage() {
     }
 
     const saleDate = new Date();
+    const selectedCustomer = availableCustomers.find(c => c.id === selectedCustomerId);
+    const customerNameForRecord = selectedCustomer ? selectedCustomer.name : "Cliente Avulso";
+
+    const incomeTransactionDescription = `Venda PDV ${customerNameForRecord ? `(${customerNameForRecord})` : ''} - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`;
 
     const incomeTransaction: Transaction = {
       id: `T-SALE-${Date.now().toString().slice(-6)}`,
-      description: `Venda PDV - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`,
+      description: incomeTransactionDescription,
       amount: cartTotal,
       type: "income",
       date: saleDate,
@@ -208,6 +225,8 @@ export default function SalesPage() {
       date: saleDate.toISOString(),
       amountPaid: paymentMethod === "Dinheiro" ? amountPaid : cartTotal,
       changeGiven: paymentMethod === "Dinheiro" ? changeDue : 0,
+      customerId: selectedCustomerId,
+      customerName: customerNameForRecord,
     };
 
     try {
@@ -221,7 +240,7 @@ export default function SalesPage() {
 
     toast({
       title: "Venda Finalizada!",
-      description: `Venda de R$ ${cartTotal.toFixed(2)} paga com ${paymentMethod}. ${paymentMethod === "Dinheiro" ? `Troco: R$ ${changeDue.toFixed(2)}.` : ''}`,
+      description: `Venda de R$ ${cartTotal.toFixed(2)} para ${customerNameForRecord} paga com ${paymentMethod}. ${paymentMethod === "Dinheiro" ? `Troco: R$ ${changeDue.toFixed(2)}.` : ''}`,
       className: "bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-700"
     });
 
@@ -229,6 +248,7 @@ export default function SalesPage() {
     setProductCodeInput("");
     setAmountPaidInput("");
     setPaymentMethod(undefined);
+    setSelectedCustomerId(undefined); // Reset selected customer
   };
 
   if (!isMounted) {
@@ -243,10 +263,39 @@ export default function SalesPage() {
             <ShoppingCart className="h-7 w-7 text-primary" />
             <CardTitle className="text-2xl">Ponto de Venda (PDV)</CardTitle>
           </div>
-          <CardDescription>Registre vendas rapidamente escaneando produtos e processando pagamentos. Os dados são salvos localmente.</CardDescription>
+          <CardDescription>Registre vendas rapidamente. Os dados são salvos localmente.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+             <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5"/> Cliente</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                        <SelectTrigger id="customerSelect">
+                        <SelectValue placeholder="Selecione um cliente (opcional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="default_consumer">Cliente Avulso</SelectItem>
+                        {availableCustomers.map(customer => (
+                            <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                    {selectedCustomerId && selectedCustomerId !== 'default_consumer' && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                            Cliente selecionado: {availableCustomers.find(c=>c.id === selectedCustomerId)?.name}
+                        </p>
+                    )}
+                     {(!selectedCustomerId || selectedCustomerId === 'default_consumer') && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                            Nenhum cliente específico selecionado (venda para Cliente Avulso).
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2"><Barcode className="h-5 w-5"/> Adicionar Produto</CardTitle>

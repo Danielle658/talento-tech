@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FilePlus2, History, Search, Download, Trash2, Loader2, ListFilter, Eye } from "lucide-react";
+import { FilePlus2, History, Search, Download, Trash2, Loader2, ListFilter, Eye, User } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,8 @@ export interface SalesRecordEntry {
   date: string; // ISO string
   amountPaid?: number; // For cash transactions
   changeGiven?: number; // For cash transactions
+  customerId?: string;
+  customerName?: string;
 }
 
 const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
@@ -66,7 +68,8 @@ export default function SalesRecordPage() {
         const saleDate = parseISO(sale.date);
         const matchesSearch = searchTerm === "" || 
           sale.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          sale.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+          sale.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (sale.customerName && sale.customerName.toLowerCase().includes(searchTerm.toLowerCase()));
         
         const matchesPayment = filterPaymentMethod === "all" || sale.paymentMethod === filterPaymentMethod;
         
@@ -104,7 +107,7 @@ export default function SalesRecordPage() {
       return;
     }
     const csvContent = "data:text/csv;charset=utf-8,"
-      + ["ID da Venda", "Data", "Itens Vendidos", "Qtd Total Itens", "Valor Total (R$)", "Método Pagamento", "Valor Pago (R$)", "Troco (R$)"]
+      + ["ID da Venda", "Data", "Cliente", "Itens Vendidos", "Qtd Total Itens", "Valor Total (R$)", "Método Pagamento", "Valor Pago (R$)", "Troco (R$)"]
           .map(header => `"${header}"`).join(",") + "\n"
       + filteredSales.map(sale => {
           const itemsString = sale.items.map(item => `${item.quantity}x ${item.name} (R$${item.unitPrice.toFixed(2)})`).join("; ");
@@ -112,6 +115,7 @@ export default function SalesRecordPage() {
           return [
             sale.id,
             isValid(parseISO(sale.date)) ? format(parseISO(sale.date), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "Data Inválida",
+            sale.customerName || "Cliente Avulso",
             itemsString,
             totalQuantity,
             sale.totalAmount.toFixed(2),
@@ -161,7 +165,7 @@ export default function SalesRecordPage() {
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             id="searchTerm"
-                            placeholder="ID da venda, nome do produto..."
+                            placeholder="ID, produto, cliente..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10"
@@ -224,6 +228,7 @@ export default function SalesRecordPage() {
                   <TableRow>
                     <TableHead>ID Venda</TableHead>
                     <TableHead>Data</TableHead>
+                    <TableHead>Cliente</TableHead>
                     <TableHead className="text-right">Valor Total (R$)</TableHead>
                     <TableHead>Pagamento</TableHead>
                     <TableHead className="text-center">Itens</TableHead>
@@ -235,6 +240,7 @@ export default function SalesRecordPage() {
                     <TableRow key={sale.id}>
                       <TableCell className="font-medium">{sale.id}</TableCell>
                       <TableCell>{isValid(parseISO(sale.date)) ? format(parseISO(sale.date), "dd/MM/yy HH:mm", { locale: ptBR }) : "Inválida"}</TableCell>
+                      <TableCell>{sale.customerName || "Cliente Avulso"}</TableCell>
                       <TableCell className="text-right font-semibold">R$ {sale.totalAmount.toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant={
@@ -277,6 +283,9 @@ export default function SalesRecordPage() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+                    {selectedSale.customerName && (
+                        <p><strong>Cliente:</strong> {selectedSale.customerName}</p>
+                    )}
                     <h4 className="font-semibold">Itens Vendidos:</h4>
                     <ul className="list-disc pl-5 space-y-1 text-sm">
                         {selectedSale.items.map(item => (

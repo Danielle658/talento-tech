@@ -29,7 +29,7 @@ export interface CustomerEntry extends CustomerFormValues {
   id: string;
 }
 
-const STORAGE_KEY_CUSTOMERS = "moneywise-customers";
+export const STORAGE_KEY_CUSTOMERS = "moneywise-customers";
 
 export default function CustomersPage() {
   const { toast } = useToast();
