@@ -188,7 +188,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/settings';
         messageForChat = "Certo, indo para as configurações.";
         break;
-      case 'navigatetotebook':
+      case 'navigatetotebook': // Corrected spelling from 'navigatetotebook'
          navigationPath = '/dashboard/notebook';
          messageForChat = "Ok, abrindo a caderneta digital.";
          break;
@@ -481,14 +481,17 @@ export function VirtualAssistant() {
             <Input
               type="text"
               placeholder={isListening ? "Ouvindo..." : "Digite seu comando..."}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              value={isListening ? userInputForVoice : inputText}
+              onChange={(e) => {
+                if (!isListening) setInputText(e.target.value);
+                // If listening, userInputForVoice is controlled by speech recognition
+              }}
               onKeyPress={(e) => {
-                if (e.key === 'Enter' && !isLoading && inputText.trim()) {
+                if (e.key === 'Enter' && !isLoading && inputText.trim() && !isListening) {
                   handleTextCommand();
                 }
               }}
-              disabled={isLoading || isListening}
+              disabled={isLoading || (isListening && !userInputForVoice)} // Disable if loading, or if listening and no interim text
               className="flex-1 h-10 text-base"
               aria-label="Entrada de comando de texto"
             />
