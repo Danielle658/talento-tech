@@ -46,18 +46,19 @@ export default function ProductsPage() {
       } catch (error) {
         console.error("Failed to parse products from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_PRODUCTS);
-        setProducts([]); // Reset state on error
+        setProducts([]); 
+        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os dados do catálogo de produtos. Os dados podem ter sido redefinidos.", variant: "destructive" });
       }
     } else {
-      setProducts([]); // Ensure default empty state
+      setProducts([]); 
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (isMounted && products.length > 0) {
       localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
     } else if (isMounted && products.length === 0) {
-        localStorage.removeItem(STORAGE_KEY_PRODUCTS); // Clean up if all products are removed
+        localStorage.removeItem(STORAGE_KEY_PRODUCTS); 
     }
   }, [products, isMounted]);
 
@@ -259,5 +260,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-
-    

@@ -113,8 +113,7 @@ export function VirtualAssistant() {
       };
       setRecognition(recognitionInstance);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, [toast]); 
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -197,12 +196,13 @@ export function VirtualAssistant() {
       case 'querytotalrevenue':
         try {
           const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
-          const transactions: Transaction[] = storedTransactions ? JSON.parse(storedTransactions) : [];
+          const transactions: Transaction[] = storedTransactions ? JSON.parse(storedTransactions).map((t: any) => ({...t, date: new Date(t.date)})) : [];
           const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
           messageForChat = `Sua receita total registrada na caderneta digital é de R$ ${totalIncome.toFixed(2)}.`;
         } catch (e) {
           console.error("Error parsing transactions for queryTotalRevenue:", e);
-          messageForChat = "Desculpe, não consegui calcular a receita total. Verifique os dados na Caderneta Digital.";
+          messageForChat = "Desculpe, não consegui calcular a receita total. Verifique os dados na Caderneta Digital ou se há erros de carregamento.";
+          toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados da caderneta para calcular receita.'})
         }
         break;
       case 'querytotalcustomers':
@@ -212,29 +212,32 @@ export function VirtualAssistant() {
           messageForChat = `Você tem ${customers.length} clientes cadastrados.`;
         } catch (e) {
           console.error("Error parsing customers for queryTotalCustomers:", e);
-          messageForChat = "Desculpe, não consegui contar os clientes. Verifique os dados em Contas de Clientes.";
+          messageForChat = "Desculpe, não consegui contar os clientes. Verifique os dados em Contas de Clientes ou se há erros de carregamento.";
+          toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de clientes.'})
         }
         break;
       case 'querytotalduefiados':
         try {
           const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries) : [];
+          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries).map((entry: any) => ({ ...entry, saleDate: new Date(entry.saleDate), dueDate: entry.dueDate ? new Date(entry.dueDate) : undefined })) : [];
           const totalDue = creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
           messageForChat = `O total pendente na caderneta de fiados é de R$ ${totalDue.toFixed(2)}.`;
         } catch (e) {
           console.error("Error parsing credit entries for queryTotalDueFiados:", e);
-          messageForChat = "Desculpe, não consegui calcular o total de fiados. Verifique os dados na Caderneta de Fiados.";
+          messageForChat = "Desculpe, não consegui calcular o total de fiados. Verifique os dados na Caderneta de Fiados ou se há erros de carregamento.";
+          toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de fiados.'})
         }
         break;
       case 'querypendingfiadoscount':
         try {
           const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries) : [];
+          const creditEntries: CreditEntry[] = storedCreditEntries ? JSON.parse(storedCreditEntries).map((entry: any) => ({ ...entry, saleDate: new Date(entry.saleDate), dueDate: entry.dueDate ? new Date(entry.dueDate) : undefined })) : [];
           const pendingCount = creditEntries.filter(entry => !entry.paid).length;
           messageForChat = `Você tem ${pendingCount} fiados pendentes de pagamento.`;
         } catch (e) {
           console.error("Error parsing credit entries for queryPendingFiadosCount:", e);
-          messageForChat = "Desculpe, não consegui contar os fiados pendentes.";
+          messageForChat = "Desculpe, não consegui contar os fiados pendentes. Verifique os dados ou se há erros de carregamento.";
+           toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de fiados pendentes.'})
         }
         break;
       case 'querylowstockproductscount':
@@ -248,7 +251,8 @@ export function VirtualAssistant() {
           messageForChat = `Você tem ${lowStockCount} produtos com estoque baixo (igual ou inferior a ${LOW_STOCK_THRESHOLD} unidades).`;
         } catch (e) {
           console.error("Error parsing products for queryLowStockProductsCount:", e);
-          messageForChat = "Desculpe, não consegui verificar o estoque dos produtos.";
+          messageForChat = "Desculpe, não consegui verificar o estoque dos produtos. Verifique os dados ou se há erros de carregamento.";
+          toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de produtos para estoque.'})
         }
         break;
       
@@ -298,6 +302,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard';
         break;
       case 'showsakes': 
+      case 'showsales': // Legacy compatibility
         navigationPath = '/dashboard/sales-record';
         messageForChat = "Ok, abrindo o histórico de vendas.";
         break;
@@ -334,6 +339,7 @@ export function VirtualAssistant() {
 
     if (navigationPath) {
       router.push(navigationPath);
+      setIsDialogOpen(false); // Close dialog after navigation
     }
     return messageForChat;
   };
@@ -511,5 +517,3 @@ export function VirtualAssistant() {
     </Dialog>
   );
 }
-
-    

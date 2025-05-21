@@ -69,12 +69,13 @@ export default function NotebookPage() {
       } catch (error) {
         console.error("Failed to parse transactions from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
-        setTransactions([]); // Reset state on error
+        setTransactions([]); 
+        toast({ title: "Erro ao Carregar Transações", description: "Não foi possível carregar os dados da caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive" });
       }
     } else {
-      setTransactions([]); // Ensure default empty state
+      setTransactions([]); 
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (isMounted && transactions.length > 0) { 
@@ -82,7 +83,7 @@ export default function NotebookPage() {
         transactions.map(t => ({...t, date: t.date.toISOString() })) 
       ));
     } else if (isMounted && transactions.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_NOTEBOOK); // Clean up if all transactions are removed
+      localStorage.removeItem(STORAGE_KEY_NOTEBOOK); 
     }
   }, [transactions, isMounted]);
 
@@ -390,5 +391,3 @@ export default function NotebookPage() {
       </Card>
     </div>;
 }
-
-    

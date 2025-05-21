@@ -19,6 +19,7 @@ import { CustomerEntry, STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/cust
 import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useToast } from "@/hooks/use-toast";
 
 interface DisplayTransaction {
   id: string;
@@ -44,9 +45,10 @@ const kpiConfigurations = [
   { id: "lowStockProducts", title: "Estoque Baixo", icon: Archive, defaultDescription: "Aguardando dados" },
 ];
 
-const placeholderNotifications: any[] = []; // Cleared placeholder notifications
+const placeholderNotifications: any[] = []; 
 
 export default function DashboardPage() {
+  const { toast } = useToast();
   const [isMounted, setIsMounted] = useState(false);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [allSalesRecords, setAllSalesRecords] = useState<SalesRecordEntry[]>([]);
@@ -65,27 +67,42 @@ export default function DashboardPage() {
         const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
         if (storedTransactions) {
           setAllTransactions(JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})));
+        } else {
+          setAllTransactions([]);
         }
       } catch (error) {
         console.error("Error loading transactions from localStorage", error);
+        localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
+        setAllTransactions([]);
+        toast({ variant: "destructive", title: "Erro ao Carregar Caderneta Digital", description: "Os dados da caderneta digital podem estar corrompidos e foram redefinidos."});
       }
 
       try {
         const storedSales = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
         if (storedSales) {
           setAllSalesRecords(JSON.parse(storedSales));
+        } else {
+          setAllSalesRecords([]);
         }
       } catch (error) {
         console.error("Error loading sales records from localStorage", error);
+        localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
+        setAllSalesRecords([]);
+        toast({ variant: "destructive", title: "Erro ao Carregar Histórico de Vendas", description: "Os dados do histórico de vendas podem estar corrompidos e foram redefinidos."});
       }
 
       try {
         const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
         if (storedProducts) {
           setProductCatalog(JSON.parse(storedProducts));
+        } else {
+          setProductCatalog([]);
         }
       } catch (error) {
         console.error("Error loading product catalog from localStorage", error);
+        localStorage.removeItem(STORAGE_KEY_PRODUCTS);
+        setProductCatalog([]);
+        toast({ variant: "destructive", title: "Erro ao Carregar Catálogo de Produtos", description: "Os dados dos produtos podem estar corrompidos e foram redefinidos."});
       }
 
       try {
@@ -97,21 +114,31 @@ export default function DashboardPage() {
             dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
           }));
           setAllCreditEntries(parsedEntries);
+        } else {
+          setAllCreditEntries([]);
         }
       } catch (error) {
         console.error("Error loading credit entries from localStorage", error);
+        localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+        setAllCreditEntries([]);
+        toast({ variant: "destructive", title: "Erro ao Carregar Caderneta de Fiados", description: "Os dados de fiados podem estar corrompidos e foram redefinidos."});
       }
 
       try {
         const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
         if (storedCustomers) {
           setAllCustomers(JSON.parse(storedCustomers));
+        } else {
+          setAllCustomers([]);
         }
       } catch (error) {
         console.error("Error loading customers from localStorage", error);
+        localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
+        setAllCustomers([]);
+        toast({ variant: "destructive", title: "Erro ao Carregar Clientes", description: "Os dados dos clientes podem estar corrompidos e foram redefinidos."});
       }
     }
-  }, [isMounted]);
+  }, [isMounted, toast]);
 
   const recentTransactionsData = useMemo((): DisplayTransaction[] => {
     if (!isMounted || !allTransactions) return [];
@@ -165,7 +192,6 @@ export default function DashboardPage() {
           stock: data.stock,
         }));
     } else if (productCatalog.length > 0) {
-      // Fallback if no sales, show some products from catalog
       return productCatalog.slice(0,3).map(p => ({
          id: p.id,
          name: p.name,
@@ -177,7 +203,6 @@ export default function DashboardPage() {
     return [];
   }, [isMounted, allSalesRecords, productCatalog]);
 
-  // Dynamic KPI Calculations
   const totalRevenueKPI = useMemo(() => {
     if (!isMounted || !allTransactions) return { value: "R$ 0,00", description: "Calculando..." };
     const income = allTransactions
@@ -241,7 +266,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {dynamicKpis.map((kpi) => (
           <KpiCard key={kpi.title} title={kpi.title} value={kpi.value} icon={kpi.icon} description={kpi.description} />
@@ -249,7 +273,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content area */}
         <div className="lg:col-span-2 space-y-6">
           <DataSection
             title="Caderneta Digital (Últimas Transações)"
@@ -325,9 +348,7 @@ export default function DashboardPage() {
           </DataSection>
         </div>
 
-        {/* Sidebar/Aside content area */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Notifications Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><BellRing className="h-5 w-5 text-primary" /> Notificações Recentes</CardTitle>

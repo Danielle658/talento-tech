@@ -11,9 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, Save, Loader2, Building2, User, Mail, Phone, ScanLine } from "lucide-react";
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; // Importar a chave
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; 
 
-// Re-using validation logic from register page for consistency, simplified for settings
 const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
 function isValidCPF(cpf: string): boolean {
   if (typeof cpf !== 'string') return false;
@@ -48,7 +47,6 @@ const accountDetailsSchema = z.object({
 
 export type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>;
 
-// ACCOUNT_DETAILS_STORAGE_KEY is now imported
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -75,9 +73,11 @@ export default function SettingsPage() {
         form.reset(parsedDetails);
       } catch (error) {
         console.error("Failed to parse account details from localStorage", error);
+        localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY); 
+        form.reset({ companyName: "", ownerName: "", email: "", phone: "", cpf: ""}); // Reset form to default
         toast({
-          title: "Erro ao carregar dados",
-          description: "Não foi possível carregar os dados da conta salvos.",
+          title: "Erro ao Carregar Dados da Conta",
+          description: "Não foi possível carregar os dados da conta salvos. As informações podem ter sido redefinidas.",
           variant: "destructive",
         });
       }

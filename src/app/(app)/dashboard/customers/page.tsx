@@ -47,18 +47,19 @@ export default function CustomersPage() {
       } catch (error) {
         console.error("Failed to parse customers from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
-        setCustomers([]); // Reset state on error
+        setCustomers([]); 
+        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os dados dos clientes. Os dados podem ter sido redefinidos.", variant: "destructive" });
       }
     } else {
-        setCustomers([]); // Ensure default empty state
+        setCustomers([]); 
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (isMounted && customers.length > 0) {
       localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(customers));
     } else if (isMounted && customers.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_CUSTOMERS); // Clean up if all customers are removed
+      localStorage.removeItem(STORAGE_KEY_CUSTOMERS); 
     }
   }, [customers, isMounted]);
 
@@ -295,5 +296,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    

@@ -39,6 +39,7 @@ export interface SalesRecordEntry {
 export const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
 
 export default function SalesRecordPage() {
+  const { toast } = useToast();
   const [salesHistory, setSalesHistory] = useState<SalesRecordEntry[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,7 +47,7 @@ export default function SalesRecordPage() {
   const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
   const [selectedSale, setSelectedSale] = useState<SalesRecordEntry | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const { toast } = useToast();
+  
 
   useEffect(() => {
     setIsMounted(true);
@@ -57,12 +58,13 @@ export default function SalesRecordPage() {
       } catch (error) {
         console.error("Failed to parse sales history from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
-        setSalesHistory([]); // Reset state on error
+        setSalesHistory([]); 
+        toast({ title: "Erro ao Carregar Histórico de Vendas", description: "Não foi possível carregar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive" });
       }
     } else {
-      setSalesHistory([]); // Ensure default empty state
+      setSalesHistory([]); 
     }
-  }, []);
+  }, [toast]);
 
   const filteredSales = useMemo(() => {
     if (!isMounted) return [];
@@ -320,5 +322,3 @@ export default function SalesRecordPage() {
     </div>
   );
 }
-
-    

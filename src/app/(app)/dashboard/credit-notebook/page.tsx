@@ -64,10 +64,11 @@ export default function CreditNotebookPage() {
       } catch (error) {
         console.error("Failed to parse credit entries from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); 
-        setCreditEntries([]); // Reset state on error
+        setCreditEntries([]); 
+        toast({ title: "Erro ao Carregar Fiados", description: "Não foi possível carregar os dados da caderneta de fiados. Os dados podem ter sido redefinidos.", variant: "destructive" });
       }
     } else {
-      setCreditEntries([]); // Ensure default empty state
+      setCreditEntries([]); 
     }
 
     const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
@@ -77,10 +78,11 @@ export default function CreditNotebookPage() {
         } catch (error) {
             console.error("Failed to parse account details from localStorage for credit notebook", error);
             localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY);
-            setAccountDetails(null); // Reset state on error
+            setAccountDetails(null); 
+            toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta para usar nos comprovantes. Os dados podem ter sido redefinidos.", variant: "destructive", duration: 7000 });
         }
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (isMounted && creditEntries.length > 0) { 
@@ -90,7 +92,7 @@ export default function CreditNotebookPage() {
         dueDate: entry.dueDate ? entry.dueDate.toISOString() : undefined,
       }))));
     } else if (isMounted && creditEntries.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); // Clean up if all entries are removed
+      localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); 
     }
 
     if (isMounted) {
@@ -103,7 +105,6 @@ export default function CreditNotebookPage() {
       );
 
       if (dueTodayEntries.length > 0) {
-        // Check if a toast for this specific day has already been shown
         const lastToastDate = localStorage.getItem('moneywise-credit-due-toast-date');
         const todayStr = format(today, 'yyyy-MM-dd');
 
@@ -117,8 +118,7 @@ export default function CreditNotebookPage() {
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creditEntries, isMounted]);
+  }, [creditEntries, isMounted, toast]);
 
   const form = useForm<CreditEntryFormValues>({
     resolver: zodResolver(creditEntrySchema),
@@ -492,7 +492,3 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
-
-    
-
-    

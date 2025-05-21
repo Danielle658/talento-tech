@@ -60,6 +60,7 @@ export default function SalesPage() {
         console.error("Failed to parse products from localStorage for PDV", error);
         localStorage.removeItem(STORAGE_KEY_PRODUCTS);
         setAvailableProducts([]); 
+        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os produtos para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive" });
       }
     } else {
         setAvailableProducts([]); 
@@ -73,11 +74,12 @@ export default function SalesPage() {
         console.error("Failed to parse customers from localStorage for PDV", error);
         localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
         setAvailableCustomers([]); 
+        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os clientes para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive" });
       }
     } else {
         setAvailableCustomers([]); 
     }
-  }, []);
+  }, [toast]);
 
 
   const addProductToCartByCode = (code: string) => {
@@ -220,7 +222,7 @@ export default function SalesPage() {
         localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
     } catch (e) {
         console.error("Error updating notebook transactions in localStorage", e);
-        toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital.", variant: "destructive"})
+        toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive"})
     }
 
     const salesRecordEntry: SalesRecordEntry = {
@@ -241,7 +243,7 @@ export default function SalesPage() {
         localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify([...existingSalesRecords, salesRecordEntry]));
     } catch (e) {
         console.error("Error updating sales records in localStorage", e);
-        toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas.", variant: "destructive"})
+        toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive"})
     }
 
     toast({
@@ -328,8 +330,7 @@ export default function SalesPage() {
                     <DialogHeader>
                       <DialogTitle>Escanear Código de Barras com a Câmera</DialogTitle>
                       <DialogDescription>
-                        Aponte a câmera para o código de barras do produto.
-                        Se a leitura não ocorrer automaticamente, digite o código no campo abaixo.
+                        Aponte a câmera para o código de barras do produto. Se a leitura não ocorrer automaticamente, digite o código no campo abaixo.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
@@ -497,5 +498,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    

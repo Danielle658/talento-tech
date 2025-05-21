@@ -27,15 +27,16 @@ export default function MonthlyReportPage() {
             const parsedDetails: AccountDetailsFormValues = JSON.parse(storedAccountDetails);
             setAccountDetails(parsedDetails);
             if (parsedDetails.phone) {
-                setWhatsappNumber(parsedDetails.phone.replace(/\D/g, '')); // Use cleaned phone number
+                setWhatsappNumber(parsedDetails.phone.replace(/\D/g, '')); 
             }
         } catch (error) {
             console.error("Failed to parse account details from localStorage for monthly report", error);
             localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY);
             setAccountDetails(null);
+            toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta. Os dados podem ter sido redefinidos.", variant: "destructive" });
         }
     }
-  }, []);
+  }, [toast]);
 
 
   const handleGenerateAndSendReport = async () => {
@@ -50,7 +51,6 @@ export default function MonthlyReportPage() {
 
     setIsProcessing(true);
 
-    // Simulate report generation
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     const currentMonthYear = format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
@@ -67,8 +67,6 @@ export default function MonthlyReportPage() {
     });
 
     setIsProcessing(false);
-    // Do not clear whatsappNumber input after sending if it was pre-filled
-    // setWhatsappNumber(""); 
   };
 
   if (!isMounted) {
@@ -97,7 +95,7 @@ export default function MonthlyReportPage() {
                 id="whatsappNumberReport"
                 placeholder="Ex: 5511912345678"
                 value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))} // Keep it clean
+                onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))} 
                 disabled={isProcessing}
               />
               <p className="text-xs text-muted-foreground mt-1">
