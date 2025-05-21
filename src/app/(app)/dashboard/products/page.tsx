@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Briefcase, PlusCircle, Trash2, DollarSign, Package, Tag, Barcode, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import Image from "next/image";
+
 
 const productSchema = z.object({
   name: z.string().min(2, { message: "Nome do produto é obrigatório." }),
@@ -216,14 +216,6 @@ export default function ProductsPage() {
               <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
               <p className="mt-4 text-lg font-medium">Nenhum produto ou serviço cadastrado.</p>
               <p className="text-muted-foreground">Clique em "Adicionar Novo" para começar.</p>
-              <Image
-                src="https://placehold.co/600x300.png"
-                alt="Placeholder Catálogo Vazio"
-                width={600}
-                height={300}
-                className="rounded-lg shadow-md mt-6 mx-auto"
-                data-ai-hint="empty product catalog"
-              />
             </div>
           ) : (
             <div className="overflow-x-auto">

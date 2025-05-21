@@ -22,7 +22,7 @@ import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartConfig } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'; // Removed Legend as it's handled by ChartLegendContent
-import Image from "next/image";
+
 
 const transactionSchema = z.object({
   description: z.string().min(2, { message: "Descrição é obrigatória." }),
@@ -348,16 +348,6 @@ export default function NotebookPage() {
                     <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
                     <p className="mt-4 text-lg font-medium">Nenhuma transação registrada ainda.</p>
                     <p className="text-muted-foreground">Clique em "Adicionar Transação" para começar.</p>
-                    <div className="mt-6">
-                      <Image 
-                          src="https://placehold.co/600x300.png" 
-                          alt="Placeholder Caderneta Vazia" 
-                          width={600}
-                          height={300}
-                          className="rounded-lg shadow-md mx-auto"
-                          data-ai-hint="empty state finance"
-                      />
-                    </div>
                 </div>
             ) : (
                 <div className="overflow-x-auto">

@@ -49,27 +49,16 @@ export default function CustomersPage() {
               ))}
                {sampleCustomers.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                    <Users className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
                     Nenhum cliente cadastrado ainda.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-          {sampleCustomers.length === 0 && (
-             <div className="mt-8 flex justify-center">
-                <img 
-                src="https://placehold.co/600x400.png" 
-                alt="Placeholder para Contas de Clientes" 
-                className="rounded-lg shadow-md"
-                data-ai-hint="customer management empty" 
-                />
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
   );
 }
-
-    

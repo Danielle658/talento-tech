@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
 import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
 import type { ProductEntry } from "@/app/(app)/dashboard/products/page"; // Import ProductEntry
-import Image from "next/image";
+
 
 // Interface for products within the PDV, compatible with ProductEntry
 interface PDVProduct {
@@ -320,14 +320,6 @@ export default function SalesPage() {
                     <ShoppingCart className="h-12 w-12 mx-auto mb-2" />
                     <p>O carrinho está vazio.</p>
                     <p className="text-sm">Adicione produtos usando o código acima.</p>
-                     <Image 
-                        src="https://placehold.co/400x200.png" 
-                        alt="Carrinho Vazio" 
-                        width={400}
-                        height={200}
-                        className="rounded-lg shadow-sm mt-4 mx-auto"
-                        data-ai-hint="empty cart shopping" 
-                    />
                   </div>
                 ) : (
                   <div className="overflow-x-auto">

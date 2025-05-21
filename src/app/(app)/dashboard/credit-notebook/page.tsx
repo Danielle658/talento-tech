@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import Image from "next/image";
+
 
 const creditEntrySchema = z.object({
   customerName: z.string().min(2, { message: "Nome do cliente é obrigatório." }),
@@ -180,7 +180,7 @@ export default function CreditNotebookPage() {
                 window.print();
                 window.onafterprint = () => window.close();
               }, 250);
-            <\/script>
+            </script>
           </body>
         </html>
       `);
@@ -363,14 +363,6 @@ export default function CreditNotebookPage() {
               <BookUser className="mx-auto h-12 w-12 text-muted-foreground" />
               <p className="mt-4 text-lg font-medium">Nenhum fiado registrado ainda.</p>
               <p className="text-muted-foreground">Clique em "Adicionar Novo Fiado" para começar.</p>
-              <Image 
-                src="https://placehold.co/600x300.png" 
-                alt="Placeholder Caderneta de Fiados Vazia" 
-                width={600}
-                height={300}
-                className="rounded-lg shadow-md mt-6 mx-auto"
-                data-ai-hint="empty state finance" 
-              />
             </div>
           ) : (
             <div className="overflow-x-auto">

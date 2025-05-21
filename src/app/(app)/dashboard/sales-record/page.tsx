@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -217,14 +216,6 @@ export default function SalesRecordPage() {
               <History className="mx-auto h-12 w-12 text-muted-foreground" />
               <p className="mt-4 text-lg font-medium">Nenhum registro de venda encontrado.</p>
               <p className="text-muted-foreground">Tente ajustar os filtros ou registre novas vendas no PDV.</p>
-              <Image 
-                src="https://placehold.co/600x300.png" 
-                alt="Placeholder Histórico Vazio" 
-                width={600}
-                height={300}
-                className="rounded-lg shadow-md mt-6 mx-auto"
-                data-ai-hint="empty state sales"
-              />
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -315,4 +306,3 @@ export default function SalesRecordPage() {
     </div>
   );
 }
-
