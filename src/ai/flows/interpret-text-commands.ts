@@ -32,7 +32,8 @@ const InterpretTextCommandsOutputSchema = z.object({
       'The action to perform based on the command. Examples: \'navigateToDashboard\', \'navigateToNotebook\', \'navigateToCustomers\', \'navigateToSales\', \'navigateToProducts\', \'navigateToCreditNotebook\', \'navigateToSalesRecord\', \'navigateToMonthlyReport\', \'navigateToSettings\', \'queryTotalRevenue\', \'queryTotalCustomers\', \'queryTotalDueFiados\', \'queryPendingFiadosCount\', \'queryLowStockProductsCount\', \'initiateAddCustomer\', \'initiateAddCreditEntry\', \'initiateAddTransaction\', \'initiateAddProduct\', \'initiateSendMonthlyReport\', \'displayKPIs\'. If the command is not understood, return \'unknown\''
     ),
   parameters: z
-    .record(z.any())
+    .record(z.string(), z.any())
+    .optional()
     .describe(
       'A JSON object containing parameters for the action. For example, if the action is \'showSales\', the parameters might include a date range. For \'initiateAddCustomer\', it might include \'customerName\'. For \'initiateAddTransaction\', it might include \'type\', \'description\', \'amount\'.'
     ),
@@ -93,6 +94,7 @@ const prompt = ai.definePrompt({
   If the command is to start a process like adding something, use the 'initiate...' actions.
   If the command is ambiguous or not understood, return action: 'unknown'.
   Extract relevant entities as parameters (e.g., customerName, productName, amount, description, type: 'income' or 'expense').
+  If no parameters are extracted, the 'parameters' field can be omitted from the output.
   Ensure that the output is valid JSON conforming to the InterpretTextCommandsOutputSchema schema.`,
 });
 
