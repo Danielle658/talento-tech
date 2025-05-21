@@ -59,10 +59,10 @@ export default function SalesPage() {
       } catch (error) {
         console.error("Failed to parse products from localStorage for PDV", error);
         localStorage.removeItem(STORAGE_KEY_PRODUCTS);
-        setAvailableProducts([]); // Reset state on error
+        setAvailableProducts([]); 
       }
     } else {
-        setAvailableProducts([]); // Ensure default empty state
+        setAvailableProducts([]); 
     }
 
     const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
@@ -72,10 +72,10 @@ export default function SalesPage() {
       } catch (error) {
         console.error("Failed to parse customers from localStorage for PDV", error);
         localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
-        setAvailableCustomers([]); // Reset state on error
+        setAvailableCustomers([]); 
       }
     } else {
-        setAvailableCustomers([]); // Ensure default empty state
+        setAvailableCustomers([]); 
     }
   }, []);
 
@@ -231,7 +231,7 @@ export default function SalesPage() {
       date: saleDate.toISOString(),
       amountPaid: paymentMethod === "Dinheiro" ? amountPaid : cartTotal,
       changeGiven: paymentMethod === "Dinheiro" ? changeDue : 0,
-      customerId: selectedCustomerId === 'default_consumer' ? undefined : selectedCustomerId, // Store undefined if "Cliente Avulso"
+      customerId: selectedCustomerId === 'default_consumer' ? undefined : selectedCustomerId,
       customerName: customerNameForRecord,
     };
 
@@ -326,10 +326,10 @@ export default function SalesPage() {
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                      <DialogTitle>Escanear Código de Barras</DialogTitle>
+                      <DialogTitle>Escanear Código de Barras com a Câmera</DialogTitle>
                       <DialogDescription>
                         Aponte a câmera para o código de barras do produto.
-                        Ou digite o código abaixo se a leitura falhar.
+                        Se a leitura não ocorrer automaticamente, digite o código no campo abaixo.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-2">
@@ -346,7 +346,7 @@ export default function SalesPage() {
                             </Alert>
                         )}
                          <Input
-                            placeholder="Ou digite o código aqui..."
+                            placeholder="Digite o código do produto aqui..."
                             value={cameraScannedCode}
                             onChange={(e) => setCameraScannedCode(e.target.value)}
                             onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductFromCameraDialog();}}
@@ -357,7 +357,7 @@ export default function SalesPage() {
                       <DialogClose asChild>
                         <Button type="button" variant="outline">Cancelar</Button>
                       </DialogClose>
-                      <Button type="button" onClick={handleAddProductFromCameraDialog} disabled={!cameraScannedCode.trim() || hasCameraPermission === null || hasCameraPermission === false}>Adicionar do Scanner</Button>
+                      <Button type="button" onClick={handleAddProductFromCameraDialog} disabled={!cameraScannedCode.trim() || hasCameraPermission === null || hasCameraPermission === false}>Adicionar Produto</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

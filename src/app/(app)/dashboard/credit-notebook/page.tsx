@@ -21,7 +21,7 @@ import { format, parseISO, isValid, isToday, isPast, startOfDay } from "date-fns
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
-export { ACCOUNT_DETAILS_STORAGE_KEY } from "@/app/(app)/dashboard/settings/page";
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
 
 
 const creditEntrySchema = z.object({
@@ -42,7 +42,6 @@ export interface CreditEntry extends CreditEntryFormValues {
 }
 
 export const STORAGE_KEY_CREDIT_NOTEBOOK = "moneywise-creditEntries";
-const ACCOUNT_DETAILS_STORAGE_KEY_LOCAL = "moneywise-accountDetails"; // Local alias for clarity
 
 export default function CreditNotebookPage() {
   const { toast } = useToast();
@@ -71,13 +70,13 @@ export default function CreditNotebookPage() {
       setCreditEntries([]); // Ensure default empty state
     }
 
-    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY_LOCAL);
+    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
     if (storedAccountDetails) {
         try {
             setAccountDetails(JSON.parse(storedAccountDetails));
         } catch (error) {
             console.error("Failed to parse account details from localStorage for credit notebook", error);
-            localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY_LOCAL);
+            localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY);
             setAccountDetails(null); // Reset state on error
         }
     }
@@ -493,5 +492,7 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
+
+    
 
     
