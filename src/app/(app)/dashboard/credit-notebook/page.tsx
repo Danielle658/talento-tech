@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// import { Label } from "@/components/ui/label"; // No longer used directly
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,11 +16,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, DollarSign, Printer, Share2 } from "lucide-react";
+import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import Image from "next/image";
 
 const creditEntrySchema = z.object({
   customerName: z.string().min(2, { message: "Nome do cliente é obrigatório." }),
@@ -33,23 +34,48 @@ const creditEntrySchema = z.object({
 
 type CreditEntryFormValues = z.infer<typeof creditEntrySchema>;
 
-interface CreditEntry extends CreditEntryFormValues {
+export interface CreditEntry extends CreditEntryFormValues {
   id: string;
   paid: boolean;
-  paymentDate?: Date;
+  paymentDate?: string; // Store as ISO string for localStorage
 }
 
-const sampleCreditEntries: CreditEntry[] = [
-  { id: "CF001", customerName: "Maria Silva", amount: 150.75, saleDate: new Date("2024-07-10"), dueDate: new Date("2024-08-10"), whatsappNumber: "5511999998888", notes: "Pagamento prometido para o dia 10.", paid: false },
-  { id: "CF002", customerName: "João Santos", amount: 85.00, saleDate: new Date("2024-06-20"), dueDate: new Date("2024-07-20"), whatsappNumber: "5521988887777", notes: "Já passou do vencimento.", paid: false },
-  { id: "CF003", customerName: "Ana Pereira", amount: 230.50, saleDate: new Date("2024-07-01"), paid: true, paymentDate: new Date("2024-07-15") },
-];
-
+const STORAGE_KEY = "moneywise-creditEntries";
 
 export default function CreditNotebookPage() {
   const { toast } = useToast();
-  const [creditEntries, setCreditEntries] = useState<CreditEntry[]>(sampleCreditEntries);
+  const [creditEntries, setCreditEntries] = useState<CreditEntry[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const storedEntries = localStorage.getItem(STORAGE_KEY);
+    if (storedEntries) {
+      try {
+        const parsedEntries: CreditEntry[] = JSON.parse(storedEntries).map((entry: any) => ({
+          ...entry,
+          saleDate: parseISO(entry.saleDate),
+          dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
+          // paymentDate remains a string, or parse if needed for display logic immediately
+        }));
+        setCreditEntries(parsedEntries);
+      } catch (error) {
+        console.error("Failed to parse credit entries from localStorage", error);
+        localStorage.removeItem(STORAGE_KEY); // Clear corrupted data
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMounted) { // Only save to localStorage after initial mount & load
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(creditEntries.map(entry => ({
+        ...entry,
+        saleDate: entry.saleDate.toISOString(), // Store dates as ISO strings
+        dueDate: entry.dueDate ? entry.dueDate.toISOString() : undefined,
+      }))));
+    }
+  }, [creditEntries, isMounted]);
 
   const form = useForm<CreditEntryFormValues>({
     resolver: zodResolver(creditEntrySchema),
@@ -66,22 +92,22 @@ export default function CreditNotebookPage() {
   const onSubmit = (data: CreditEntryFormValues) => {
     const newEntry: CreditEntry = {
       ...data,
-      id: `CF${String(creditEntries.length + 1).padStart(3, '0')}`,
+      id: `CF${String(Date.now()).slice(-6)}`, // More unique ID
       paid: false,
     };
-    setCreditEntries(prev => [newEntry, ...prev]);
+    setCreditEntries(prev => [newEntry, ...prev].sort((a,b) => b.saleDate.getTime() - a.saleDate.getTime()));
     toast({
       title: "Fiado Registrado!",
       description: `Nova venda a prazo para ${data.customerName} no valor de R$ ${data.amount.toFixed(2)} registrada.`,
     });
-    form.reset();
+    form.reset({ customerName: "", amount: 0, saleDate: new Date(), dueDate: undefined, whatsappNumber: "", notes: "" });
     setIsAddDialogOpen(false);
   };
 
   const handleMarkAsPaid = (id: string) => {
     setCreditEntries(prev =>
       prev.map(entry =>
-        entry.id === id ? { ...entry, paid: !entry.paid, paymentDate: !entry.paid ? new Date() : undefined } : entry
+        entry.id === id ? { ...entry, paid: !entry.paid, paymentDate: !entry.paid ? new Date().toISOString() : undefined } : entry
       )
     );
     const entry = creditEntries.find(e => e.id === id);
@@ -96,16 +122,21 @@ export default function CreditNotebookPage() {
       toast({ title: "WhatsApp não informado", description: "Não é possível enviar lembrete pois o número de WhatsApp do cliente não foi cadastrado.", variant: "destructive"});
       return;
     }
-    const message = `Olá ${entry.customerName}, gostaríamos de lembrar sobre o valor de R$${entry.amount.toFixed(2)} pendente referente à sua compra em ${format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR })}.${entry.dueDate ? ` O vencimento é/foi em ${format(entry.dueDate, "dd/MM/yyyy", { locale: ptBR })}.` : ''} Por favor, entre em contato para regularizar. Obrigado!`;
+    const saleDateFormatted = isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR }) : "Data Inválida";
+    const dueDateFormatted = entry.dueDate && isValid(entry.dueDate) ? ` O vencimento é/foi em ${format(entry.dueDate, "dd/MM/yyyy", { locale: ptBR })}.` : '';
+    const message = `Olá ${entry.customerName}, gostaríamos de lembrar sobre o valor de R$${entry.amount.toFixed(2)} pendente referente à sua compra em ${saleDateFormatted}.${dueDateFormatted} Por favor, entre em contato para regularizar. Obrigado!`;
     const whatsappUrl = `https://wa.me/${entry.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
   };
 
   const handlePrintReceipt = (entry: CreditEntry) => {
-    const paymentDate = entry.paymentDate || new Date();
+    const paymentDate = entry.paymentDate ? parseISO(entry.paymentDate) : new Date();
+    const saleDateFormatted = isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR }) : "Data Inválida";
+    const paymentDateFormatted = isValid(paymentDate) ? format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : "Data Inválida";
+
     const receiptWindow = window.open('', '_blank');
     if (receiptWindow) {
-      receiptWindow.document.write(`
+      receiptWindow.document.write(\`
         <html>
           <head>
             <title>Comprovante de Pagamento</title>
@@ -133,26 +164,26 @@ export default function CreditNotebookPage() {
                 <p>Sua Empresa</p>
               </div>
               <div class="details">
-                <p><strong>Cliente:</strong> ${entry.customerName}</p>
-                <p><strong>Valor Pago:</strong> R$ ${entry.amount.toFixed(2)}</p>
-                <p><strong>Data do Pagamento:</strong> ${format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
-                <p><strong>Referente à Venda de:</strong> ${format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR })}</p>
-                ${entry.notes ? `<p><strong>Observações da Venda:</strong> ${entry.notes}</p>` : ''}
+                <p><strong>Cliente:</strong> \${entry.customerName}</p>
+                <p><strong>Valor Pago:</strong> R$ \${entry.amount.toFixed(2)}</p>
+                <p><strong>Data do Pagamento:</strong> \${paymentDateFormatted}</p>
+                <p><strong>Referente à Venda de:</strong> \${saleDateFormatted}</p>
+                \${entry.notes ? \`<p><strong>Observações da Venda:</strong> \${entry.notes}</p>\` : ''}
               </div>
               <div class="footer">
                 <p>Obrigado pela preferência!</p>
-                <p>Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</p>
+                <p>Gerado em: \${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</p>
               </div>
             </div>
             <script>
               setTimeout(() => {
                 window.print();
                 window.onafterprint = () => window.close();
-              }, 250); // Timeout to ensure content is rendered
-            </script>
+              }, 250);
+            <\/script>
           </body>
         </html>
-      `);
+      \`);
       receiptWindow.document.close();
     } else {
       toast({ title: "Erro ao Abrir Comprovante", description: "Não foi possível abrir a janela para impressão. Verifique as configurações do seu navegador.", variant: "destructive" });
@@ -164,17 +195,24 @@ export default function CreditNotebookPage() {
       toast({ title: "WhatsApp não informado", description: "Não é possível enviar comprovante pois o número de WhatsApp do cliente não foi cadastrado.", variant: "destructive"});
       return;
     }
-    const paymentDate = entry.paymentDate || new Date();
-    const message = `🧾 *Comprovante de Pagamento - Sua Empresa*\n\nOlá ${entry.customerName},\nConfirmamos o recebimento de *R$${entry.amount.toFixed(2)}* referente à sua compra de ${format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR })}.\n\nPagamento confirmado em: ${format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}\n\nObrigado!`;
-    const whatsappUrl = `https://wa.me/${entry.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    const paymentDate = entry.paymentDate ? parseISO(entry.paymentDate) : new Date();
+    const saleDateFormatted = isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR }) : "Data Inválida";
+    const paymentDateFormatted = isValid(paymentDate) ? format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : "Data Inválida";
+    
+    const message = \`🧾 *Comprovante de Pagamento - Sua Empresa*\\n\\nOlá \${entry.customerName},\\nConfirmamos o recebimento de *R$\${entry.amount.toFixed(2)}* referente à sua compra de \${saleDateFormatted}.\\n\\nPagamento confirmado em: \${paymentDateFormatted}\\n\\nObrigado!\`;
+    const whatsappUrl = \`https://wa.me/\${entry.whatsappNumber.replace(/\\D/g, '')}?text=\${encodeURIComponent(message)}\`;
     window.open(whatsappUrl, "_blank");
      toast({ title: "Redirecionando para WhatsApp", description: "O comprovante de pagamento está pronto para ser enviado."});
   };
 
-
   const totalDue = useMemo(() => {
+    if (!isMounted) return 0;
     return creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
-  }, [creditEntries]);
+  }, [creditEntries, isMounted]);
+
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-screen"><PlusCircle className="h-8 w-8 animate-spin text-primary" /></div>; // Or a proper skeleton loader
+  }
 
   return (
     <div className="space-y-6">
@@ -187,7 +225,7 @@ export default function CreditNotebookPage() {
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => form.reset()}>
+                <Button onClick={() => form.reset({ customerName: "", amount: 0, saleDate: new Date(), dueDate: undefined, whatsappNumber: "", notes: "" })}>
                   <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Fiado
                 </Button>
               </DialogTrigger>
@@ -238,7 +276,7 @@ export default function CreditNotebookPage() {
                                     variant={"outline"}
                                     className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                                     >
-                                    {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                    {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                     </Button>
                                 </FormControl>
@@ -264,7 +302,7 @@ export default function CreditNotebookPage() {
                                     variant={"outline"}
                                     className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                                     >
-                                    {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                    {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                     </Button>
                                 </FormControl>
@@ -317,7 +355,7 @@ export default function CreditNotebookPage() {
               </DialogContent>
             </Dialog>
           </div>
-          <CardDescription>Gerencie os registros de vendas a prazo e fiados.</CardDescription>
+          <CardDescription>Gerencie os registros de vendas a prazo e fiados. Os dados são salvos localmente no seu navegador.</CardDescription>
         </CardHeader>
         <CardContent>
           {creditEntries.length === 0 ? (
@@ -325,9 +363,11 @@ export default function CreditNotebookPage() {
               <BookUser className="mx-auto h-12 w-12 text-muted-foreground" />
               <p className="mt-4 text-lg font-medium">Nenhum fiado registrado ainda.</p>
               <p className="text-muted-foreground">Clique em "Adicionar Novo Fiado" para começar.</p>
-              <img 
+              <Image 
                 src="https://placehold.co/600x300.png" 
                 alt="Placeholder Caderneta de Fiados Vazia" 
+                width={600}
+                height={300}
                 className="rounded-lg shadow-md mt-6 mx-auto"
                 data-ai-hint="empty state finance" 
               />
@@ -348,16 +388,16 @@ export default function CreditNotebookPage() {
                 </TableHeader>
                 <TableBody>
                   {creditEntries.map((entry) => (
-                    <TableRow key={entry.id} className={cn(entry.paid ? "bg-green-500/10" : (entry.dueDate && new Date(entry.dueDate) < new Date() && !entry.paid) ? "bg-red-500/10" : "")}>
+                    <TableRow key={entry.id} className={cn(entry.paid ? "bg-green-500/10" : (entry.dueDate && isValid(entry.dueDate) && new Date(entry.dueDate) < new Date() && !entry.paid) ? "bg-red-500/10" : "")}>
                       <TableCell className="font-medium">{entry.customerName}</TableCell>
                       <TableCell className="text-right">{entry.amount.toFixed(2)}</TableCell>
-                      <TableCell>{format(entry.saleDate, "dd/MM/yy", { locale: ptBR })}</TableCell>
-                      <TableCell>{entry.dueDate ? format(entry.dueDate, "dd/MM/yy", { locale: ptBR }) : "-"}</TableCell>
+                      <TableCell>{isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yy", { locale: ptBR }) : "Inválido"}</TableCell>
+                      <TableCell>{entry.dueDate && isValid(entry.dueDate) ? format(entry.dueDate, "dd/MM/yy", { locale: ptBR }) : "-"}</TableCell>
                       <TableCell>
                         <Badge variant={entry.paid ? "default" : "destructive"} className={cn(entry.paid ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}>
                           {entry.paid ? "Pago" : "Pendente"}
                         </Badge>
-                        {!entry.paid && entry.dueDate && new Date(entry.dueDate) < new Date() && (
+                        {!entry.paid && entry.dueDate && isValid(entry.dueDate) && new Date(entry.dueDate) < new Date() && (
                           <Badge variant="destructive" className="ml-2 bg-orange-500 hover:bg-orange-600">Vencido</Badge>
                         )}
                       </TableCell>
@@ -402,5 +442,3 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
-
-    

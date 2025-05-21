@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// import { Label } from "@/components/ui/label"; // No longer used directly
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -15,13 +15,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign } from "lucide-react";
+import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO, startOfMonth, subMonths, endOfMonth } from "date-fns";
+import { format, parseISO, startOfMonth, subMonths, endOfMonth, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartConfig } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'; // Removed Legend as it's handled by ChartLegendContent
 import Image from "next/image";
 
 const transactionSchema = z.object({
@@ -33,22 +33,11 @@ const transactionSchema = z.object({
 
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
-interface Transaction extends TransactionFormValues {
+export interface Transaction extends TransactionFormValues {
   id: string;
 }
 
-// Sample data to make the page more illustrative
-const initialTransactions: Transaction[] = [
-  { id: "T001", description: "Venda Consultoria", amount: 1200.50, type: "income", date: subMonths(new Date(),1) },
-  { id: "T002", description: "Pagamento Aluguel Escritório", amount: 800.00, type: "expense", date: subMonths(new Date(),1) },
-  { id: "T003", description: "Venda Software", amount: 450.00, type: "income", date: subMonths(new Date(), 2) },
-  { id: "T004", description: "Material de Escritório", amount: 75.20, type: "expense", date: subMonths(new Date(), 2) },
-  { id: "T005", description: "Serviço de Design", amount: 600.00, type: "income", date: new Date() },
-  { id: "T006", description: "Assinatura Software Contábil", amount: 99.90, type: "expense", date: new Date() },
-  { id: "T007", description: "Recebimento Cliente X", amount: 250.00, type: "income", date: subMonths(new Date(), 3) },
-  { id: "T008", description: "Conta de Luz", amount: 150.80, type: "expense", date: subMonths(new Date(), 3) },
-];
-
+const STORAGE_KEY_NOTEBOOK = "moneywise-transactions";
 
 const chartConfig = {
   income: {
@@ -64,8 +53,34 @@ const chartConfig = {
 
 export default function NotebookPage() {
   const { toast } = useToast();
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
+    if (storedTransactions) {
+      try {
+        const parsedTransactions: Transaction[] = JSON.parse(storedTransactions).map((t: any) => ({
+          ...t,
+          date: parseISO(t.date), // Convert ISO string back to Date object
+        }));
+        setTransactions(parsedTransactions.sort((a,b) => b.date.getTime() - a.date.getTime()));
+      } catch (error) {
+        console.error("Failed to parse transactions from localStorage", error);
+        localStorage.removeItem(STORAGE_KEY_NOTEBOOK); // Clear corrupted data
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMounted) { // Only save to localStorage after initial mount & load
+      localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify(
+        transactions.map(t => ({...t, date: t.date.toISOString() })) // Store dates as ISO strings
+      ));
+    }
+  }, [transactions, isMounted]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -80,7 +95,7 @@ export default function NotebookPage() {
   const onSubmitTransaction = (data: TransactionFormValues) => {
     const newTransaction: Transaction = {
       ...data,
-      id: `T${String(transactions.length + 1).padStart(3, '0')}`,
+      id: `T${String(Date.now()).slice(-6)}`, // More unique ID
     };
     setTransactions(prev => [newTransaction, ...prev].sort((a,b) => b.date.getTime() - a.date.getTime()));
     toast({
@@ -92,6 +107,7 @@ export default function NotebookPage() {
   };
 
   const { totalIncome, totalExpense, balance } = useMemo(() => {
+    if (!isMounted) return { totalIncome: 0, totalExpense: 0, balance: 0 };
     const income = transactions
       .filter(t => t.type === "income")
       .reduce((sum, t) => sum + t.amount, 0);
@@ -99,9 +115,10 @@ export default function NotebookPage() {
       .filter(t => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0);
     return { totalIncome: income, totalExpense: expense, balance: income - expense };
-  }, [transactions]);
+  }, [transactions, isMounted]);
 
   const monthlyChartData = useMemo(() => {
+    if (!isMounted) return [];
     const data: { month: string; income: number; expense: number }[] = [];
     const today = new Date();
     for (let i = 5; i >= 0; i--) { // Last 6 months including current
@@ -111,20 +128,23 @@ export default function NotebookPage() {
       const monthEnd = endOfMonth(targetMonthDate);
 
       const monthIncome = transactions
-        .filter(t => t.type === "income" && t.date >= monthStart && t.date <= monthEnd)
+        .filter(t => t.type === "income" && isValid(t.date) && t.date >= monthStart && t.date <= monthEnd)
         .reduce((sum, t) => sum + t.amount, 0);
       
       const monthExpense = transactions
-        .filter(t => t.type === "expense" && t.date >= monthStart && t.date <= monthEnd)
+        .filter(t => t.type === "expense" && isValid(t.date) && t.date >= monthStart && t.date <= monthEnd)
         .reduce((sum, t) => sum + t.amount, 0);
 
       data.push({ month: monthKey, income: monthIncome, expense: monthExpense });
     }
     return data;
-  }, [transactions]);
+  }, [transactions, isMounted]);
 
-  return (
-    <div className="space-y-6">
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>; // Or a proper skeleton loader
+  }
+
+  return <div className="space-y-6">
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -213,7 +233,7 @@ export default function NotebookPage() {
                                     variant={"outline"}
                                     className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                                   >
-                                    {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                    {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                   </Button>
                                 </FormControl>
@@ -240,7 +260,7 @@ export default function NotebookPage() {
               </DialogContent>
             </Dialog>
           </div>
-          <CardDescription>Gerencie suas receitas, despesas e acompanhe o fluxo de caixa.</CardDescription>
+          <CardDescription>Gerencie suas receitas, despesas e acompanhe o fluxo de caixa. Os dados são salvos localmente no seu navegador.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           {/* Summary Section */}
@@ -307,7 +327,7 @@ export default function NotebookPage() {
                         cursor={false}
                         content={<ChartTooltipContent indicator="dot" />}
                     />
-                    <Legend content={<ChartLegendContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
                     <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} name="Receitas" />
                     <Bar dataKey="expense" fill="var(--color-expense)" radius={[4, 4, 0, 0]} name="Despesas" />
                   </BarChart>
@@ -353,17 +373,17 @@ export default function NotebookPage() {
                     <TableBody>
                     {transactions.map((transaction) => (
                         <TableRow key={transaction.id}>
-                        <TableCell>{format(transaction.date, "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                        <TableCell>{isValid(transaction.date) ? format(transaction.date, "dd/MM/yyyy", { locale: ptBR }) : "Inválida"}</TableCell>
                         <TableCell className="font-medium">{transaction.description}</TableCell>
                         <TableCell>
                             <span className={cn("px-2 py-1 rounded-full text-xs font-medium", 
-                                transaction.type === "income" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                transaction.type === "income" ? "bg-green-100 text-green-700 dark:bg-green-700/30 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-700/30 dark:text-red-300"
                             )}>
                             {transaction.type === "income" ? "Receita" : "Despesa"}
                             </span>
                         </TableCell>
                         <TableCell className={cn("text-right font-semibold",
-                            transaction.type === "income" ? "text-green-600" : "text-red-600"
+                            transaction.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                         )}>
                             {transaction.type === "expense" && "-"}R$ {transaction.amount.toFixed(2)}
                         </TableCell>
@@ -377,8 +397,5 @@ export default function NotebookPage() {
           </Card>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 }
-
-    

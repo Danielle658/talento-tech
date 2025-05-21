@@ -10,9 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera } from "lucide-react";
+import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; // For Caderneta Digital
+import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; // For Sales Record
+import Image from "next/image";
 
 interface Product {
   id: string;
@@ -25,6 +28,7 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+// Sample products - in a real app, this would come from a DB or localStorage (Products page)
 const sampleProducts: Product[] = [
   { id: "prod001", code: "123", name: "Refrigerante Lata", price: 5.50 },
   { id: "prod002", code: "456", name: "Salgadinho Pacote", price: 8.75 },
@@ -32,6 +36,9 @@ const sampleProducts: Product[] = [
   { id: "prod004", code: "101", name: "Água Mineral 500ml", price: 3.00 },
   { id: "prod005", code: "202", name: "Suco Caixa 1L", price: 7.90 },
 ];
+
+const STORAGE_KEY_NOTEBOOK = "moneywise-transactions";
+const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
 
 export default function SalesPage() {
   const { toast } = useToast();
@@ -43,12 +50,20 @@ export default function SalesPage() {
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraScannedCode, setCameraScannedCode] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    // In a real app, you might load active products from localStorage here if Products page is implemented
+  }, []);
+
 
   const addProductToCartByCode = (code: string) => {
     if (!code.trim()) {
       toast({ title: "Código Inválido", description: "Por favor, insira um código de produto.", variant: "destructive" });
       return false;
     }
+    // TODO: Replace sampleProducts with products loaded from localStorage if Products page is implemented
     const product = sampleProducts.find(p => p.code === code.trim());
     if (product) {
       setCart(prevCart => {
@@ -77,7 +92,7 @@ export default function SalesPage() {
   const handleAddProductFromCameraDialog = () => {
     if (addProductToCartByCode(cameraScannedCode)) {
       setCameraScannedCode("");
-      setIsCameraScanDialogOpen(false);
+      setIsCameraScanDialogOpen(false); // Close dialog on successful add
     }
   };
 
@@ -85,7 +100,7 @@ export default function SalesPage() {
     if (isCameraScanDialogOpen) {
       const getCameraPermission = async () => {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
           setHasCameraPermission(true);
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
@@ -102,7 +117,7 @@ export default function SalesPage() {
       };
       getCameraPermission();
 
-      return () => { // Cleanup: stop video stream when dialog closes
+      return () => {
         if (videoRef.current && videoRef.current.srcObject) {
           const stream = videoRef.current.srcObject as MediaStream;
           stream.getTracks().forEach(track => track.stop());
@@ -142,11 +157,11 @@ export default function SalesPage() {
   }, [amountPaidInput]);
   
   const changeDue = useMemo(() => {
-    if (amountPaid >= cartTotal && cart.length > 0) { // Ensure cart is not empty for change calculation
+    if (paymentMethod === "Dinheiro" && amountPaid >= cartTotal && cart.length > 0) {
       return amountPaid - cartTotal;
     }
     return 0; 
-  }, [amountPaid, cartTotal, cart.length]);
+  }, [amountPaid, cartTotal, cart.length, paymentMethod]);
 
   const handleFinalizeSale = () => {
     if (cart.length === 0) {
@@ -157,18 +172,52 @@ export default function SalesPage() {
       toast({ title: "Forma de Pagamento", description: "Selecione uma forma de pagamento.", variant: "destructive" });
       return;
     }
-    if (amountPaid < cartTotal && paymentMethod === "Dinheiro") { // Only enforce if payment method requires exact or more
+    if (paymentMethod === "Dinheiro" && amountPaid < cartTotal) {
       toast({ title: "Valor Insuficiente", description: "O valor pago é menor que o total da compra.", variant: "destructive" });
       return;
     }
 
-    console.log("Venda Finalizada:", {
-      cart,
-      cartTotal,
-      amountPaid,
-      changeDue,
-      paymentMethod,
-    });
+    const saleDate = new Date();
+
+    // 1. Add to Caderneta Digital (Notebook)
+    const incomeTransaction: Transaction = {
+      id: `T-SALE-${Date.now().toString().slice(-6)}`,
+      description: `Venda PDV - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`,
+      amount: cartTotal,
+      type: "income",
+      date: saleDate,
+    };
+    
+    try {
+        const existingNotebookTransactionsRaw = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
+        const existingNotebookTransactions: Transaction[] = existingNotebookTransactionsRaw ? JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: new Date(t.date)})) : [];
+        localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
+    } catch (e) {
+        console.error("Error updating notebook transactions in localStorage", e);
+        toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital.", variant: "destructive"})
+    }
+
+
+    // 2. Add to Sales Record
+    const salesRecordEntry: SalesRecordEntry = {
+      id: `SR-${Date.now().toString().slice(-6)}`,
+      items: cart.map(item => ({ productId: item.id, name: item.name, quantity: item.quantity, unitPrice: item.price })),
+      totalAmount: cartTotal,
+      paymentMethod: paymentMethod,
+      date: saleDate.toISOString(),
+      amountPaid: paymentMethod === "Dinheiro" ? amountPaid : cartTotal,
+      changeGiven: paymentMethod === "Dinheiro" ? changeDue : 0,
+    };
+
+    try {
+        const existingSalesRecordsRaw = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
+        const existingSalesRecords: SalesRecordEntry[] = existingSalesRecordsRaw ? JSON.parse(existingSalesRecordsRaw) : [];
+        localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify([...existingSalesRecords, salesRecordEntry]));
+    } catch (e) {
+        console.error("Error updating sales records in localStorage", e);
+        toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas.", variant: "destructive"})
+    }
+
 
     toast({
       title: "Venda Finalizada!",
@@ -182,6 +231,10 @@ export default function SalesPage() {
     setPaymentMethod(undefined);
   };
 
+  if (!isMounted) {
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -190,7 +243,7 @@ export default function SalesPage() {
             <ShoppingCart className="h-7 w-7 text-primary" />
             <CardTitle className="text-2xl">Ponto de Venda (PDV)</CardTitle>
           </div>
-          <CardDescription>Registre vendas rapidamente escaneando produtos e processando pagamentos.</CardDescription>
+          <CardDescription>Registre vendas rapidamente escaneando produtos e processando pagamentos. Os dados são salvos localmente.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Coluna Esquerda: Entrada de Produto e Carrinho */}
@@ -243,14 +296,14 @@ export default function SalesPage() {
                             value={cameraScannedCode}
                             onChange={(e) => setCameraScannedCode(e.target.value)}
                             onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductFromCameraDialog();}}
-                            disabled={hasCameraPermission === null}
+                            disabled={hasCameraPermission === null || hasCameraPermission === false}
                         />
                     </div>
                     <DialogFooter>
                       <DialogClose asChild>
                         <Button type="button" variant="outline">Cancelar</Button>
                       </DialogClose>
-                      <Button type="button" onClick={handleAddProductFromCameraDialog} disabled={!cameraScannedCode.trim()}>Adicionar do Scanner</Button>
+                      <Button type="button" onClick={handleAddProductFromCameraDialog} disabled={!cameraScannedCode.trim() || hasCameraPermission === null || hasCameraPermission === false}>Adicionar do Scanner</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -268,9 +321,11 @@ export default function SalesPage() {
                     <ShoppingCart className="h-12 w-12 mx-auto mb-2" />
                     <p>O carrinho está vazio.</p>
                     <p className="text-sm">Adicione produtos usando o código acima.</p>
-                     <img 
+                     <Image 
                         src="https://placehold.co/400x200.png" 
                         alt="Carrinho Vazio" 
+                        width={400}
+                        height={200}
                         className="rounded-lg shadow-sm mt-4 mx-auto"
                         data-ai-hint="empty cart shopping" 
                     />
@@ -361,6 +416,7 @@ export default function SalesPage() {
                     value={amountPaidInput}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
                         const value = e.target.value;
+                        // Allow only numbers and a single comma for decimals, up to 2 decimal places
                         if (/^[0-9]*[,]?[0-9]{0,2}$/.test(value) || value === "") {
                             setAmountPaidInput(value);
                         }
@@ -375,7 +431,7 @@ export default function SalesPage() {
 
                 <div>
                   <Label className="text-sm text-muted-foreground">Troco</Label>
-                  <p className={cn("text-2xl font-semibold", changeDue > 0 ? "text-green-600" : "text-muted-foreground")}>
+                  <p className={cn("text-2xl font-semibold", changeDue > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
                     R$ {paymentMethod === "Dinheiro" ? changeDue.toFixed(2) : "0.00"}
                   </p>
                 </div>
@@ -385,7 +441,7 @@ export default function SalesPage() {
                     onClick={handleFinalizeSale} 
                     className="w-full text-lg py-6" 
                     size="lg"
-                    disabled={cart.length === 0 || !paymentMethod || (paymentMethod === "Dinheiro" && amountPaid < cartTotal)}
+                    disabled={cart.length === 0 || !paymentMethod || (paymentMethod === "Dinheiro" && amountPaid < cartTotal && amountPaidInput !== "")}
                 >
                   <CheckCircle className="mr-2 h-5 w-5"/> Finalizar Venda
                 </Button>
@@ -397,7 +453,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    
-
-    
