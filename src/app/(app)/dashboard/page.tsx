@@ -129,7 +129,8 @@ export default function DashboardPage() {
               <CardDescription>Comparativo de vendas mensais.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Image src="https://placehold.co/600x400.png" alt="Gráfico de Vendas" width={600} height={400} className="rounded-md" data-ai-hint="sales chart" />
+              {/* Image placeholder removed */}
+              <p className="text-muted-foreground text-center py-4">Gráfico de vendas será exibido aqui.</p>
             </CardContent>
           </Card>
 

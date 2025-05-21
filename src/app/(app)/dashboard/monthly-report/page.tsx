@@ -86,12 +86,8 @@ export default function MonthlyReportPage() {
             Atualmente, o "relatório" enviado é uma mensagem de texto resumida. Em futuras atualizações, esta seção permitirá visualizar gráficos de desempenho detalhados, principais KPIs do mês, comparativos com períodos anteriores e muito mais.
           </p>
           <div className="mt-8 flex justify-center">
-            <img 
-              src="https://placehold.co/600x400.png" 
-              alt="Placeholder para Gráficos de Relatório Mensal" 
-              className="rounded-lg shadow-md"
-              data-ai-hint="financial report chart"
-            />
+            {/* Image placeholder removed */}
+            <p className="text-muted-foreground text-center py-4">Gráficos de relatório mensal serão exibidos aqui.</p>
           </div>
         </CardContent>
       </Card>
