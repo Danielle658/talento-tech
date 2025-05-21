@@ -36,7 +36,7 @@ export interface SalesRecordEntry {
   customerName?: string;
 }
 
-const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
+export const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
 
 export default function SalesRecordPage() {
   const [salesHistory, setSalesHistory] = useState<SalesRecordEntry[]>([]);

@@ -29,7 +29,7 @@ export interface ProductEntry extends ProductFormValues {
   id: string;
 }
 
-const STORAGE_KEY_PRODUCTS = "moneywise-products";
+export const STORAGE_KEY_PRODUCTS = "moneywise-products";
 
 export default function ProductsPage() {
   const { toast } = useToast();

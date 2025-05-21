@@ -1,19 +1,20 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { DataSection } from '@/components/dashboard/data-section';
-import { DollarSign, Users, FileText, Archive, BarChartBig, TrendingUp, AlertCircle, Package, BellRing, PackageWarning, FileClock } from 'lucide-react';
+import { DollarSign, Users, FileText, Archive, BarChartBig, TrendingUp, AlertCircle, Package, BellRing, AlertTriangle, FileClock, Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link'; // Added import for Link
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Transaction, STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
 import { ProductEntry, STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
 import { SalesRecordEntry, STORAGE_KEY_SALES_RECORD } from '@/app/(app)/dashboard/sales-record/page';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -27,10 +28,10 @@ const kpis = [
 
 interface DisplayTransaction {
   id: string;
-  customer: string; // For simplicity, combining with description or using placeholder
+  customer: string;
   date: string;
   amount: string;
-  status: string; // Or determine from type
+  status: string;
   type: 'income' | 'expense';
 }
 
@@ -45,15 +46,16 @@ interface DisplayProduct {
 
 const placeholderNotifications = [
   { id: 'notif1', icon: DollarSign, iconBg: 'bg-green-100 dark:bg-green-700/30', iconColor: 'text-green-600 dark:text-green-400', title: 'Nova venda de R$ 150,00 registrada.', time: '2 minutos atrás' },
-  { id: 'notif2', icon: PackageWarning, iconBg: 'bg-yellow-100 dark:bg-yellow-700/30', iconColor: 'text-yellow-600 dark:text-yellow-400', title: 'Produto "Cabo USB-C" com estoque baixo (2 unidades).', time: '1 hora atrás' },
+  { id: 'notif2', icon: AlertTriangle, iconBg: 'bg-yellow-100 dark:bg-yellow-700/30', iconColor: 'text-yellow-600 dark:text-yellow-400', title: 'Produto "Cabo USB-C" com estoque baixo (2 unidades).', time: '1 hora atrás' },
   { id: 'notif3', icon: FileClock, iconBg: 'bg-red-100 dark:bg-red-700/30', iconColor: 'text-red-600 dark:text-red-400', title: 'Fatura #F2300 para "Empresa Sol" vence amanhã.', time: '1 dia atrás' },
 ];
 
 
 export default function DashboardPage() {
-  const [recentTransactionsData, setRecentTransactionsData] = useState<DisplayTransaction[]>([]);
-  const [topSellingProductsData, setTopSellingProductsData] = useState<DisplayProduct[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [allSalesRecords, setAllSalesRecords] = useState<SalesRecordEntry[]>([]);
+  const [productCatalog, setProductCatalog] = useState<ProductEntry[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -61,88 +63,106 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isMounted) {
-      // Load Recent Transactions
       try {
         const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
         if (storedTransactions) {
-          const parsedTransactions: Transaction[] = JSON.parse(storedTransactions);
-          const displayedTransactions = parsedTransactions
-            .sort((a, b) => parseISO(b.date as any).getTime() - parseISO(a.date as any).getTime())
-            .slice(0, 4)
-            .map(t => ({
-              id: t.id,
-              customer: t.description.substring(0, 30) + (t.description.length > 30 ? '...' : ''), // Simplified customer
-              date: format(parseISO(t.date as any), "dd/MM/yyyy", { locale: ptBR }),
-              amount: `R$ ${t.amount.toFixed(2)}`,
-              status: t.type === 'income' ? 'Receita' : 'Despesa', // Simplified status
-              type: t.type
-            }));
-          setRecentTransactionsData(displayedTransactions);
+          setAllTransactions(JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})));
         }
       } catch (error) {
-        console.error("Error loading recent transactions from localStorage", error);
+        console.error("Error loading transactions from localStorage", error);
       }
 
-      // Load Top Selling Products
       try {
         const storedSales = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
-        const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-        let catalog: ProductEntry[] = [];
-        if (storedProducts) {
-          catalog = JSON.parse(storedProducts);
-        }
-
         if (storedSales) {
-          const salesRecords: SalesRecordEntry[] = JSON.parse(storedSales);
-          const productSalesMap = new Map<string, { name: string; quantity: number; revenue: number; stock: string }>();
-
-          salesRecords.forEach(sale => {
-            sale.items.forEach(item => {
-              const existing = productSalesMap.get(item.productId);
-              const productDetails = catalog.find(p => p.id === item.productId);
-              const stockInfo = productDetails?.stock || "N/A";
-
-              if (existing) {
-                existing.quantity += item.quantity;
-                existing.revenue += item.quantity * item.unitPrice;
-              } else {
-                productSalesMap.set(item.productId, {
-                  name: item.name,
-                  quantity: item.quantity,
-                  revenue: item.quantity * item.unitPrice,
-                  stock: stockInfo
-                });
-              }
-            });
-          });
-
-          const sortedProducts = Array.from(productSalesMap.entries())
-            .sort(([, a], [, b]) => b.revenue - a.revenue) // Sort by revenue
-            .slice(0, 3)
-            .map(([id, data]) => ({
-              id,
-              name: data.name,
-              sales: data.quantity,
-              revenue: `R$ ${data.revenue.toFixed(2)}`,
-              stock: data.stock,
-            }));
-          setTopSellingProductsData(sortedProducts);
-        } else if (catalog.length > 0) {
-          // Fallback if no sales, show some products from catalog
-           setTopSellingProductsData(catalog.slice(0,3).map(p => ({
-             id: p.id,
-             name: p.name,
-             sales: "N/A",
-             revenue: `R$ ${p.price.toFixed(2)} (Preço)`,
-             stock: p.stock || "N/A"
-           })));
+          setAllSalesRecords(JSON.parse(storedSales));
         }
       } catch (error) {
-        console.error("Error loading top selling products from localStorage", error);
+        console.error("Error loading sales records from localStorage", error);
+      }
+
+      try {
+        const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
+        if (storedProducts) {
+          setProductCatalog(JSON.parse(storedProducts));
+        }
+      } catch (error) {
+        console.error("Error loading product catalog from localStorage", error);
       }
     }
   }, [isMounted]);
 
+  const recentTransactionsData = useMemo((): DisplayTransaction[] => {
+    if (!isMounted || !allTransactions) return [];
+    return allTransactions
+      .sort((a, b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0))
+      .slice(0, 4)
+      .map(t => ({
+        id: t.id,
+        customer: t.description.substring(0, 30) + (t.description.length > 30 ? '...' : ''),
+        date: isValid(t.date) ? format(t.date, "dd/MM/yyyy", { locale: ptBR }) : "Data Inválida",
+        amount: `R$ ${t.amount.toFixed(2)}`,
+        status: t.type === 'income' ? 'Receita' : 'Despesa',
+        type: t.type
+      }));
+  }, [isMounted, allTransactions]);
+
+  const topSellingProductsData = useMemo((): DisplayProduct[] => {
+    if (!isMounted || !allSalesRecords || !productCatalog) return [];
+
+    if (allSalesRecords.length > 0) {
+      const productSalesMap = new Map<string, { name: string; quantity: number; revenue: number; stock: string }>();
+
+      allSalesRecords.forEach(sale => {
+        sale.items.forEach(item => {
+          const existing = productSalesMap.get(item.productId);
+          const productDetails = productCatalog.find(p => p.id === item.productId);
+          const stockInfo = productDetails?.stock || "N/A";
+
+          if (existing) {
+            existing.quantity += item.quantity;
+            existing.revenue += item.quantity * item.unitPrice;
+          } else {
+            productSalesMap.set(item.productId, {
+              name: item.name,
+              quantity: item.quantity,
+              revenue: item.quantity * item.unitPrice,
+              stock: stockInfo
+            });
+          }
+        });
+      });
+
+      return Array.from(productSalesMap.entries())
+        .sort(([, a], [, b]) => b.revenue - a.revenue)
+        .slice(0, 3)
+        .map(([id, data]) => ({
+          id,
+          name: data.name,
+          sales: data.quantity,
+          revenue: `R$ ${data.revenue.toFixed(2)}`,
+          stock: data.stock,
+        }));
+    } else if (productCatalog.length > 0) {
+      // Fallback if no sales, show some products from catalog
+      return productCatalog.slice(0,3).map(p => ({
+         id: p.id,
+         name: p.name,
+         sales: "N/A",
+         revenue: `R$ ${p.price.toFixed(2)} (Preço)`,
+         stock: p.stock || "N/A"
+       }));
+    }
+    return [];
+  }, [isMounted, allSalesRecords, productCatalog]);
+
+  if (!isMounted) {
+    return (
+      <div className="flex h-[calc(100vh-8rem)] w-full items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -298,3 +318,10 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+    
+
+    
+
+    

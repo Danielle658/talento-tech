@@ -37,7 +37,7 @@ export interface Transaction extends TransactionFormValues {
   id: string;
 }
 
-const STORAGE_KEY_NOTEBOOK = "moneywise-transactions";
+export const STORAGE_KEY_NOTEBOOK = "moneywise-transactions";
 
 const chartConfig = {
   income: {
