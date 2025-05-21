@@ -157,7 +157,7 @@ export default function SalesRecordPage() {
           <div className="mb-6 p-4 border rounded-lg bg-card shadow">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <div>
-                    <Label htmlFor="searchTerm" className="text-sm font-medium">Pesquisar</Label>
+                    <label htmlFor="searchTerm" className="text-sm font-medium block mb-1">Pesquisar</label>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -170,7 +170,7 @@ export default function SalesRecordPage() {
                     </div>
                 </div>
                 <div>
-                    <Label htmlFor="filterPaymentMethod" className="text-sm font-medium">Forma de Pagamento</Label>
+                    <label htmlFor="filterPaymentMethod" className="text-sm font-medium block mb-1">Forma de Pagamento</label>
                     <Select value={filterPaymentMethod} onValueChange={setFilterPaymentMethod}>
                         <SelectTrigger id="filterPaymentMethod">
                         <SelectValue placeholder="Todas" />
@@ -185,7 +185,7 @@ export default function SalesRecordPage() {
                     </Select>
                 </div>
                 <div>
-                    <Label htmlFor="filterDate" className="text-sm font-medium">Data Específica</Label>
+                    <label htmlFor="filterDate" className="text-sm font-medium block mb-1">Data Específica</label>
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button
