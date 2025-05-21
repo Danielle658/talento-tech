@@ -6,7 +6,7 @@ interface LogoProps {
   height?: string | number;
 }
 
-export function Logo({ className, width = 50, height = 50 }: LogoProps) {
+export function Logo({ className, width = 80, height = 80 }: LogoProps) {
   return (
     <div className={cn("flex items-center justify-center", className)}>
       <svg width={width} height={height} viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">

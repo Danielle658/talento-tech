@@ -89,7 +89,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen>
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader className="p-4">
-          <Logo textClassName="text-sidebar-foreground group-data-[collapsible=icon]:hidden" />
+          <Logo />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
