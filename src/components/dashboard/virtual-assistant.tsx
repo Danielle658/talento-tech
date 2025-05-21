@@ -14,8 +14,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Bot, Mic, Send, Loader2, Volume2, MicOff } from 'lucide-react';
-import { interpretTextCommands } from '@/ai/flows/interpret-text-commands';
-import { interpretVoiceCommand } from '@/ai/flows/interpret-voice-commands';
+import { interpretTextCommands, type InterpretTextCommandsOutput } from '@/ai/flows/interpret-text-commands';
+import { interpretVoiceCommand, type InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -144,15 +144,29 @@ export function VirtualAssistant() {
     setChatMessages(prev => [...prev, { id: Date.now().toString(), sender, text, timestamp: new Date() }]);
   };
 
-  const executeActionAndSpeak = (action: string, parameters: any): string => {
+  const executeActionAndSpeak = (action: string, paramsString?: string): string => {
     let navigationPath: string | null = null;
     let messageForChat: string = "Ação não reconhecida.";
-    const customerNameParam = parameters?.customerName || parameters?.nomeCliente || "";
-    const productNameParam = parameters?.productName || parameters?.nomeProduto || "";
-    const transactionType = parameters?.type || "";
-    const transactionDesc = parameters?.description || "";
-    const transactionAmount = parameters?.amount || "";
-    const whatsappNumberParam = parameters?.whatsappNumber || "";
+    let parsedParameters: Record<string, any> = {};
+
+    if (paramsString) {
+      try {
+        parsedParameters = JSON.parse(paramsString);
+      } catch (e) {
+        console.error("Failed to parse parameters JSON string:", paramsString, e);
+        messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando.";
+        addMessage('assistant', messageForChat);
+        speak(messageForChat);
+        return messageForChat;
+      }
+    }
+
+    const customerNameParam = parsedParameters?.customerName || parsedParameters?.nomeCliente || "";
+    const productNameParam = parsedParameters?.productName || parsedParameters?.nomeProduto || "";
+    const transactionType = parsedParameters?.type || "";
+    const transactionDesc = parsedParameters?.description || "";
+    const transactionAmount = parsedParameters?.amount || "";
+    const whatsappNumberParam = parsedParameters?.whatsappNumber || "";
 
 
     switch (action?.toLowerCase()) {
@@ -188,7 +202,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/settings';
         messageForChat = "Certo, indo para as configurações.";
         break;
-      case 'navigatetotebook': // Corrected spelling from 'navigatetotebook'
+      case 'navigatetotebook': 
          navigationPath = '/dashboard/notebook';
          messageForChat = "Ok, abrindo a caderneta digital.";
          break;
@@ -318,7 +332,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/customers';
         break;
       case 'searchtransactions':
-        const searchTerm = parameters?.term || 'algo específico';
+        const searchTerm = parsedParameters?.term || 'algo específico';
         messageForChat = `Para buscar transações por '${searchTerm}', por favor, vá para a Caderneta Digital. A busca detalhada lá ainda está em desenvolvimento.`;
         navigationPath = '/dashboard/notebook';
         break;
@@ -329,8 +343,8 @@ export function VirtualAssistant() {
         break;
       default:
         messageForChat = `Recebi a ação '${action}', mas ainda não sei como executá-la.`;
-        if (parameters && Object.keys(parameters).length > 0) {
-            messageForChat += ` Parâmetros: ${JSON.stringify(parameters)}`;
+        if (parsedParameters && Object.keys(parsedParameters).length > 0) {
+            messageForChat += ` Parâmetros: ${JSON.stringify(parsedParameters)}`;
         }
         break;
     }
@@ -352,7 +366,7 @@ export function VirtualAssistant() {
     setIsLoading(true);
 
     try {
-      const response = await interpretTextCommands({ command: commandText });
+      const response: InterpretTextCommandsOutput = await interpretTextCommands({ command: commandText });
       const messageToSpeak = executeActionAndSpeak(response.action, response.parameters);
       speak(messageToSpeak);
     } catch (error) {
@@ -372,7 +386,7 @@ export function VirtualAssistant() {
     setIsLoading(true);
 
     try {
-      const response = await interpretVoiceCommand({ voiceCommand: commandText });
+      const response: InterpretVoiceCommandOutput = await interpretVoiceCommand({ voiceCommand: commandText });
       const messageToSpeak = executeActionAndSpeak(response.action, response.parameters);
       speak(messageToSpeak);
     } catch (error) {
@@ -520,3 +534,4 @@ export function VirtualAssistant() {
     </Dialog>
   );
 }
+

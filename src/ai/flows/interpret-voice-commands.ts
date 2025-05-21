@@ -24,10 +24,10 @@ const InterpretVoiceCommandOutputSchema = z.object({
       'The action to perform based on the voice command. Examples: \'navigateToDashboard\', \'navigateToNotebook\', \'navigateToCustomers\', \'navigateToSales\', \'navigateToProducts\', \'navigateToCreditNotebook\', \'navigateToSalesRecord\', \'navigateToMonthlyReport\', \'navigateToSettings\', \'queryTotalRevenue\', \'queryTotalCustomers\', \'queryTotalDueFiados\', \'queryPendingFiadosCount\', \'queryLowStockProductsCount\', \'initiateAddCustomer\', \'initiateAddCreditEntry\', \'initiateAddTransaction\', \'initiateAddProduct\', \'initiateSendMonthlyReport\', \'displayKPIs\'. If the command is not understood, return \'unknownCommand\''
     ),
   parameters: z
-    .record(z.string(), z.unknown()) // Changed z.any() to z.unknown()
+    .string()
     .optional()
     .describe(
-      'A JSON object containing parameters for the action. For example, for \'initiateAddCustomer\', parameters might be { customerName: "Maria" }.'
+      'A JSON string containing parameters for the action. For example, for \'initiateAddCustomer\', the JSON string might be \'{"customerName": "Maria"}\'.'
     ),
 });
 export type InterpretVoiceCommandOutput = z.infer<typeof InterpretVoiceCommandOutputSchema>;
@@ -81,6 +81,7 @@ Prioritize specific query actions if the user is asking for specific data.
 Prioritize navigation actions if the user is asking to go to a specific section.
 Prioritize 'initiate...' actions if the user wants to start a process like adding data.
 Extract relevant entities as parameters (e.g., customerName, productName, amount, description, type: 'income' or 'expense').
+**Provide these parameters as a valid JSON string in the 'parameters' field.**
 If no parameters are extracted, the 'parameters' field can be omitted from the output.
 Ensure that the output is valid JSON conforming to the InterpretVoiceCommandOutputSchema schema.`,
 });
