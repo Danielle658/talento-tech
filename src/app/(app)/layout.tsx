@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 // Sheet components are not directly used here anymore for sidebar, but Sidebar component might use them internally if needed.
-// import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; 
+// import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   SidebarProvider,
   Sidebar,
@@ -55,6 +55,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
+import { VirtualAssistant } from '@/components/dashboard/virtual-assistant'; // Added import
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Painel Central", tooltip: "Painel" },
@@ -137,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarTrigger>
             
             {/* Search, Bell, User Menu - adjusted for flex layout */}
-            <div className="flex flex-1 items-center justify-end gap-2 md:gap-4">
+            <div className="flex flex-1 items-center justify-end gap-1 md:gap-2"> {/* Reduced gap for more items */}
               <form className="relative flex-1 sm:flex-initial max-w-xs md:max-w-sm lg:max-w-md">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -150,6 +151,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Bell className="h-5 w-5" />
                 <span className="sr-only">Notificações</span>
               </Button>
+              <VirtualAssistant /> {/* Moved Virtual Assistant here */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">

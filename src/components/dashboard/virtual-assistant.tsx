@@ -29,6 +29,7 @@ interface ChatMessage {
 export function VirtualAssistant() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -36,9 +37,10 @@ export function VirtualAssistant() {
   useEffect(() => {
     // Scroll to bottom when new messages are added
     if (scrollAreaRef.current) {
-      const scrollViewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
-      if (scrollViewport) {
-        scrollViewport.scrollTop = scrollViewport.scrollHeight;
+      // Access the viewport element correctly based on ScrollArea structure
+      const viewportElement = scrollAreaRef.current.querySelector('div[style*="overflow: scroll"]');
+      if (viewportElement) {
+        viewportElement.scrollTop = viewportElement.scrollHeight;
       }
     }
   }, [chatMessages]);
@@ -70,12 +72,13 @@ export function VirtualAssistant() {
         toast({ title: "Comando de Voz", description: "Digite um comando no campo para simular a entrada de voz.", variant: "default" });
         return;
     }
-    const commandText = inputText;
+    const commandText = inputText; // Simulate voice input with current text
     addMessage('user', commandText);
     setInputText(''); // Clear input after simulating voice command submission
     setIsLoading(true);
 
     try {
+      // Assuming interpretVoiceCommand expects a similar structure or just the text
       const response = await interpretVoiceCommand({ voiceCommand: commandText });
       addMessage('assistant', undefined, response);
     } catch (error) {
@@ -87,11 +90,11 @@ export function VirtualAssistant() {
   };
 
   return (
-    <Dialog>
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full justify-start shadow-md hover:shadow-lg transition-shadow duration-200 text-base py-6">
-          <Bot className="mr-3 h-6 w-6 text-primary" />
-          Assistente Virtual
+        <Button variant="ghost" size="icon" className="rounded-full">
+          <Bot className="h-5 w-5" />
+          <span className="sr-only">Assistente Virtual</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl p-0 flex flex-col h-[80vh] max-h-[700px] min-h-[400px]">
