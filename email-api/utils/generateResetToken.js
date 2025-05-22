@@ -1,18 +1,23 @@
 const jwt = require('jsonwebtoken');
 
 function generateResetToken(email) {
-  // It's good practice to include more identifying info in the token if needed,
-  // but for a simple reset, email might suffice if you verify it against your user database.
-  // Ensure your JWT_SECRET is strong and kept secret.
+  if (!process.env.JWT_SECRET) {
+    throw new Error('A variável de ambiente JWT_SECRET não está definida.');
+  }
+  // Considerar adicionar mais informações se necessário, como um ID de usuário.
   return jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 }
 
-// Optional: Add a function to verify tokens if this backend will also handle token verification
 function verifyResetToken(token) {
+  if (!process.env.JWT_SECRET) {
+    console.error('A variável de ambiente JWT_SECRET não está definida para verificação.');
+    return null;
+  }
   try {
     return jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
-    return null; // Token is invalid or expired
+    console.error('Erro ao verificar o token:', err.message);
+    return null; // Token inválido ou expirado
   }
 }
 
