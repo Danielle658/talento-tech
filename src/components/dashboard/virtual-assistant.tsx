@@ -14,8 +14,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Bot, Mic, Send, Loader2, Volume2, MicOff, VolumeX } from 'lucide-react';
-import { interpretTextCommands, type InterpretTextCommandsOutput } from '@/ai/flows/interpret-text-commands';
-import { interpretVoiceCommand, type InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands';
+import { interpretTextCommands, type InterpretTextCommandsOutput, type InterpretTextCommandsInput } from '@/ai/flows/interpret-text-commands';
+import { interpretVoiceCommand, type InterpretVoiceCommandOutput, type InterpretVoiceCommandInput } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,7 @@ import type { CreditEntry } from '@/app/(app)/dashboard/credit-notebook/page';
 import { STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page';
 import type { CustomerEntry } from '@/app/(app)/dashboard/customers/page';
 import { STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page';
-import { parseISO, isValid as isValidDate } from 'date-fns';
+import { parseISO, isValid as isValidDate, format as formatDate } from 'date-fns';
 
 
 interface ChatMessage {
@@ -52,9 +52,8 @@ function getStoredData<T>(key: string, defaultValue: T[]): T[] {
     return storedData ? JSON.parse(storedData) : defaultValue;
   } catch (error) {
     console.error(`Error parsing data from localStorage for key ${key}:`, error);
-    localStorage.removeItem(key); // Clear corrupted data
-    // Potentially notify user about data corruption for this key
-    // toast({ title: `Erro de Dados (${key})`, description: `Dados locais para ${key} parecem estar corrompidos e foram resetados.`, variant: "destructive"});
+    localStorage.removeItem(key);
+    // toast({ title: `Erro de Dados (${key})`, description: `Dados locais para ${key} parecem estar corrompidos e foram resetados.`, variant: "destructive", duration: 7000});
     return defaultValue;
   }
 }
@@ -66,7 +65,7 @@ function saveStoredData<T>(key: string, data: T[]): boolean {
     return true;
   } catch (error) {
     console.error(`Error saving data to localStorage for key ${key}:`, error);
-    // toast({ title: `Erro ao Salvar Dados (${key})`, description: `Não foi possível salvar dados para ${key}.`, variant: "destructive"});
+    // toast({ title: `Erro ao Salvar Dados (${key})`, description: `Não foi possível salvar dados para ${key}.`, variant: "destructive", duration: 7000});
     return false;
   }
 }
@@ -183,20 +182,21 @@ export function VirtualAssistant() {
         parsedParameters = JSON.parse(paramsString);
       } catch (e) {
         console.error("Failed to parse parameters JSON string:", paramsString, e);
-        messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando. Por favor, verifique o formato dos parâmetros se você os especificou como JSON.";
+        messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando. Por favor, verifique o formato dos parâmetros.";
         addMessage('assistant', messageForChat);
         return messageForChat;
       }
     }
     
-    const customerNameParam = parsedParameters?.customerName || "";
-    const customerPhoneParam = parsedParameters?.phone || "";
-    const customerEmailParam = parsedParameters?.email || "";
-    const customerAddressParam = parsedParameters?.address || "";
+    const customerNameParam = parsedParameters?.customerName;
+    const customerPhoneParam = parsedParameters?.phone;
+    const customerEmailParam = parsedParameters?.email;
+    const customerAddressParam = parsedParameters?.address;
 
     const creditAmountParam = parsedParameters?.amount;
-    const creditDueDateParam = parsedParameters?.dueDate;
+    const creditDueDateParam = parsedParameters?.dueDate; // Expected as string e.g. "AAAA-MM-DD"
     const creditWhatsappParam = parsedParameters?.whatsappNumber;
+    const creditNotesParam = parsedParameters?.notes;
     
     const transactionTypeParam = parsedParameters?.type?.toLowerCase(); // income or expense
     const transactionDescParam = parsedParameters?.description;
@@ -208,7 +208,7 @@ export function VirtualAssistant() {
     const productCategoryParam = parsedParameters?.category;
     const productStockParam = parsedParameters?.stock;
     
-    const whatsappNumberParam = parsedParameters?.whatsapp || "";
+    const whatsappNumberParam = parsedParameters?.whatsapp;
 
 
     switch (action?.toLowerCase()) {
@@ -272,8 +272,8 @@ export function VirtualAssistant() {
         break;
       case 'querytotalduefiados':
         try {
-          const creditEntries = getStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, [])
-             .map(entry => ({...entry, saleDate: parseISO(entry.saleDate as unknown as string), dueDate: entry.dueDate ? parseISO(entry.dueDate as unknown as string) : undefined}));
+          const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, []);
+          const creditEntries = creditEntriesRaw.map(entry => ({...entry, saleDate: parseISO(entry.saleDate), dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined}));
           const totalDue = creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
           messageForChat = `O total pendente na caderneta de fiados é de R$ ${totalDue.toFixed(2)}.`;
         } catch (e) {
@@ -284,8 +284,8 @@ export function VirtualAssistant() {
         break;
       case 'querypendingfiadoscount':
         try {
-          const creditEntries = getStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, [])
-            .map(entry => ({...entry, saleDate: parseISO(entry.saleDate as unknown as string), dueDate: entry.dueDate ? parseISO(entry.dueDate as unknown as string) : undefined}));
+          const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, []);
+          const creditEntries = creditEntriesRaw.map(entry => ({...entry, saleDate: parseISO(entry.saleDate), dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined}));
           const pendingCount = creditEntries.filter(entry => !entry.paid).length;
           messageForChat = `Você tem ${pendingCount} fiados pendentes de pagamento.`;
         } catch (e) {
@@ -319,37 +319,52 @@ export function VirtualAssistant() {
             email: customerEmailParam || "",
             address: customerAddressParam || "",
           };
-          if(saveStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, [...customers, newCustomer])) {
+          if(saveStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name)))) {
             messageForChat = `Cliente '${customerNameParam}' adicionado com sucesso. Vou te mostrar na lista de clientes.`;
           } else {
             messageForChat = `Não foi possível salvar o cliente '${customerNameParam}'. Por favor, tente novamente na página de clientes.`;
           }
+          navigationPath = '/dashboard/customers';
         } else {
           messageForChat = "Para adicionar um cliente, preciso pelo menos do nome e telefone. Estou te levando para a página de Clientes para você preencher os detalhes.";
+          navigationPath = '/dashboard/customers';
         }
-        navigationPath = '/dashboard/customers';
         break;
 
       case 'initiateaddcreditentry':
         if (customerNameParam && creditAmountParam) {
-            const creditEntries = getStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, [])
-             .map(entry => ({...entry, saleDate: parseISO(entry.saleDate as unknown as string), dueDate: entry.dueDate ? parseISO(entry.dueDate as unknown as string) : undefined}));
+            const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, []);
+            // Ensure dates are parsed correctly before mapping for saving
+            const creditEntries = creditEntriesRaw.map(entry => ({
+                ...entry,
+                saleDate: isValidDate(parseISO(entry.saleDate)) ? parseISO(entry.saleDate) : new Date(), // fallback to now if invalid
+                dueDate: entry.dueDate && isValidDate(parseISO(entry.dueDate)) ? parseISO(entry.dueDate) : undefined,
+            }));
+            
+            let parsedDueDate: Date | undefined = undefined;
+            if (creditDueDateParam) {
+                const date = parseISO(creditDueDateParam);
+                if(isValidDate(date)) parsedDueDate = date;
+                else console.warn(`Assistente: Data de vencimento inválida recebida: ${creditDueDateParam}`);
+            }
 
             const newEntry: CreditEntry = {
                 id: `CF${String(Date.now()).slice(-6)}`,
                 customerName: customerNameParam,
                 amount: Number(creditAmountParam),
-                saleDate: new Date(), 
-                dueDate: creditDueDateParam ? new Date(creditDueDateParam) : undefined,
+                saleDate: new Date(), // saleDate always today for new entries via assistant
+                dueDate: parsedDueDate,
                 whatsappNumber: creditWhatsappParam || "",
-                notes: parsedParameters?.notes || "",
+                notes: creditNotesParam || "",
                 paid: false,
             };
-            const updatedEntries = [...creditEntries, newEntry].map(entry => ({
-                ...entry,
-                saleDate: (entry.saleDate as Date).toISOString(),
-                dueDate: entry.dueDate ? (entry.dueDate as Date).toISOString() : undefined,
-            })) as unknown as CreditEntry[];
+            const updatedEntries = [...creditEntries, newEntry]
+                                    .sort((a,b) => b.saleDate.getTime() - a.saleDate.getTime())
+                                    .map(entry => ({
+                                        ...entry,
+                                        saleDate: (entry.saleDate as Date).toISOString(),
+                                        dueDate: entry.dueDate ? (entry.dueDate as Date).toISOString() : undefined,
+                                    })) as unknown as CreditEntry[];
 
 
             if(saveStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, updatedEntries)) {
@@ -357,35 +372,39 @@ export function VirtualAssistant() {
             } else {
                 messageForChat = `Não foi possível salvar o fiado para '${customerNameParam}'. Por favor, tente novamente na página de fiados.`;
             }
+            navigationPath = '/dashboard/credit-notebook';
         } else {
             messageForChat = "Para adicionar um fiado, preciso do nome do cliente e do valor. Estou te levando para a Caderneta de Fiados para você preencher os detalhes.";
+            navigationPath = '/dashboard/credit-notebook';
         }
-        navigationPath = '/dashboard/credit-notebook';
         break;
 
       case 'initiateaddtransaction':
         if (transactionDescParam && transactionAmountParam && (transactionTypeParam === 'income' || transactionTypeParam === 'expense')) {
-            const transactions = getStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, [])
-              .map(t => ({...t, date: parseISO(t.date as unknown as string)}));
+            const transactionsRaw = getStoredData<any>(STORAGE_KEY_NOTEBOOK, []);
+            const transactions = transactionsRaw.map(t => ({...t, date: isValidDate(parseISO(t.date)) ? parseISO(t.date) : new Date() }));
             
             const newTransaction: Transaction = {
                 id: `T${String(Date.now()).slice(-6)}`,
                 description: transactionDescParam,
                 amount: Number(transactionAmountParam),
                 type: transactionTypeParam as "income" | "expense",
-                date: new Date(), 
+                date: new Date(), // date always today for new entries via assistant
             };
-            const updatedTransactions = [...transactions, newTransaction].map(t => ({...t, date: (t.date as Date).toISOString()})) as unknown as Transaction[];
+            const updatedTransactions = [...transactions, newTransaction]
+                                          .sort((a,b) => b.date.getTime() - a.date.getTime())
+                                          .map(t => ({...t, date: (t.date as Date).toISOString()})) as unknown as Transaction[];
 
             if(saveStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, updatedTransactions)) {
                 messageForChat = `${transactionTypeParam === 'income' ? 'Receita' : 'Despesa'} de '${transactionDescParam}' no valor de R$ ${Number(transactionAmountParam).toFixed(2)} registrada. Vou te mostrar na caderneta.`;
             } else {
                  messageForChat = `Não foi possível salvar a transação. Por favor, tente novamente na caderneta digital.`;
             }
+            navigationPath = '/dashboard/notebook';
         } else {
             messageForChat = "Para adicionar uma transação, preciso da descrição, valor e tipo (receita ou despesa). Estou te levando para a Caderneta Digital.";
+            navigationPath = '/dashboard/notebook';
         }
-        navigationPath = '/dashboard/notebook';
         break;
 
       case 'initiateaddproduct':
@@ -399,15 +418,16 @@ export function VirtualAssistant() {
                 category: productCategoryParam || "",
                 stock: productStockParam || "",
             };
-            if(saveStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, [...products, newProduct])) {
+            if(saveStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, [...products, newProduct].sort((a,b) => a.name.localeCompare(b.name)))) {
                 messageForChat = `Produto '${productNameParam}' adicionado com código '${productCodeParam}' e preço R$ ${Number(productPriceParam).toFixed(2)}. Vou te mostrar no catálogo.`;
             } else {
                 messageForChat = `Não foi possível salvar o produto. Por favor, tente novamente na página de produtos.`;
             }
+            navigationPath = '/dashboard/products';
         } else {
              messageForChat = "Para adicionar um produto, preciso do nome, código e preço. Estou te levando para a página de Produtos.";
+             navigationPath = '/dashboard/products';
         }
-        navigationPath = '/dashboard/products';
         break;
         
       case 'initiatesendmonthlyreport':
@@ -424,7 +444,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard';
         break;
       case 'showsakes': 
-      case 'showsales':
+      case 'showsales': // Common misinterpretation by STT
         navigationPath = '/dashboard/sales-record';
         messageForChat = "Ok, abrindo o histórico de vendas.";
         break;
@@ -476,7 +496,7 @@ export function VirtualAssistant() {
     setIsLoading(true);
 
     try {
-      const response: InterpretTextCommandsOutput = await interpretTextCommands({ command: commandText });
+      const response: InterpretTextCommandsOutput = await interpretTextCommands({ command: commandText } as InterpretTextCommandsInput);
       const messageToSpeak = executeActionAndSpeak(response.action, response.parameters);
       speak(messageToSpeak);
     } catch (error) {
@@ -498,7 +518,7 @@ export function VirtualAssistant() {
     setIsLoading(true);
 
     try {
-      const response: InterpretVoiceCommandOutput = await interpretVoiceCommand({ voiceCommand: commandText });
+      const response: InterpretVoiceCommandOutput = await interpretVoiceCommand({ voiceCommand: commandText } as InterpretVoiceCommandInput);
       const messageToSpeak = executeActionAndSpeak(response.action, response.parameters);
       speak(messageToSpeak);
     } catch (error) {
@@ -521,6 +541,7 @@ export function VirtualAssistant() {
     if (isListening) {
       if (recognition) {
         recognition.stop();
+        // processSpokenCommand(userInputForVoice); // Process any captured input when stopped manually
       }
     } else {
       if (!supportedFeatures.speechRecognition || !recognition) {
@@ -543,6 +564,8 @@ export function VirtualAssistant() {
   let VoiceControlIcon = Mic;
   let voiceControlButtonLabel = "Começar a ouvir";
   let voiceControlButtonClass = "";
+  let voiceControlButtonVariant: "outline" | "default" | "destructive" | "ghost" | "link" | "secondary" | null | undefined  = "outline";
+
 
   if (isSpeaking) {
     VoiceControlIcon = VolumeX;
@@ -552,6 +575,7 @@ export function VirtualAssistant() {
     VoiceControlIcon = MicOff;
     voiceControlButtonLabel = "Parar de ouvir";
     voiceControlButtonClass = "border-destructive text-destructive hover:bg-destructive/10";
+    voiceControlButtonVariant = "destructive";
   }
 
 
@@ -647,9 +671,9 @@ export function VirtualAssistant() {
             </Button>
             {supportedFeatures.speechRecognition && (
               <Button
-                variant="outline"
+                variant={voiceControlButtonVariant}
                 onClick={handleVoiceControlButtonClick}
-                disabled={isLoading || (!isSpeaking && !isListening && !supportedFeatures.speechRecognition && !isLoading)}
+                disabled={isLoading || (!isSpeaking && !isListening && !supportedFeatures.speechRecognition)}
                 aria-label={voiceControlButtonLabel}
                 size="icon"
                 className={cn("h-10 w-10", voiceControlButtonClass)}
@@ -667,4 +691,3 @@ export function VirtualAssistant() {
     </Dialog>
   );
 }
-```
