@@ -55,7 +55,7 @@ export default function MonthlyReportPage() {
     const currentMonthYear = format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
     const companyNameToUse = accountDetails?.companyName || "Sua Empresa";
     // Placeholder for actual report data - In a real app, this would be dynamically generated.
-    const reportMessage = `Olá! Segue o resumo do seu relatório mensal da MoneyWise (${companyNameToUse}) para ${currentMonthYear}. Em breve, este relatório incluirá dados financeiros detalhados da sua empresa.`;
+    const reportMessage = `Olá! Segue o resumo do seu relatório mensal da MoneyWise (${companyNameToUse}) para ${currentMonthYear}. Em breve, este relatório incluirá dados financeiros detalhados da sua empresa.\\n\\nVocê pode gerar uma versão em PDF do relatório exemplo através da opção 'Baixar/Imprimir Relatório (PDF)' no app.`;
     
     const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(reportMessage)}`;
 
@@ -224,3 +224,4 @@ export default function MonthlyReportPage() {
     </div>
   );
 }
+
