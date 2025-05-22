@@ -10,7 +10,7 @@ router.post('/reset-password', async (req, res) => {
     res.status(200).json({ message: 'E-mail de recuperação enviado.' });
   } catch (err) {
     console.error('Erro ao enviar e-mail de recuperação:', err);
-    res.status(500).json({ error: err.message || 'Erro interno ao tentar enviar e-mail de recuperação.' });
+    res.status(500).json({ error: 'Erro interno ao tentar enviar e-mail de recuperação. Por favor, tente novamente mais tarde.' });
   }
 });
 
@@ -21,7 +21,7 @@ router.post('/notify', async (req, res) => {
     res.status(200).json({ message: 'Notificação enviada com sucesso.' });
   } catch (err) {
     console.error('Erro ao enviar e-mail de notificação:', err);
-    res.status(500).json({ error: err.message || 'Erro interno ao tentar enviar notificação.' });
+    res.status(500).json({ error: 'Erro interno ao tentar enviar notificação. Por favor, tente novamente mais tarde.' });
   }
 });
 
