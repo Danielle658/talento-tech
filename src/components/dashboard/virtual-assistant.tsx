@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Bot, Mic, Send, Loader2, Volume2, MicOff, VolumeX } from 'lucide-react'; // Added VolumeX
+import { Bot, Mic, Send, Loader2, Volume2, MicOff, VolumeX } from 'lucide-react';
 import { interpretTextCommands, type InterpretTextCommandsOutput } from '@/ai/flows/interpret-text-commands';
 import { interpretVoiceCommand, type InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
@@ -155,9 +155,8 @@ export function VirtualAssistant() {
         parsedParameters = JSON.parse(paramsString);
       } catch (e) {
         console.error("Failed to parse parameters JSON string:", paramsString, e);
-        messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando.";
+        messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando. Por favor, verifique o formato dos parâmetros se você os especificou como JSON.";
         addMessage('assistant', messageForChat);
-        // speak(messageForChat); // This speak call is redundant, will be called by caller
         return messageForChat;
       }
     }
@@ -167,7 +166,7 @@ export function VirtualAssistant() {
     const transactionType = parsedParameters?.type || "";
     const transactionDesc = parsedParameters?.description || "";
     const transactionAmount = parsedParameters?.amount || "";
-    const whatsappNumberParam = parsedParameters?.whatsappNumber || "";
+    const whatsappNumberParam = parsedParameters?.whatsapp || parsedParameters?.whatsappNumber || ""; // Added whatsappNumber
 
 
     switch (action?.toLowerCase()) {
@@ -203,7 +202,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/settings';
         messageForChat = "Certo, indo para as configurações.";
         break;
-      case 'navigatetotebook':
+      case 'navigatetotebook': // Ensure this is correct as per your Genkit flow
          navigationPath = '/dashboard/notebook';
          messageForChat = "Ok, abrindo a caderneta digital.";
          break;
@@ -273,42 +272,44 @@ export function VirtualAssistant() {
 
       case 'initiateaddcustomer':
         navigationPath = '/dashboard/customers';
-        messageForChat = `Certo! Indo para a página de clientes. Clique em 'Adicionar Novo Cliente' para continuar.`;
         if (customerNameParam) {
-          messageForChat += ` Você pode adicionar o cliente ${customerNameParam}.`;
+          messageForChat = `Entendido. Para adicionar o cliente '${customerNameParam}', estou te levando para a página de Clientes. Clique em 'Adicionar Novo Cliente' e preencha os demais detalhes.`;
+        } else {
+          messageForChat = `Certo! Indo para a página de clientes. Clique em 'Adicionar Novo Cliente' para continuar.`;
         }
         break;
       case 'initiateaddcreditentry':
         navigationPath = '/dashboard/credit-notebook';
-        messageForChat = `Ok! Indo para a Caderneta de Fiados. Clique em 'Adicionar Novo Fiado' para registrar.`;
         if (customerNameParam) {
-          messageForChat += ` Você pode registrar um fiado para ${customerNameParam}.`;
+          messageForChat = `Ok! Para adicionar um fiado para '${customerNameParam}', vou te levar à Caderneta de Fiados. Clique em 'Adicionar Novo Fiado' e complete as informações.`;
+        } else {
+          messageForChat = `Ok! Indo para a Caderneta de Fiados. Clique em 'Adicionar Novo Fiado' para registrar.`;
         }
         break;
       case 'initiateaddtransaction':
         navigationPath = '/dashboard/notebook';
-        messageForChat = `Entendido. Indo para a Caderneta Digital. Clique em 'Adicionar Transação'.`;
-        if (transactionType) {
-            messageForChat += ` Você pode registrar uma ${transactionType === 'income' ? 'receita' : 'despesa'}`;
-            if (transactionDesc) messageForChat += ` para "${transactionDesc}"`;
-            if (transactionAmount) messageForChat += ` no valor de R$ ${transactionAmount}`;
-            messageForChat += `.`;
+        if (transactionType && transactionDesc && transactionAmount) {
+            messageForChat = `Compreendi. Para registrar uma ${transactionType === 'income' ? 'receita' : 'despesa'} de '${transactionDesc}' no valor de R$ ${transactionAmount}, estou abrindo a Caderneta Digital. Clique em 'Adicionar Transação' e preencha os campos.`;
+        } else if (transactionType) {
+             messageForChat = `Entendido. Para adicionar uma ${transactionType === 'income' ? 'receita' : 'despesa'}, estou abrindo a Caderneta Digital. Clique em 'Adicionar Transação'.`;
+        } else {
+            messageForChat = `Entendido. Indo para a Caderneta Digital. Clique em 'Adicionar Transação'.`;
         }
         break;
       case 'initiateaddproduct':
         navigationPath = '/dashboard/products';
-        messageForChat = `Certo! Indo para a página de Produtos. Clique em 'Adicionar Novo' para cadastrar.`;
         if (productNameParam) {
-          messageForChat += ` Você pode cadastrar o produto ${productNameParam}.`;
+          messageForChat = `Certo! Para adicionar o produto '${productNameParam}', vamos para a página de Produtos. Clique em 'Adicionar Novo'.`;
+        } else {
+          messageForChat = `Certo! Indo para a página de Produtos. Clique em 'Adicionar Novo' para cadastrar.`;
         }
         break;
       case 'initiatesendmonthlyreport':
         navigationPath = '/dashboard/monthly-report';
-        messageForChat = `Ok! Indo para a página de Relatório Mensal.`;
         if (whatsappNumberParam) {
-            messageForChat += ` Você pode inserir o número ${whatsappNumberParam} e clicar em 'Gerar e Enviar Relatório para WhatsApp'.`;
+            messageForChat = `Ok! Para enviar o relatório mensal para o WhatsApp ${whatsappNumberParam}, estou abrindo a página de Relatório Mensal. Confirme o número e clique em 'Gerar e Enviar Relatório para WhatsApp'.`;
         } else {
-            messageForChat += ` Por favor, insira o número de WhatsApp e clique em 'Gerar e Enviar Relatório para WhatsApp'.`;
+            messageForChat = `Ok! Indo para a página de Relatório Mensal. Por favor, insira o número de WhatsApp e clique em 'Gerar e Enviar Relatório para WhatsApp'.`;
         }
         break;
 
@@ -316,8 +317,9 @@ export function VirtualAssistant() {
         messageForChat = "Os principais indicadores (KPIs) são exibidos no Painel Central. Estou te levando para lá!";
         navigationPath = '/dashboard';
         break;
-      case 'showsakes':
-      case 'showsales': // Legacy compatibility
+      // Legacy/Alternative phrasing compatibility
+      case 'showsakes': 
+      case 'showsales':
         navigationPath = '/dashboard/sales-record';
         messageForChat = "Ok, abrindo o histórico de vendas.";
         break;
@@ -325,19 +327,21 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/customers';
         messageForChat = "Certo, indo para as contas de clientes.";
         break;
+      // Placeholder for future features
       case 'createnewinvoice':
         messageForChat = "Entendido! A funcionalidade de criar nova fatura ainda está em desenvolvimento.";
         break;
+      // More specific query examples
       case 'viewcustomerdetails':
-        messageForChat = `Para ver detalhes do cliente ${customerNameParam || 'específico'}, por favor, vá para a seção Contas de Clientes e utilize a busca.`;
+        messageForChat = `Para ver detalhes do cliente ${customerNameParam || 'específico'}, por favor, vá para a seção Contas de Clientes e utilize a busca. Estou te direcionando para lá.`;
         navigationPath = '/dashboard/customers';
         break;
       case 'searchtransactions':
         const searchTerm = parsedParameters?.term || 'algo específico';
-        messageForChat = `Para buscar transações por '${searchTerm}', por favor, vá para a Caderneta Digital. A busca detalhada lá ainda está em desenvolvimento.`;
+        messageForChat = `Para buscar transações por '${searchTerm}', por favor, vá para a Caderneta Digital. A busca detalhada lá ainda está em desenvolvimento. Vou te levar para a Caderneta.`;
         navigationPath = '/dashboard/notebook';
         break;
-
+      
       case 'unknown':
       case 'unknowncommand':
         messageForChat = "Desculpe, não entendi o comando. Pode tentar de outra forma ou ser mais específico?";
@@ -421,7 +425,7 @@ export function VirtualAssistant() {
         toast({ title: "Recurso Indisponível", description: "O reconhecimento de voz não é suportado pelo seu navegador.", variant: "destructive" });
         return;
       }
-      setUserInputForVoice('');
+      setUserInputForVoice(''); // Clear previous interim results
       try {
         recognition.start();
         setIsListening(true); // Set immediately
@@ -429,7 +433,7 @@ export function VirtualAssistant() {
       } catch (e) {
         console.error("Error starting recognition:", e);
         toast({ title: "Erro ao Iniciar", description: "Não foi possível iniciar o reconhecimento de voz. Verifique as permissões do microfone.", variant: "destructive" });
-        setIsListening(false);
+        setIsListening(false); // Reset if start fails
       }
     }
   };
@@ -455,7 +459,7 @@ export function VirtualAssistant() {
       if (!open) { // Dialog is closing
         if (recognition && isListening) {
           recognition.stop();
-          setIsListening(false);
+          // setIsListening(false); // onend will handle this
         }
         if (window.speechSynthesis && isSpeaking) {
           window.speechSynthesis.cancel();
@@ -529,7 +533,7 @@ export function VirtualAssistant() {
                 if (!isListening) setInputText(e.target.value);
               }}
               onKeyPress={(e) => {
-                if (e.key === 'Enter' && !isLoading && inputText.trim() && !isListening) {
+                if (e.key === 'Enter' && !isLoading && inputText.trim() && !isListening && !isSpeaking) {
                   handleTextCommand();
                 }
               }}
