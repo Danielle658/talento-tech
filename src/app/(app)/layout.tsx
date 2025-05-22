@@ -48,8 +48,8 @@ import {
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
 import { VirtualAssistant } from '@/components/dashboard/virtual-assistant';
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; // Added import
-import type { AccountDetailsFormValues } from '@/app/(app)/dashboard/settings/page'; // Added import
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
+import type { AccountDetailsFormValues } from '@/app/(app)/dashboard/settings/page';
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Painel Central", tooltip: "Painel" },
@@ -151,7 +151,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenu>
               <SidebarMenuItem>
                   <Link href="/dashboard/settings" passHref legacyBehavior>
-                    <SidebarMenuButton tooltip="Configurações">
+                    <SidebarMenuButton tooltip="Configurações da Conta">
                       <Settings />
                       <span>Configurações</span>
                     </SidebarMenuButton>
@@ -198,12 +198,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <DropdownMenuItem asChild>
                        <a><UserCircle className="mr-2 h-4 w-4" />
                         <span>Perfil</span></a>
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/dashboard/settings" passHref legacyBehavior>
-                     <DropdownMenuItem asChild>
-                       <a><Settings className="mr-2 h-4 w-4" />
-                        <span>Configurações</span></a>
                     </DropdownMenuItem>
                   </Link>
                   <Link href="/support" passHref legacyBehavior>
