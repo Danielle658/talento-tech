@@ -203,7 +203,7 @@ export default function CreditNotebookPage() {
 
     if (window.confirm(`Tem certeza que deseja excluir o fiado de "${entryToDelete.customerName}" no valor de R$ ${entryToDelete.amount.toFixed(2)}?`)) {
       const updatedEntries = creditEntries.filter(e => e.id !== id);
-      setCreditEntries(updatedEntries); // State update will trigger useEffect to save to localStorage
+      setCreditEntries(updatedEntries);
       toast({
         title: "Fiado Excluído!",
         description: `O fiado de "${entryToDelete.customerName}" foi removido.`,
@@ -237,21 +237,27 @@ export default function CreditNotebookPage() {
       receiptWindow.document.write(`
         <html>
           <head>
-            <title>Comprovante de Pagamento</title>
+            <title>Comprovante de Pagamento - ${companyNameToUse}</title>
             <style>
-              body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-              .container { max-width: 450px; margin: auto; border: 1px solid #ccc; padding: 25px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-              .header { text-align: center; margin-bottom: 25px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
-              .header h1 { margin: 0 0 5px 0; font-size: 1.8em; color: #333; }
-              .header p { margin: 0; font-size: 1.1em; font-weight: bold; }
-              .details p { margin-bottom: 12px; line-height: 1.6; font-size: 1em; }
-              .details strong { color: #555; }
-              .footer { text-align: center; font-size: 0.9em; margin-top: 30px; color: #777; }
+              body { font-family: Arial, sans-serif; margin: 20px; color: #333; line-height: 1.6; }
+              .container { max-width: 480px; margin: auto; border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 0 0 12px rgba(0,0,0,0.1); }
+              .header { text-align: center; margin-bottom: 20px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
+              .header h1 { margin: 0 0 8px 0; font-size: 1.6em; color: #222; }
+              .header p { margin: 0; font-size: 1em; font-weight: bold; }
+              .details { margin-bottom: 20px; }
+              .details p { margin-bottom: 10px; font-size: 0.95em; }
+              .details strong { color: #444; min-width: 150px; display: inline-block; }
+              .footer { text-align: center; font-size: 0.85em; margin-top: 25px; color: #666; border-top: 1px dashed #eee; padding-top: 15px;}
+              .item-list { margin-top: 15px; margin-bottom: 15px; }
+              .item-list ul { list-style: none; padding-left: 0; }
+              .item-list li { padding: 3px 0; }
               @media print {
-                body { margin: 0; color: #000; }
+                body { margin: 0; color: #000; font-size: 12pt; }
                 .container { border: none; box-shadow: none; max-width: 100%; padding: 0; }
-                .header p { font-size: 1.2em; }
-                .details p { font-size: 1em; }
+                .header h1 { font-size: 1.5em; }
+                .header p { font-size: 1.1em; }
+                .details p { font-size: 0.9em; }
+                .footer { font-size: 0.8em; }
               }
             </style>
           </head>
@@ -516,10 +522,10 @@ export default function CreditNotebookPage() {
                           )}
                           {entry.paid && (
                             <>
-                              <Button variant="outline" size="sm" onClick={() => handlePrintReceipt(entry)} title="Imprimir Comprovante">
+                              <Button variant="outline" size="sm" onClick={() => handlePrintReceipt(entry)} title="Imprimir/Salvar Comprovante (PDF)">
                                 <Printer className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleSendWhatsAppReceipt(entry)} title="Enviar Comprovante via WhatsApp" disabled={!entry.whatsappNumber}>
+                              <Button variant="outline" size="sm" onClick={() => handleSendWhatsAppReceipt(entry)} title="Enviar Resumo Comprovante via WhatsApp" disabled={!entry.whatsappNumber}>
                                 <Share2 className="h-4 w-4" />
                               </Button>
                             </>
