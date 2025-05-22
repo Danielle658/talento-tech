@@ -49,33 +49,30 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: data.email }),
       });
 
-      rawResponseText = await response.text(); // Obter a resposta como texto primeiro
+      rawResponseText = await response.text(); 
 
       if (!response.ok) {
-        // Tentar analisar como JSON se houver um corpo de erro JSON
         try {
           const errorResult = JSON.parse(rawResponseText);
           toast({
             title: "Erro ao Solicitar Redefinição",
-            description: errorResult.error || `A API retornou um erro: ${response.statusText || response.status}`,
+            description: errorResult.error || `A API retornou um erro: ${response.statusText || response.status}. Verifique se o servidor 'email-api' (porta 5001) está rodando.`,
             variant: "destructive",
             duration: 10000,
           });
         } catch (jsonParseError) {
-          // Se falhar ao analisar como JSON, é provável que seja HTML ou texto simples
           console.error("A resposta de erro da API não era JSON. Resposta bruta:", rawResponseText);
           toast({
-            title: "Erro de Comunicação com API",
-            description: `A API retornou uma resposta inesperada (status ${response.status}). Verifique se o servidor 'email-api' na porta 5000 está rodando e acessível pelo servidor Next.js. A resposta não foi um JSON válido, indicando uma possível página de erro HTML.`,
+            title: "Erro de Comunicação com API de E-mail",
+            description: `A API retornou uma resposta inesperada (status ${response.status}). Verifique se o servidor 'email-api' na porta 5001 está rodando e acessível pelo servidor Next.js. A resposta não foi um JSON válido, indicando uma possível página de erro HTML ou problema de CORS. Se estiver em ambiente de desenvolvimento remoto, pode ser necessário configurar encaminhamento de porta ou usar uma URL pública para a API de e-mail.`,
             variant: "destructive",
-            duration: 10000,
+            duration: 15000,
           });
         }
         setIsLoading(false);
-        return; // Parar a execução aqui
+        return; 
       }
-
-      // Se response.ok, tentar analisar a resposta de sucesso como JSON
+      
       const result = JSON.parse(rawResponseText);
       const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
       let emailExists = false;
@@ -93,7 +90,7 @@ export default function ForgotPasswordPage() {
       if (emailExists) {
         toast({
           title: "Verifique seu E-mail",
-          description: result.message || `(Simulação) Se uma conta com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend, um link de redefinição de senha foi enviado.`,
+          description: result.message || `(Simulação) Se uma conta com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend (porta 5001), um link de redefinição de senha foi enviado.`,
           duration: 7000,
         });
       } else {
@@ -104,13 +101,12 @@ export default function ForgotPasswordPage() {
           duration: 7000,
         });
       }
-      form.reset(); // Resetar o formulário apenas em caso de sucesso aparente (mesmo que simulado)
+      form.reset();
     } catch (error: any) {
-      // Este bloco catch lida com erros de rede (ex: servidor `email-api` totalmente offline)
       console.error("Erro de rede ao chamar API de redefinição de senha (via proxy):", error);
       toast({
         title: "Falha na Conexão com API de E-mail",
-        description: `Não foi possível conectar à API de e-mail. Verifique se o servidor 'email-api' (http://localhost:5000) está rodando e se o servidor Next.js pode alcançá-lo através do proxy. Detalhes: ${error.message}. Certifique-se também de que não há problemas de conteúdo misto (HTTPS vs HTTP) se estiver acessando via uma URL pública.`,
+        description: `Não foi possível conectar à API de e-mail através do proxy. Verifique se o servidor 'email-api' (que deve estar rodando na porta 5001) está online e se o servidor Next.js pode alcançá-lo. Detalhes: ${error.message}. Se estiver em ambiente de desenvolvimento remoto, pode ser necessário configurar encaminhamento de porta ou usar uma URL pública para a API de e-mail.`,
         variant: "destructive",
         duration: 15000,
       });

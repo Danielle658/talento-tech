@@ -29,7 +29,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/internal-email/:path*',
-        destination: 'http://localhost:5000/api/email/:path*', // Proxy to Express email API
+        destination: 'http://localhost:5001/api/email/:path*', // Proxy to Express email API on port 5001
       },
     ]
   },
