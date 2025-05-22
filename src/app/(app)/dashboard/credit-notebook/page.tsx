@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2 } from "lucide-react";
+import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, isValid, isToday, isPast, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -63,12 +63,12 @@ export default function CreditNotebookPage() {
         setCreditEntries(parsedEntries.sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
       } catch (error) {
         console.error("Failed to parse credit entries from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); 
-        setCreditEntries([]); 
-        toast({ title: "Erro ao Carregar Fiados", description: "Não foi possível carregar os dados da caderneta de fiados. Os dados podem ter sido redefinidos.", variant: "destructive" });
+        localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+        setCreditEntries([]);
+        toast({ title: "Erro ao Carregar Fiados", description: "Não foi possível carregar os dados da caderneta de fiados. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'creditLoadError' });
       }
     } else {
-      setCreditEntries([]); 
+      setCreditEntries([]);
     }
 
     const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
@@ -78,29 +78,29 @@ export default function CreditNotebookPage() {
         } catch (error) {
             console.error("Failed to parse account details from localStorage for credit notebook", error);
             localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY);
-            setAccountDetails(null); 
-            toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta para usar nos comprovantes. Os dados podem ter sido redefinidos.", variant: "destructive", duration: 7000 });
+            setAccountDetails(null);
+            toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta para usar nos comprovantes. Os dados podem ter sido redefinidos.", variant: "destructive", duration: 7000, toastId: 'creditAccountLoadError' });
         }
     }
   }, [toast]);
 
   useEffect(() => {
-    if (isMounted && creditEntries.length > 0) { 
+    if (isMounted && creditEntries.length > 0) {
       localStorage.setItem(STORAGE_KEY_CREDIT_NOTEBOOK, JSON.stringify(creditEntries.map(entry => ({
         ...entry,
-        saleDate: entry.saleDate.toISOString(), 
-        dueDate: entry.dueDate ? entry.dueDate.toISOString() : undefined,
+        saleDate: isValid(entry.saleDate) ? entry.saleDate.toISOString() : new Date().toISOString(),
+        dueDate: entry.dueDate && isValid(entry.dueDate) ? entry.dueDate.toISOString() : undefined,
       }))));
     } else if (isMounted && creditEntries.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK); 
+      localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
     }
 
     if (isMounted) {
       const today = startOfDay(new Date());
-      const dueTodayEntries = creditEntries.filter(entry => 
-        !entry.paid && 
-        entry.dueDate && 
-        isValid(entry.dueDate) && 
+      const dueTodayEntries = creditEntries.filter(entry =>
+        !entry.paid &&
+        entry.dueDate &&
+        isValid(entry.dueDate) &&
         (isToday(entry.dueDate) || isPast(entry.dueDate))
       );
 
@@ -135,7 +135,7 @@ export default function CreditNotebookPage() {
   const onSubmit = (data: CreditEntryFormValues) => {
     const newEntry: CreditEntry = {
       ...data,
-      id: `CF${String(Date.now()).slice(-6)}`, 
+      id: `CF${String(Date.now()).slice(-6)}`,
       paid: false,
     };
     setCreditEntries(prev => [newEntry, ...prev].sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
@@ -158,6 +158,21 @@ export default function CreditNotebookPage() {
       title: `Status Alterado!`,
       description: `Fiado de ${entry?.customerName} marcado como ${entry?.paid ? "pendente" : "pago"}.`,
     });
+  };
+
+  const handleDeleteCreditEntry = (id: string) => {
+    const entryToDelete = creditEntries.find(e => e.id === id);
+    if (!entryToDelete) return;
+
+    if (window.confirm(`Tem certeza que deseja excluir o fiado de "${entryToDelete.customerName}" no valor de R$ ${entryToDelete.amount.toFixed(2)}?`)) {
+      const updatedEntries = creditEntries.filter(e => e.id !== id);
+      setCreditEntries(updatedEntries);
+      toast({
+        title: "Fiado Excluído!",
+        description: `O fiado de "${entryToDelete.customerName}" foi removido.`,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleSendWhatsAppReminder = (entry: CreditEntry) => {
@@ -245,7 +260,7 @@ export default function CreditNotebookPage() {
     const saleDateFormatted = isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yyyy", { locale: ptBR }) : "Data Inválida";
     const paymentDateFormatted = isValid(paymentDate) ? format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : "Data Inválida";
     const companyNameToUse = accountDetails?.companyName || 'Sua Empresa';
-    
+
     const message = `🧾 *Comprovante de Pagamento - ${companyNameToUse}*\\n\\nOlá ${entry.customerName},\\nConfirmamos o recebimento de *R$${entry.amount.toFixed(2)}* referente à sua compra de ${saleDateFormatted}.\\n\\nPagamento confirmado em: ${paymentDateFormatted}\\n\\nObrigado!`;
     const whatsappUrl = `https://wa.me/${entry.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
@@ -430,10 +445,10 @@ export default function CreditNotebookPage() {
                     const isOverdue = !entry.paid && entry.dueDate && isValid(entry.dueDate) && isPast(startOfDay(entry.dueDate)) && !isToday(startOfDay(entry.dueDate));
                     const isDueToday = !entry.paid && entry.dueDate && isValid(entry.dueDate) && isToday(startOfDay(entry.dueDate));
                     return (
-                    <TableRow 
-                        key={entry.id} 
+                    <TableRow
+                        key={entry.id}
                         className={cn(
-                            entry.paid ? "bg-green-500/10" : 
+                            entry.paid ? "bg-green-500/10" :
                             (isOverdue || isDueToday) ? "bg-red-500/10 hover:bg-red-500/20" : ""
                         )}
                     >
@@ -472,6 +487,9 @@ export default function CreditNotebookPage() {
                               </Button>
                             </>
                           )}
+                           <Button variant="destructive" size="sm" onClick={() => handleDeleteCreditEntry(entry.id)} title="Excluir Fiado">
+                              <Trash2 className="h-4 w-4" />
+                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -492,3 +510,5 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
+
+    

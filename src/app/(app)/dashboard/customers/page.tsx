@@ -7,12 +7,11 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// Removed Textarea import as notes field is being removed
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, Loader2 } from "lucide-react"; // Removed StickyNote
+import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; // Basic Brazilian phone regex
@@ -22,7 +21,6 @@ const customerSchema = z.object({
   email: z.string().email({ message: "E-mail inválido." }).optional().or(z.literal('')),
   phone: z.string().regex(phoneRegex, { message: "Telefone inválido. Use (XX) XXXXX-XXXX ou similar." }),
   address: z.string().optional(),
-  // notes field removed
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -49,11 +47,11 @@ export default function CustomersPage() {
       } catch (error) {
         console.error("Failed to parse customers from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
-        setCustomers([]); 
-        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os dados dos clientes. Os dados podem ter sido redefinidos.", variant: "destructive" });
+        setCustomers([]);
+        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os dados dos clientes. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'customerLoadError' });
       }
     } else {
-        setCustomers([]); 
+        setCustomers([]);
     }
   }, [toast]);
 
@@ -61,7 +59,7 @@ export default function CustomersPage() {
     if (isMounted && customers.length > 0) {
       localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(customers));
     } else if (isMounted && customers.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_CUSTOMERS); 
+      localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
     }
   }, [customers, isMounted]);
 
@@ -70,9 +68,8 @@ export default function CustomersPage() {
     defaultValues: {
       name: "",
       email: "",
-      phone: "", // Phone is now required
+      phone: "",
       address: "",
-      // notes field removed
     },
   });
 
@@ -80,7 +77,7 @@ export default function CustomersPage() {
     if (editingCustomer) {
       form.reset(editingCustomer);
     } else {
-      form.reset({ name: "", email: "", phone: "", address: "" }); // Notes removed
+      form.reset({ name: "", email: "", phone: "", address: "" });
     }
   }, [editingCustomer, form, isFormDialogOpen]);
 
@@ -220,7 +217,6 @@ export default function CustomersPage() {
                         </FormItem>
                       )}
                     />
-                    {/* Notes field removed from form */}
                     <DialogFooter>
                       <DialogClose asChild>
                         <Button type="button" variant="outline">Cancelar</Button>
@@ -252,7 +248,6 @@ export default function CustomersPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Telefone</TableHead>
                         <TableHead>Endereço</TableHead>
-                        {/* Notes column removed */}
                         <TableHead className="text-center">Ações</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -261,9 +256,8 @@ export default function CustomersPage() {
                         <TableRow key={customer.id}>
                         <TableCell className="font-medium">{customer.name}</TableCell>
                         <TableCell>{customer.email || "-"}</TableCell>
-                        <TableCell>{customer.phone}</TableCell> {/* Phone is now always present */}
+                        <TableCell>{customer.phone}</TableCell>
                         <TableCell className="max-w-xs truncate" title={customer.address || undefined}>{customer.address || "-"}</TableCell>
-                        {/* Notes cell removed */}
                         <TableCell className="text-center space-x-1">
                             <Button variant="outline" size="sm" onClick={() => handleEditCustomer(customer)} title="Editar Cliente">
                                 <Edit3 className="h-4 w-4" />
@@ -284,3 +278,4 @@ export default function CustomersPage() {
   );
 }
 
+    

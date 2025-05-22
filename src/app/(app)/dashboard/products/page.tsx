@@ -46,11 +46,11 @@ export default function ProductsPage() {
       } catch (error) {
         console.error("Failed to parse products from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_PRODUCTS);
-        setProducts([]); 
-        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os dados do catálogo de produtos. Os dados podem ter sido redefinidos.", variant: "destructive" });
+        setProducts([]);
+        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os dados do catálogo de produtos. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'productsLoadError' });
       }
     } else {
-      setProducts([]); 
+      setProducts([]);
     }
   }, [toast]);
 
@@ -58,7 +58,7 @@ export default function ProductsPage() {
     if (isMounted && products.length > 0) {
       localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
     } else if (isMounted && products.length === 0) {
-        localStorage.removeItem(STORAGE_KEY_PRODUCTS); 
+        localStorage.removeItem(STORAGE_KEY_PRODUCTS);
     }
   }, [products, isMounted]);
 
@@ -88,16 +88,19 @@ export default function ProductsPage() {
   };
 
   const handleDeleteProduct = (id: string) => {
-    if (!window.confirm("Tem certeza que deseja excluir este produto?")) return;
-    const productName = products.find(p => p.id === id)?.name || "Produto";
+    const productToDelete = products.find(p => p.id === id);
+    if(!productToDelete) return;
+
+    if (!window.confirm(`Tem certeza que deseja excluir o produto "${productToDelete.name}"?`)) return;
+
     setProducts(prev => prev.filter(p => p.id !== id));
     toast({
       title: "Produto Excluído!",
-      description: `${productName} foi removido do catálogo.`,
+      description: `${productToDelete.name} foi removido do catálogo.`,
       variant: "destructive"
     });
   };
-  
+
   if (!isMounted) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -245,7 +248,7 @@ export default function ProductsPage() {
                       <TableCell>{product.category || "-"}</TableCell>
                       <TableCell>{product.stock || "-"}</TableCell>
                       <TableCell className="text-center">
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.id)}>
+                        <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.id)} title="Excluir Produto">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -260,3 +263,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    

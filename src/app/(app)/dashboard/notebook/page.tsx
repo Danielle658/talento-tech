@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign, Loader2 } from "lucide-react";
+import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, startOfMonth, subMonths, endOfMonth, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -65,25 +65,25 @@ export default function NotebookPage() {
           ...t,
           date: parseISO(t.date),
         }));
-        setTransactions(parsedTransactions.sort((a,b) => b.date.getTime() - a.date.getTime()));
+        setTransactions(parsedTransactions.sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0)));
       } catch (error) {
         console.error("Failed to parse transactions from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
-        setTransactions([]); 
-        toast({ title: "Erro ao Carregar Transações", description: "Não foi possível carregar os dados da caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive" });
+        setTransactions([]);
+        toast({ title: "Erro ao Carregar Transações", description: "Não foi possível carregar os dados da caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'notebookLoadError' });
       }
     } else {
-      setTransactions([]); 
+      setTransactions([]);
     }
   }, [toast]);
 
   useEffect(() => {
-    if (isMounted && transactions.length > 0) { 
+    if (isMounted && transactions.length > 0) {
       localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify(
-        transactions.map(t => ({...t, date: t.date.toISOString() })) 
+        transactions.map(t => ({...t, date: isValid(t.date) ? t.date.toISOString() : new Date().toISOString() }))
       ));
     } else if (isMounted && transactions.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_NOTEBOOK); 
+      localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
     }
   }, [transactions, isMounted]);
 
@@ -102,13 +102,28 @@ export default function NotebookPage() {
       ...data,
       id: `T${String(Date.now()).slice(-6)}`,
     };
-    setTransactions(prev => [newTransaction, ...prev].sort((a,b) => b.date.getTime() - a.date.getTime()));
+    setTransactions(prev => [newTransaction, ...prev].sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0)));
     toast({
       title: "Transação Registrada!",
       description: `${data.type === "income" ? "Receita" : "Despesa"} de ${data.description} no valor de R$ ${data.amount.toFixed(2)} registrada.`,
     });
     form.reset({ date: new Date(), amount: 0, description: "", type: undefined });
     setIsAddTransactionDialogOpen(false);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    const transactionToDelete = transactions.find(t => t.id === id);
+    if (!transactionToDelete) return;
+
+    if (window.confirm(`Tem certeza que deseja excluir a transação "${transactionToDelete.description}"?`)) {
+      const updatedTransactions = transactions.filter(t => t.id !== id);
+      setTransactions(updatedTransactions);
+      toast({
+        title: "Transação Excluída!",
+        description: `A transação "${transactionToDelete.description}" foi removida.`,
+        variant: "destructive"
+      });
+    }
   };
 
   const { totalIncome, totalExpense, balance } = useMemo(() => {
@@ -126,7 +141,7 @@ export default function NotebookPage() {
     if (!isMounted) return [];
     const data: { month: string; income: number; expense: number }[] = [];
     const today = new Date();
-    for (let i = 5; i >= 0; i--) { 
+    for (let i = 5; i >= 0; i--) {
       const targetMonthDate = subMonths(today, i);
       const monthKey = format(targetMonthDate, "MMM/yy", { locale: ptBR });
       const monthStart = startOfMonth(targetMonthDate);
@@ -135,7 +150,7 @@ export default function NotebookPage() {
       const monthIncome = transactions
         .filter(t => t.type === "income" && isValid(t.date) && t.date >= monthStart && t.date <= monthEnd)
         .reduce((sum, t) => sum + t.amount, 0);
-      
+
       const monthExpense = transactions
         .filter(t => t.type === "expense" && isValid(t.date) && t.date >= monthStart && t.date <= monthEnd)
         .reduce((sum, t) => sum + t.amount, 0);
@@ -313,18 +328,18 @@ export default function NotebookPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyChartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis 
-                      dataKey="month" 
-                      tickLine={false} 
-                      axisLine={false} 
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      axisLine={false}
                       tickMargin={8}
                       tickFormatter={(value) => value.slice(0,3)}
                     />
-                    <YAxis 
-                      tickFormatter={(value) => `R$${value/1000}k`} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickMargin={8} 
+                    <YAxis
+                      tickFormatter={(value) => `R$${value/1000}k`}
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
                     />
                     <ChartTooltip
                         cursor={false}
@@ -338,7 +353,7 @@ export default function NotebookPage() {
               </ChartContainer>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Todas as Transações</CardTitle>
@@ -360,6 +375,7 @@ export default function NotebookPage() {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead className="text-right">Valor (R$)</TableHead>
+                        <TableHead className="text-center">Ações</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -368,7 +384,7 @@ export default function NotebookPage() {
                         <TableCell>{isValid(transaction.date) ? format(transaction.date, "dd/MM/yyyy", { locale: ptBR }) : "Inválida"}</TableCell>
                         <TableCell className="font-medium">{transaction.description}</TableCell>
                         <TableCell>
-                            <span className={cn("px-2 py-1 rounded-full text-xs font-medium", 
+                            <span className={cn("px-2 py-1 rounded-full text-xs font-medium",
                                 transaction.type === "income" ? "bg-green-100 text-green-700 dark:bg-green-700/30 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-700/30 dark:text-red-300"
                             )}>
                             {transaction.type === "income" ? "Receita" : "Despesa"}
@@ -378,6 +394,11 @@ export default function NotebookPage() {
                             transaction.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                         )}>
                             {transaction.type === "expense" && "-"}R$ {transaction.amount.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                            <Button variant="destructive" size="sm" onClick={() => handleDeleteTransaction(transaction.id)} title="Excluir Transação">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
                         </TableCell>
                         </TableRow>
                     ))}
@@ -391,3 +412,5 @@ export default function NotebookPage() {
       </Card>
     </div>;
 }
+
+    

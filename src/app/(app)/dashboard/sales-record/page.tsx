@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FilePlus2, History, Search, Download, Trash2, Loader2, ListFilter, Eye, User } from "lucide-react";
+import { History, Search, Download, Trash2, Loader2, ListFilter, Eye } from "lucide-react";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -30,8 +30,8 @@ export interface SalesRecordEntry {
   totalAmount: number;
   paymentMethod: string;
   date: string; // ISO string
-  amountPaid?: number; 
-  changeGiven?: number; 
+  amountPaid?: number;
+  changeGiven?: number;
   customerId?: string;
   customerName?: string;
 }
@@ -47,64 +47,71 @@ export default function SalesRecordPage() {
   const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
   const [selectedSale, setSelectedSale] = useState<SalesRecordEntry | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  
+
 
   useEffect(() => {
     setIsMounted(true);
     const storedSales = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
     if (storedSales) {
       try {
-        setSalesHistory(JSON.parse(storedSales).sort((a: SalesRecordEntry, b: SalesRecordEntry) => parseISO(b.date).getTime() - parseISO(a.date).getTime()));
+        setSalesHistory(JSON.parse(storedSales).sort((a: SalesRecordEntry, b: SalesRecordEntry) => (isValid(parseISO(b.date)) ? parseISO(b.date).getTime() : 0) - (isValid(parseISO(a.date)) ? parseISO(a.date).getTime() : 0)));
       } catch (error) {
         console.error("Failed to parse sales history from localStorage", error);
         localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
-        setSalesHistory([]); 
-        toast({ title: "Erro ao Carregar Histórico de Vendas", description: "Não foi possível carregar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive" });
+        setSalesHistory([]);
+        toast({ title: "Erro ao Carregar Histórico de Vendas", description: "Não foi possível carregar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'salesRecordLoadError' });
       }
     } else {
-      setSalesHistory([]); 
+      setSalesHistory([]);
     }
   }, [toast]);
+
+  useEffect(() => {
+    if (isMounted && salesHistory.length > 0) {
+      localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify(salesHistory));
+    } else if (isMounted && salesHistory.length === 0) {
+      localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
+    }
+  }, [salesHistory, isMounted]);
 
   const filteredSales = useMemo(() => {
     if (!isMounted) return [];
     return salesHistory
       .filter(sale => {
         const saleDate = parseISO(sale.date);
-        const matchesSearch = searchTerm === "" || 
+        const matchesSearch = searchTerm === "" ||
           sale.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
           sale.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
           (sale.customerName && sale.customerName.toLowerCase().includes(searchTerm.toLowerCase()));
-        
+
         const matchesPayment = filterPaymentMethod === "all" || sale.paymentMethod === filterPaymentMethod;
-        
-        const matchesDate = !filterDate || 
+
+        const matchesDate = !filterDate ||
           (isValid(saleDate) && format(saleDate, "yyyy-MM-dd") === format(filterDate, "yyyy-MM-dd"));
 
         return matchesSearch && matchesPayment && matchesDate;
       })
-      .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+      .sort((a, b) => (isValid(parseISO(b.date)) ? parseISO(b.date).getTime() : 0) - (isValid(parseISO(a.date)) ? parseISO(a.date).getTime() : 0));
   }, [salesHistory, searchTerm, filterPaymentMethod, filterDate, isMounted]);
 
   const handleViewDetails = (sale: SalesRecordEntry) => {
     setSelectedSale(sale);
     setIsDetailModalOpen(true);
   };
-  
+
   const handleDeleteSale = (saleId: string) => {
-    if (!window.confirm("Tem certeza que deseja excluir este registro de venda? Esta ação não pode ser desfeita.")) {
+    const saleToDelete = salesHistory.find(s => s.id === saleId);
+    if(!saleToDelete) return;
+
+    if (!window.confirm(`Tem certeza que deseja excluir o registro de venda ${saleId}? Esta ação não pode ser desfeita e não afetará os lançamentos na Caderneta Digital.`)) {
       return;
     }
     const updatedSalesHistory = salesHistory.filter(sale => sale.id !== saleId);
     setSalesHistory(updatedSalesHistory);
-    localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify(updatedSalesHistory));
-    if(updatedSalesHistory.length === 0){
-      localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
-    }
     toast({
       title: "Registro Excluído",
       description: `O registro de venda ${saleId} foi excluído.`,
-      variant: "default",
+      variant: "destructive",
     });
   };
 
@@ -251,8 +258,8 @@ export default function SalesRecordPage() {
                       <TableCell className="text-right font-semibold">R$ {sale.totalAmount.toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant={
-                            sale.paymentMethod === "Dinheiro" ? "secondary" : 
-                            sale.paymentMethod === "PIX" ? "default" : 
+                            sale.paymentMethod === "Dinheiro" ? "secondary" :
+                            sale.paymentMethod === "PIX" ? "default" :
                             "outline"
                         }
                         className={cn(
@@ -322,3 +329,5 @@ export default function SalesRecordPage() {
     </div>
   );
 }
+
+    
