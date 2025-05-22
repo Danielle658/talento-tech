@@ -37,9 +37,11 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setIsLoading(true);
     
+    const apiUrl = 'http://localhost:5000/api/email/reset-password';
+    console.log("Tentando conectar à API de e-mail em:", apiUrl);
+
     try {
-      // Atualizado para chamar o backend Express
-      const response = await fetch('http://localhost:5000/api/email/reset-password', {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,8 +65,8 @@ export default function ForgotPasswordPage() {
           duration: 7000,
         });
       }
-    } catch (error) {
-      console.error("Erro na chamada da API de redefinição de senha:", error);
+    } catch (error: any) {
+      console.error("Erro detalhado na chamada da API de redefinição de senha:", error);
       toast({
         title: "Erro de Conexão com o Servidor",
         description: "Não foi possível conectar ao servidor de e-mail. Verifique sua conexão com a internet e se o servidor da API de e-mail (localizado na pasta 'email-api') está em execução na porta 5000. Tente novamente.",
