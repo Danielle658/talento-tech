@@ -40,7 +40,7 @@ async function sendPasswordResetEmail(email) {
           </a>
         </p>
         <p>Se você não solicitou esta redefinição, por favor, ignore este e-mail. Sua senha permanecerá inalterada.</p>
-        <p>O link de redefinição é válido por 1 hora.</p>
+        <p>O link de redefinição é válido por 20 minutos.</p>
         <br>
         <p>Obrigado,</p>
         <p>Equipe MoneyWise</p>
