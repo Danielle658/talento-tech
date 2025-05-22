@@ -93,7 +93,9 @@ export default function ProductsPage() {
 
     if (!window.confirm(`Tem certeza que deseja excluir o produto "${productToDelete.name}"?`)) return;
 
-    setProducts(prev => prev.filter(p => p.id !== id));
+    const updatedProducts = products.filter(p => p.id !== id);
+    setProducts(updatedProducts);
+    
     toast({
       title: "Produto Excluído!",
       description: `${productToDelete.name} foi removido do catálogo.`,

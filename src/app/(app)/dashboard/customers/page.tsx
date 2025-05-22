@@ -113,7 +113,8 @@ export default function CustomersPage() {
     if (!window.confirm(`Tem certeza que deseja excluir o cliente "${customerToDelete.name}"? Esta ação não pode ser desfeita.`)) {
       return;
     }
-    setCustomers(prev => prev.filter(c => c.id !== id));
+    const updatedCustomers = customers.filter(c => c.id !== id);
+    setCustomers(updatedCustomers);
     toast({ title: "Cliente Excluído!", description: `${customerToDelete.name} foi removido.`, variant: "destructive" });
   };
 
