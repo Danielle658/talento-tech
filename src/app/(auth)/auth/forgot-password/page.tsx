@@ -36,10 +36,9 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setIsLoading(true);
-    
-    // Alterado para usar a rota de proxy do Next.js
-    const apiUrl = '/api/internal-email/reset-password'; 
-    console.log("Tentando conectar à API de e-mail via proxy em:", apiUrl);
+    const apiUrl = '/api/internal-email/reset-password'; // Use a rota de proxy do Next.js
+    console.log("Tentando conectar à API de e-mail (via proxy Next.js) em:", apiUrl, " com e-mail:", data.email);
+    let rawResponseText = '';
 
     try {
       const response = await fetch(apiUrl, {
@@ -50,56 +49,73 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: data.email }),
       });
 
-      const result = await response.json();
+      rawResponseText = await response.text(); // Obter a resposta como texto primeiro
 
-      if (response.ok) {
-        const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
-        let emailExists = false;
-        if (storedDetailsRaw) {
-          try {
-            const storedDetails = JSON.parse(storedDetailsRaw);
-            if (storedDetails.email && storedDetails.email.toLowerCase() === data.email.toLowerCase()) {
-              emailExists = true;
-            }
-          } catch (e) {
-            console.error("Erro ao ler detalhes da conta do localStorage:", e);
-          }
-        }
-
-        if (emailExists) {
-          toast({ 
-            title: "Verifique seu E-mail", 
-            description: result.message || `(Simulação) Se uma conta com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend, um link de redefinição de senha foi enviado.`,
-            duration: 7000,
-          });
-        } else {
-           toast({ 
-            title: "E-mail Não Encontrado", 
-            description: `Não foi possível encontrar uma conta com o e-mail ${data.email}. Verifique o endereço digitado.`,
+      if (!response.ok) {
+        // Tentar analisar como JSON se houver um corpo de erro JSON
+        try {
+          const errorResult = JSON.parse(rawResponseText);
+          toast({
+            title: "Erro ao Solicitar Redefinição",
+            description: errorResult.error || `A API retornou um erro: ${response.statusText || response.status}`,
             variant: "destructive",
-            duration: 7000,
+            duration: 10000,
+          });
+        } catch (jsonParseError) {
+          // Se falhar ao analisar como JSON, é provável que seja HTML ou texto simples
+          console.error("A resposta de erro da API não era JSON. Resposta bruta:", rawResponseText);
+          toast({
+            title: "Erro de Comunicação com API",
+            description: `A API retornou uma resposta inesperada (status ${response.status}). Verifique se o servidor 'email-api' na porta 5000 está rodando e acessível pelo servidor Next.js. A resposta não foi um JSON válido, indicando uma possível página de erro HTML.`,
+            variant: "destructive",
+            duration: 10000,
           });
         }
+        setIsLoading(false);
+        return; // Parar a execução aqui
+      }
+
+      // Se response.ok, tentar analisar a resposta de sucesso como JSON
+      const result = JSON.parse(rawResponseText);
+      const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+      let emailExists = false;
+      if (storedDetailsRaw) {
+        try {
+          const storedDetails = JSON.parse(storedDetailsRaw);
+          if (storedDetails.email && storedDetails.email.toLowerCase() === data.email.toLowerCase()) {
+            emailExists = true;
+          }
+        } catch (e) {
+          console.error("Erro ao ler detalhes da conta do localStorage:", e);
+        }
+      }
+
+      if (emailExists) {
+        toast({
+          title: "Verifique seu E-mail",
+          description: result.message || `(Simulação) Se uma conta com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend, um link de redefinição de senha foi enviado.`,
+          duration: 7000,
+        });
       } else {
         toast({
-          title: "Erro ao Solicitar Redefinição",
-          description: result.error || "Não foi possível processar sua solicitação. Verifique se o servidor de backend (email-api) está rodando e configurado corretamente na porta 5000 e se o proxy do Next.js está funcionando. Tente novamente mais tarde.",
+          title: "E-mail Não Encontrado",
+          description: `Não foi possível encontrar uma conta com o e-mail ${data.email}. Verifique o endereço digitado.`,
           variant: "destructive",
-          duration: 10000,
+          duration: 7000,
         });
       }
+      form.reset(); // Resetar o formulário apenas em caso de sucesso aparente (mesmo que simulado)
     } catch (error: any) {
-      console.error("Erro detalhado na chamada da API de redefinição de senha (via proxy):", error);
+      // Este bloco catch lida com erros de rede (ex: servidor `email-api` totalmente offline)
+      console.error("Erro de rede ao chamar API de redefinição de senha (via proxy):", error);
       toast({
-        title: "Falha na Requisição para a API de E-mail",
-        description: `Ocorreu um erro ao tentar se comunicar com a API de e-mail através do proxy do Next.js. Verifique se o servidor 'email-api' está rodando corretamente na porta 5000 no ambiente do Cloud Workstation. Detalhes do erro: ${error.message}`,
+        title: "Falha na Conexão com API de E-mail",
+        description: `Não foi possível conectar à API de e-mail. Verifique se o servidor 'email-api' (http://localhost:5000) está rodando e se o servidor Next.js pode alcançá-lo através do proxy. Detalhes: ${error.message}. Certifique-se também de que não há problemas de conteúdo misto (HTTPS vs HTTP) se estiver acessando via uma URL pública.`,
         variant: "destructive",
-        duration: 15000, 
+        duration: 15000,
       });
     }
-    
     setIsLoading(false);
-    form.reset();
   };
 
   return (
