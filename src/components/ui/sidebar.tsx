@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -322,7 +323,7 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        "relative flex flex-1 flex-col bg-background", // Removed min-h-svh
+        "relative flex flex-1 flex-col bg-background", 
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
         className
       )}
@@ -549,12 +550,20 @@ const SidebarMenuButton = React.forwardRef<
       size = "default",
       tooltip,
       className,
+      onClick, // Capture onClick from props
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : "button"
-    const { isMobile, state } = useSidebar()
+    const { isMobile, state, setOpen } = useSidebar()
+
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (!isMobile && state === "collapsed") {
+        setOpen(true);
+      }
+      onClick?.(event); // Call original onClick if it exists
+    };
 
     const button = (
       <Comp
@@ -563,6 +572,7 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+        onClick={handleClick} // Use the new handleClick
         {...props}
       />
     )
@@ -761,3 +771,5 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+    
