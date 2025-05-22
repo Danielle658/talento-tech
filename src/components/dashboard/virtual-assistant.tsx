@@ -24,9 +24,9 @@ import type { Transaction } from '@/app/(app)/dashboard/notebook/page';
 import { STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
 import type { ProductEntry } from '@/app/(app)/dashboard/products/page';
 import { STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
-import type { CreditEntry } from '@/app/(app)/dashboard/credit-notebook/page';
+import type { CreditEntryFormValues, CreditEntry } from '@/app/(app)/dashboard/credit-notebook/page';
 import { STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page';
-import type { CustomerEntry } from '@/app/(app)/dashboard/customers/page';
+import type { CustomerEntry, CustomerFormValues } from '@/app/(app)/dashboard/customers/page';
 import { STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page';
 import { parseISO, isValid as isValidDate, format as formatDate } from 'date-fns';
 
@@ -47,25 +47,27 @@ const LOW_STOCK_THRESHOLD = 5;
 
 // Helper function to safely parse localStorage
 function getStoredData<T>(key: string, defaultValue: T[], toastInstance?: ReturnType<typeof useToast>['toast']): T[] {
+  if (typeof window === 'undefined') return defaultValue;
   try {
     const storedData = localStorage.getItem(key);
     return storedData ? JSON.parse(storedData) : defaultValue;
   } catch (error) {
     console.error(`Error parsing data from localStorage for key ${key}:`, error);
-    localStorage.removeItem(key);
-    toastInstance?.({ title: `Erro de Dados (${key.replace('moneywise-','')})`, description: `Dados locais para ${key.replace('moneywise-','')} parecem corrompidos e foram resetados.`, variant: "destructive", duration: 7000});
+    localStorage.removeItem(key); // Clear corrupted data
+    toastInstance?.({ title: `Erro de Dados (${key.replace('moneywise-','')})`, description: `Dados locais para ${key.replace('moneywise-','')} parecem corrompidos e foram resetados.`, variant: "destructive", duration: 7000, toastId: `loadError-${key}` });
     return defaultValue;
   }
 }
 
 // Helper function to save data to localStorage
 function saveStoredData<T>(key: string, data: T[], toastInstance?: ReturnType<typeof useToast>['toast']): boolean {
+  if (typeof window === 'undefined') return false;
   try {
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
     console.error(`Error saving data to localStorage for key ${key}:`, error);
-    toastInstance?.({ title: `Erro ao Salvar Dados (${key.replace('moneywise-','')})`, description: `Não foi possível salvar dados para ${key.replace('moneywise-','')}. Pode ser um problema de limite de armazenamento.`, variant: "destructive", duration: 7000});
+    toastInstance?.({ title: `Erro ao Salvar Dados (${key.replace('moneywise-','')})`, description: `Não foi possível salvar dados para ${key.replace('moneywise-','')}. Pode ser um problema de limite de armazenamento.`, variant: "destructive", duration: 7000, toastId: `saveError-${key}` });
     return false;
   }
 }
@@ -195,7 +197,7 @@ export function VirtualAssistant() {
     const customerAddressParam = parsedParameters?.address;
 
     const creditAmountParam = parsedParameters?.amount;
-    let creditDueDateParam = parsedParameters?.dueDate; 
+    const creditDueDateParam = parsedParameters?.dueDate; 
     const creditWhatsappParam = parsedParameters?.whatsappNumber;
     const creditNotesParam = parsedParameters?.notes;
     
@@ -330,7 +332,7 @@ export function VirtualAssistant() {
       case 'initiateaddcreditentry':
         if (customerNameParam && creditAmountParam) {
             const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, [], toast);
-            const creditEntries = creditEntriesRaw.map(entry => ({
+            const creditEntries = creditEntriesRaw.map((entry: any) => ({
                 ...entry,
                 saleDate: isValidDate(parseISO(entry.saleDate)) ? parseISO(entry.saleDate) : new Date(),
                 dueDate: entry.dueDate && isValidDate(parseISO(entry.dueDate)) ? parseISO(entry.dueDate) : undefined,
@@ -353,14 +355,14 @@ export function VirtualAssistant() {
                 notes: creditNotesParam || "",
                 paid: false,
             };
-            const entriesToSave = [...creditEntries, newEntry].sort((a,b) => b.saleDate.getTime() - a.saleDate.getTime());
+            const entriesToSave = [...creditEntries, newEntry].sort((a,b) => (b.saleDate as Date).getTime() - (a.saleDate as Date).getTime());
             const entriesForStorage = entriesToSave.map(entry => ({
               ...entry,
               saleDate: (entry.saleDate as Date).toISOString(), 
               dueDate: entry.dueDate ? (entry.dueDate as Date).toISOString() : undefined,
-            })) as unknown as CreditEntry[];
+            }));
 
-            if(saveStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, entriesForStorage, toast)) {
+            if(saveStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, entriesForStorage as CreditEntry[], toast)) {
                 messageForChat = `Fiado de R$ ${Number(creditAmountParam).toFixed(2)} para '${customerNameParam}' adicionado com sucesso! Vou te mostrar na caderneta de fiados.`;
             } else {
                 messageForChat = `Não foi possível salvar o fiado para '${customerNameParam}' diretamente. Por favor, tente adicioná-lo na página de fiados.`;
@@ -375,7 +377,7 @@ export function VirtualAssistant() {
       case 'initiateaddtransaction':
         if (transactionDescParam && transactionAmountParam && (transactionTypeParam === 'income' || transactionTypeParam === 'expense')) {
             const transactionsRaw = getStoredData<any>(STORAGE_KEY_NOTEBOOK, [], toast);
-            const transactions = transactionsRaw.map(t => ({...t, date: isValidDate(parseISO(t.date)) ? parseISO(t.date) : new Date() }));
+            const transactions = transactionsRaw.map((t: any) => ({...t, date: isValidDate(parseISO(t.date)) ? parseISO(t.date) : new Date() }));
             
             const newTransaction: Transaction = {
                 id: `T${String(Date.now()).slice(-6)}`,
@@ -384,11 +386,10 @@ export function VirtualAssistant() {
                 type: transactionTypeParam as "income" | "expense",
                 date: new Date(), 
             };
-            const transactionsToSave = [...transactions, newTransaction].sort((a,b) => b.date.getTime() - a.date.getTime());
-            const transactionsForStorage = transactionsToSave.map(t => ({ ...t, date: (t.date as Date).toISOString() })) as unknown as Transaction[];
+            const transactionsToSave = [...transactions, newTransaction].sort((a,b) => (b.date as Date).getTime() - (a.date as Date).getTime());
+            const transactionsForStorage = transactionsToSave.map(t => ({ ...t, date: (t.date as Date).toISOString() }));
 
-
-            if(saveStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, transactionsForStorage, toast)) {
+            if(saveStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, transactionsForStorage as Transaction[], toast)) {
                 messageForChat = `${transactionTypeParam === 'income' ? 'Receita' : 'Despesa'} de '${transactionDescParam}' no valor de R$ ${Number(transactionAmountParam).toFixed(2)} registrada com sucesso! Vou te mostrar na caderneta.`;
             } else {
                  messageForChat = `Não foi possível salvar a transação diretamente. Por favor, tente adicioná-la na caderneta digital.`;
@@ -431,6 +432,24 @@ export function VirtualAssistant() {
             messageForChat = `Ok! Indo para a página de Relatório Mensal. Por favor, insira o número de WhatsApp e clique em 'Gerar e Enviar Relatório para WhatsApp'.`;
         }
         break;
+      
+      case 'initiatedeletecustomer':
+        navigationPath = '/dashboard/customers';
+        messageForChat = `Ok. Para excluir o cliente ${parsedParameters.customerName || 'especificado'}, estou te levando para a página de Clientes. Lá você pode encontrar o cliente e usar o botão de excluir.`;
+        break;
+      case 'initiatedeleteproduct':
+        navigationPath = '/dashboard/products';
+        messageForChat = `Certo. Para excluir o produto ${parsedParameters.productName || parsedParameters.productCode || 'especificado'}, vamos para a página de Produtos. Encontre o produto na lista e use a opção de excluir.`;
+        break;
+      case 'initiatedeletetransaction':
+        navigationPath = '/dashboard/notebook';
+        messageForChat = `Entendido. Para excluir a transação ${parsedParameters.description || 'especificada'}, estou abrindo a Caderneta Digital. Localize a transação e utilize o botão de exclusão.`;
+        break;
+      case 'initiatedeletecreditentry':
+        navigationPath = '/dashboard/credit-notebook';
+        messageForChat = `Ok. Para excluir o fiado de ${parsedParameters.customerName || 'especificado'}, vamos para a Caderneta de Fiados. Encontre o registro e use a opção de excluir.`;
+        break;
+
 
       case 'displaykpis':
         messageForChat = "Os principais indicadores (KPIs) são exibidos no Painel Central. Estou te levando para lá!";
@@ -596,7 +615,7 @@ export function VirtualAssistant() {
             <Bot className="h-6 w-6 text-primary" /> Assistente Virtual MoneyWise
           </DialogTitle>
           <DialogDescription>
-            Use comandos de texto ou voz. Ex: 'Abrir painel', 'Adicionar cliente Maria telefone (11)9...', 'Qual minha receita?'.
+            Use comandos de texto ou voz. Ex: 'Abrir painel', 'Adicionar cliente Maria telefone (11)9...', 'Qual minha receita?', 'Excluir cliente João'.
             {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs mt-1">Reconhecimento de voz não suportado neste navegador.</span>}
             {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs mt-1">Síntese de voz não suportada neste navegador.</span>}
           </DialogDescription>
