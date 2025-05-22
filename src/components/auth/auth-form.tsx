@@ -15,11 +15,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { KeyRound, Mail, LogIn, Loader2 } from 'lucide-react';
+import { KeyRound, LogIn, Loader2, Building2 } from 'lucide-react'; // Added Building2, removed Mail
 import { Logo } from '@/components/shared/logo';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: "E-mail inválido." }),
+  companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   rememberMe: z.boolean().default(false).optional(),
 });
@@ -34,14 +34,14 @@ export function AuthForm() {
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "", rememberMe: false },
+    defaultValues: { companyName: "", password: "", rememberMe: false },
   });
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Login data:", data);
+    console.log("Login data:", data); // Now logs companyName
     login(); // Mock login
     toast({ title: "Login bem-sucedido!", description: "Redirecionando para o painel." });
     router.push('/dashboard');
@@ -60,14 +60,14 @@ export function AuthForm() {
           <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6 pt-4">
             <FormField
               control={loginForm.control}
-              name="email"
+              name="companyName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>E-mail</FormLabel>
+                  <FormLabel>Nome da Empresa</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input placeholder="seu@email.com" {...field} className="pl-10" />
+                      <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input placeholder="Digite o nome da sua empresa" {...field} className="pl-10" />
                     </div>
                   </FormControl>
                   <FormMessage />
