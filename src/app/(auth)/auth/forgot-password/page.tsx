@@ -52,11 +52,34 @@ export default function ForgotPasswordPage() {
       const result = await response.json();
 
       if (response.ok) {
-        toast({ 
-          title: "Verifique seu E-mail", 
-          description: result.message || `(Simulação) Se um usuário com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado corretamente no backend, um link de redefinição de senha foi enviado.`,
-          duration: 7000,
-        });
+        // Verifica se o e-mail existe no localStorage para uma simulação mais "real"
+        const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+        let emailExists = false;
+        if (storedDetailsRaw) {
+          try {
+            const storedDetails = JSON.parse(storedDetailsRaw);
+            if (storedDetails.email && storedDetails.email.toLowerCase() === data.email.toLowerCase()) {
+              emailExists = true;
+            }
+          } catch (e) {
+            console.error("Erro ao ler detalhes da conta do localStorage:", e);
+          }
+        }
+
+        if (emailExists) {
+          toast({ 
+            title: "Verifique seu E-mail", 
+            description: result.message || `(Simulação) Se um usuário com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend, um link de redefinição de senha foi enviado.`,
+            duration: 7000,
+          });
+        } else {
+           toast({ 
+            title: "E-mail Não Encontrado", 
+            description: `Não foi possível encontrar uma conta com o e-mail ${data.email}. Verifique o endereço digitado.`,
+            variant: "destructive",
+            duration: 7000,
+          });
+        }
       } else {
         toast({
           title: "Erro ao Solicitar Redefinição",
@@ -68,10 +91,10 @@ export default function ForgotPasswordPage() {
     } catch (error: any) {
       console.error("Erro detalhado na chamada da API de redefinição de senha:", error);
       toast({
-        title: "Erro de Conexão com o Servidor",
-        description: "Não foi possível conectar ao servidor de e-mail. Verifique sua conexão com a internet e se o servidor da API de e-mail (localizado na pasta 'email-api') está em execução na porta 5000. Tente novamente.",
+        title: "Erro de Conexão com o Servidor da API de E-mail",
+        description: "Falha ao conectar com o servidor da API de e-mail. Por favor, verifique: 1. Se o servidor na pasta 'email-api' foi iniciado (com 'npm start' no terminal daquela pasta). 2. Se não há erros no console do servidor 'email-api'. 3. Se a porta 5000 não está bloqueada.",
         variant: "destructive",
-        duration: 9000,
+        duration: 10000, // Aumentado para dar mais tempo de leitura
       });
     }
     
