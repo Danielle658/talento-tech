@@ -13,11 +13,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Bot, Mic, Send, Loader2, Volume2, MicOff } from 'lucide-react';
+import { Bot, Mic, Send, Loader2, Volume2, MicOff, VolumeX } from 'lucide-react'; // Added VolumeX
 import { interpretTextCommands, type InterpretTextCommandsOutput } from '@/ai/flows/interpret-text-commands';
 import { interpretVoiceCommand, type InterpretVoiceCommandOutput } from '@/ai/flows/interpret-voice-commands';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 import type { Transaction } from '@/app/(app)/dashboard/notebook/page';
 import { STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
@@ -88,7 +89,7 @@ export function VirtualAssistant() {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        setUserInputForVoice(finalTranscript || interimTranscript); 
+        setUserInputForVoice(finalTranscript || interimTranscript);
         if (finalTranscript) {
           processSpokenCommand(finalTranscript);
         }
@@ -113,7 +114,7 @@ export function VirtualAssistant() {
       };
       setRecognition(recognitionInstance);
     }
-  }, [toast]); 
+  }, [toast]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -125,9 +126,9 @@ export function VirtualAssistant() {
   }, [chatMessages]);
 
   const speak = (textToSpeak: string) => {
-    if (!supportedFeatures.speechSynthesis || !textToSpeak || isSpeaking) return;
+    if (!supportedFeatures.speechSynthesis || !textToSpeak) return;
+    if (isSpeaking) speechSynthesis.cancel(); // Cancel current speech if any
 
-    speechSynthesis.cancel(); 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'pt-BR';
     utterance.onstart = () => setIsSpeaking(true);
@@ -156,7 +157,7 @@ export function VirtualAssistant() {
         console.error("Failed to parse parameters JSON string:", paramsString, e);
         messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando.";
         addMessage('assistant', messageForChat);
-        speak(messageForChat);
+        // speak(messageForChat); // This speak call is redundant, will be called by caller
         return messageForChat;
       }
     }
@@ -178,7 +179,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/customers';
         messageForChat = "Certo, indo para as contas de clientes.";
         break;
-      case 'navigatetosales': 
+      case 'navigatetosales':
         navigationPath = '/dashboard/sales';
         messageForChat = "Entendido. Abrindo o Ponto de Venda.";
         break;
@@ -202,7 +203,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard/settings';
         messageForChat = "Certo, indo para as configurações.";
         break;
-      case 'navigatetotebook': 
+      case 'navigatetotebook':
          navigationPath = '/dashboard/notebook';
          messageForChat = "Ok, abrindo a caderneta digital.";
          break;
@@ -269,7 +270,7 @@ export function VirtualAssistant() {
           toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de produtos para estoque.'})
         }
         break;
-      
+
       case 'initiateaddcustomer':
         navigationPath = '/dashboard/customers';
         messageForChat = `Certo! Indo para a página de clientes. Clique em 'Adicionar Novo Cliente' para continuar.`;
@@ -315,12 +316,12 @@ export function VirtualAssistant() {
         messageForChat = "Os principais indicadores (KPIs) são exibidos no Painel Central. Estou te levando para lá!";
         navigationPath = '/dashboard';
         break;
-      case 'showsakes': 
+      case 'showsakes':
       case 'showsales': // Legacy compatibility
         navigationPath = '/dashboard/sales-record';
         messageForChat = "Ok, abrindo o histórico de vendas.";
         break;
-      case 'gotocustomeraccounts': 
+      case 'gotocustomeraccounts':
         navigationPath = '/dashboard/customers';
         messageForChat = "Certo, indo para as contas de clientes.";
         break;
@@ -360,6 +361,8 @@ export function VirtualAssistant() {
 
   const handleTextCommand = async () => {
     if (!inputText.trim()) return;
+    if (isSpeaking) speechSynthesis.cancel();
+
     const commandText = inputText;
     addMessage('user', commandText);
     setInputText('');
@@ -381,8 +384,10 @@ export function VirtualAssistant() {
 
   const processSpokenCommand = async (commandText: string) => {
     if (!commandText.trim()) return;
-    addMessage('user', `🎤: ${commandText}`); 
-    setUserInputForVoice(""); 
+    if (isSpeaking) speechSynthesis.cancel();
+
+    addMessage('user', `🎤: ${commandText}`);
+    setUserInputForVoice("");
     setIsLoading(true);
 
     try {
@@ -398,20 +403,28 @@ export function VirtualAssistant() {
     }
     setIsLoading(false);
   };
-  
-  const handleToggleListening = () => {
-    if (!supportedFeatures.speechRecognition || !recognition) {
-      toast({ title: "Recurso Indisponível", description: "O reconhecimento de voz não é suportado pelo seu navegador.", variant: "destructive" });
+
+  const handleVoiceControlButtonClick = () => {
+    if (isSpeaking) {
+      speechSynthesis.cancel();
+      setIsSpeaking(false);
       return;
     }
+
     if (isListening) {
-      recognition.stop();
-      setIsListening(false);
+      if (recognition) {
+        recognition.stop();
+        // setIsListening will be set to false by recognition.onend
+      }
     } else {
-      setUserInputForVoice(''); 
+      if (!supportedFeatures.speechRecognition || !recognition) {
+        toast({ title: "Recurso Indisponível", description: "O reconhecimento de voz não é suportado pelo seu navegador.", variant: "destructive" });
+        return;
+      }
+      setUserInputForVoice('');
       try {
         recognition.start();
-        setIsListening(true);
+        setIsListening(true); // Set immediately
         toast({ title: "Ouvindo...", description: "Fale agora." });
       } catch (e) {
         console.error("Error starting recognition:", e);
@@ -421,17 +434,33 @@ export function VirtualAssistant() {
     }
   };
 
+  let VoiceControlIcon = Mic;
+  let voiceControlButtonLabel = "Começar a ouvir";
+  let voiceControlButtonClass = "";
+
+  if (isSpeaking) {
+    VoiceControlIcon = VolumeX;
+    voiceControlButtonLabel = "Parar de falar";
+    voiceControlButtonClass = "border-yellow-500 text-yellow-500 hover:bg-yellow-500/10 dark:border-yellow-400 dark:text-yellow-400 dark:hover:bg-yellow-400/10";
+  } else if (isListening) {
+    VoiceControlIcon = MicOff;
+    voiceControlButtonLabel = "Parar de ouvir";
+    voiceControlButtonClass = "border-destructive text-destructive hover:bg-destructive/10";
+  }
+
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={(open) => {
       setIsDialogOpen(open);
-      if (!open && recognition && isListening) {
-        recognition.stop();
-        setIsListening(false);
-      }
-      if (!open && window.speechSynthesis && isSpeaking) {
-        window.speechSynthesis.cancel();
-        setIsSpeaking(false);
+      if (!open) { // Dialog is closing
+        if (recognition && isListening) {
+          recognition.stop();
+          setIsListening(false);
+        }
+        if (window.speechSynthesis && isSpeaking) {
+          window.speechSynthesis.cancel();
+          setIsSpeaking(false);
+        }
       }
     }}>
       <DialogTrigger asChild>
@@ -447,8 +476,8 @@ export function VirtualAssistant() {
           </DialogTitle>
           <DialogDescription>
             Use comandos de texto ou voz. Ex: 'Abrir painel', 'Adicionar cliente Maria', 'Qual minha receita?'.
-            {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs">Reconhecimento de voz não suportado neste navegador.</span>}
-            {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs">Síntese de voz não suportada neste navegador.</span>}
+            {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs mt-1">Reconhecimento de voz não suportado neste navegador.</span>}
+            {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs mt-1">Síntese de voz não suportada neste navegador.</span>}
           </DialogDescription>
         </DialogHeader>
 
@@ -473,14 +502,14 @@ export function VirtualAssistant() {
                 </div>
               </div>
             ))}
-            {isLoading && ( 
+            {isLoading && (
               <div className="flex justify-start">
                  <div className="max-w-[75%] rounded-lg px-3 py-2 text-sm bg-muted text-card-foreground shadow">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                  </div>
               </div>
             )}
-             {isListening && userInputForVoice && ( 
+             {isListening && userInputForVoice && (
               <div className="flex justify-end">
                 <div className="max-w-[80%] rounded-lg px-4 py-3 text-sm shadow bg-primary/80 text-primary-foreground italic">
                   <p className="whitespace-pre-wrap">🎤: {userInputForVoice}...</p>
@@ -494,40 +523,39 @@ export function VirtualAssistant() {
           <div className="flex gap-2 items-center">
             <Input
               type="text"
-              placeholder={isListening ? "Ouvindo..." : "Digite seu comando..."}
+              placeholder={isListening ? "Ouvindo..." : (isSpeaking ? "Assistente falando..." : "Digite seu comando...")}
               value={isListening ? userInputForVoice : inputText}
               onChange={(e) => {
                 if (!isListening) setInputText(e.target.value);
-                // If listening, userInputForVoice is controlled by speech recognition
               }}
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && !isLoading && inputText.trim() && !isListening) {
                   handleTextCommand();
                 }
               }}
-              disabled={isLoading || (isListening && !userInputForVoice)} // Disable if loading, or if listening and no interim text
+              disabled={isLoading || isListening || isSpeaking}
               className="flex-1 h-10 text-base"
               aria-label="Entrada de comando de texto"
             />
-            <Button onClick={handleTextCommand} disabled={isLoading || !inputText.trim() || isListening} aria-label="Enviar comando de texto" size="icon" className="h-10 w-10">
+            <Button onClick={handleTextCommand} disabled={isLoading || !inputText.trim() || isListening || isSpeaking} aria-label="Enviar comando de texto" size="icon" className="h-10 w-10">
               <Send className="h-5 w-5" />
             </Button>
             {supportedFeatures.speechRecognition && (
-              <Button 
-                variant="outline" 
-                onClick={handleToggleListening} 
-                disabled={isLoading || isSpeaking} 
-                aria-label={isListening ? "Parar de ouvir" : "Começar a ouvir"} 
-                size="icon" 
-                className={`h-10 w-10 ${isListening ? 'border-destructive text-destructive hover:bg-destructive/10' : ''}`}
+              <Button
+                variant="outline"
+                onClick={handleVoiceControlButtonClick}
+                disabled={isLoading || (!isSpeaking && !isListening && !supportedFeatures.speechRecognition)}
+                aria-label={voiceControlButtonLabel}
+                size="icon"
+                className={cn("h-10 w-10", voiceControlButtonClass)}
               >
-                {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                <VoiceControlIcon className="h-5 w-5" />
               </Button>
             )}
-             {isSpeaking && <Volume2 className="h-5 w-5 text-primary animate-pulse" />}
+             {isSpeaking && !isLoading && <Volume2 className="h-5 w-5 text-primary animate-pulse ml-2" />}
           </div>
            <p className="text-xs text-muted-foreground mt-2 text-center">
-            {isListening ? "Fale agora. Pressione o microfone novamente para parar." : "Pressione Enter para enviar texto ou clique no microfone para falar."}
+            {isSpeaking ? "Assistente falando..." : (isListening ? "Fale agora. Pressione o microfone novamente para parar." : "Pressione Enter para enviar texto ou clique no microfone para falar.")}
           </p>
         </div>
       </DialogContent>
