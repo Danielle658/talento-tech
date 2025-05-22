@@ -534,7 +534,7 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-const SidebarMenuButton = React.forwardRef<
+const SidebarMenuButton = React.memo(React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> & {
     asChild?: boolean
@@ -558,12 +558,12 @@ const SidebarMenuButton = React.forwardRef<
     const Comp = asChild ? Slot : "button"
     const { isMobile, state, setOpen } = useSidebar()
 
-    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const handleClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
       if (!isMobile && state === "collapsed") {
         setOpen(true);
       }
       onClick?.(event); // Call original onClick if it exists
-    };
+    }, [isMobile, state, setOpen, onClick]);
 
     const button = (
       <Comp
@@ -599,7 +599,7 @@ const SidebarMenuButton = React.forwardRef<
       </Tooltip>
     )
   }
-)
+));
 SidebarMenuButton.displayName = "SidebarMenuButton"
 
 const SidebarMenuAction = React.forwardRef<

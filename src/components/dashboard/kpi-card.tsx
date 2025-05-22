@@ -1,5 +1,8 @@
+
+"use client";
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React from 'react';
 
 interface KpiCardProps {
   title: string;
@@ -9,7 +12,7 @@ interface KpiCardProps {
   className?: string;
 }
 
-export function KpiCard({ title, value, icon: Icon, description, className }: KpiCardProps) {
+export const KpiCard = React.memo(function KpiCard({ title, value, icon: Icon, description, className }: KpiCardProps) {
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -24,4 +27,5 @@ export function KpiCard({ title, value, icon: Icon, description, className }: Kp
       </CardContent>
     </Card>
   );
-}
+});
+KpiCard.displayName = "KpiCard";

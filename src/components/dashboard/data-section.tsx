@@ -1,4 +1,7 @@
+
+"use client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React from 'react';
 
 interface DataSectionProps {
   title: string;
@@ -8,7 +11,7 @@ interface DataSectionProps {
   action?: React.ReactNode;
 }
 
-export function DataSection({ title, description, children, className, action }: DataSectionProps) {
+export const DataSection = React.memo(function DataSection({ title, description, children, className, action }: DataSectionProps) {
   return (
     <Card className={className}>
       <CardHeader>
@@ -25,4 +28,5 @@ export function DataSection({ title, description, children, className, action }:
       </CardContent>
     </Card>
   );
-}
+});
+DataSection.displayName = "DataSection";
