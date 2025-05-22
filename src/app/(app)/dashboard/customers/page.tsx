@@ -7,20 +7,22 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+// Removed Textarea import as notes field is being removed
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, StickyNote, Loader2 } from "lucide-react";
+import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, Loader2 } from "lucide-react"; // Removed StickyNote
 import { useToast } from "@/hooks/use-toast";
+
+const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; // Basic Brazilian phone regex
 
 const customerSchema = z.object({
   name: z.string().min(2, { message: "Nome do cliente é obrigatório." }),
   email: z.string().email({ message: "E-mail inválido." }).optional().or(z.literal('')),
-  phone: z.string().optional(),
+  phone: z.string().regex(phoneRegex, { message: "Telefone inválido. Use (XX) XXXXX-XXXX ou similar." }),
   address: z.string().optional(),
-  notes: z.string().optional(),
+  // notes field removed
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -68,9 +70,9 @@ export default function CustomersPage() {
     defaultValues: {
       name: "",
       email: "",
-      phone: "",
+      phone: "", // Phone is now required
       address: "",
-      notes: "",
+      // notes field removed
     },
   });
 
@@ -78,7 +80,7 @@ export default function CustomersPage() {
     if (editingCustomer) {
       form.reset(editingCustomer);
     } else {
-      form.reset({ name: "", email: "", phone: "", address: "", notes: "" });
+      form.reset({ name: "", email: "", phone: "", address: "" }); // Notes removed
     }
   }, [editingCustomer, form, isFormDialogOpen]);
 
@@ -191,7 +193,7 @@ export default function CustomersPage() {
                       name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Telefone (Opcional)</FormLabel>
+                          <FormLabel>Telefone</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -218,22 +220,7 @@ export default function CustomersPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Observações (Opcional)</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                               <StickyNote className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                               <Textarea placeholder="Anotações sobre o cliente..." {...field} className="pl-10 min-h-[60px]" />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {/* Notes field removed from form */}
                     <DialogFooter>
                       <DialogClose asChild>
                         <Button type="button" variant="outline">Cancelar</Button>
@@ -265,7 +252,7 @@ export default function CustomersPage() {
                         <TableHead>Email</TableHead>
                         <TableHead>Telefone</TableHead>
                         <TableHead>Endereço</TableHead>
-                        <TableHead>Observações</TableHead>
+                        {/* Notes column removed */}
                         <TableHead className="text-center">Ações</TableHead>
                     </TableRow>
                     </TableHeader>
@@ -274,9 +261,9 @@ export default function CustomersPage() {
                         <TableRow key={customer.id}>
                         <TableCell className="font-medium">{customer.name}</TableCell>
                         <TableCell>{customer.email || "-"}</TableCell>
-                        <TableCell>{customer.phone || "-"}</TableCell>
+                        <TableCell>{customer.phone}</TableCell> {/* Phone is now always present */}
                         <TableCell className="max-w-xs truncate" title={customer.address || undefined}>{customer.address || "-"}</TableCell>
-                        <TableCell className="max-w-xs truncate" title={customer.notes || undefined}>{customer.notes || "-"}</TableCell>
+                        {/* Notes cell removed */}
                         <TableCell className="text-center space-x-1">
                             <Button variant="outline" size="sm" onClick={() => handleEditCustomer(customer)} title="Editar Cliente">
                                 <Edit3 className="h-4 w-4" />
@@ -296,3 +283,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+
