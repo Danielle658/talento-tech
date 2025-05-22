@@ -78,10 +78,10 @@ const prompt = ai.definePrompt({
   - "Quais produtos estão com estoque baixo?", "Contar produtos com estoque baixo": action: queryLowStockProductsCount
 
   Initiate Actions (Add):
-  - "Adicionar novo cliente [nome] telefone [telefone] email [email] endereço [endereco]", "Cadastrar cliente [nome] com telefone [telefone] e email [email] e endereco [endereco]": action: initiateAddCustomer (extract customerName, phone, email, address if provided)
-  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero] observacoes [texto]", "Registrar fiado para [cliente] de [valor] vencendo em [data] com whatsapp [numero] e notas [texto]": action: initiateAddCreditEntry (extract customerName, amount, dueDate (YYYY-MM-DD format), whatsappNumber, notes if provided. Sale date defaults to today if not specified by user)
-  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction (extract type (income/expense), description, amount if provided. Date defaults to today if not specified by user)
-  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço], categoria [categoria] e estoque [quantidade]": action: initiateAddProduct (extract productName, productCode, productPrice, category, stock if provided)
+  - "Adicionar novo cliente [nome] telefone [telefone] email [email] endereço [endereco]", "Cadastrar cliente [nome] com telefone [telefone] e email [email] e endereco [endereco]": action: initiateAddCustomer. Extract: customerName (required), phone (required), email (optional), address (optional).
+  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero] observacoes [texto]", "Registrar fiado para [cliente] de [valor] vencendo em [data] com whatsapp [numero] e notas [texto]": action: initiateAddCreditEntry. Extract: customerName (required), amount (required), dueDate (optional, YYYY-MM-DD format), whatsappNumber (optional), notes (optional). Sale date defaults to today if not specified by user.
+  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction. Extract: type (required: 'income' or 'expense'), description (required), amount (required). Date defaults to today if not specified by user.
+  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço], categoria [categoria] e estoque [quantidade]": action: initiateAddProduct. Extract: productName (required), productCode (required), productPrice (required), category (optional), stock (optional).
   - "Enviar relatório mensal", "Gerar relatório para [whatsapp]": action: initiateSendMonthlyReport (extract whatsapp if provided)
 
   Initiate Actions (Delete - guide user to page):
@@ -95,16 +95,18 @@ const prompt = ai.definePrompt({
 
   Command: {{{command}}}
 
-  If a command can be interpreted as a data query, prefer the query action.
-  If a command is a general request for information typically found on the dashboard (like KPIs), use action: displayKPIs which will be handled on the client.
-  If the command is to start a process like adding or deleting something, use the 'initiate...' actions.
-  For 'initiateAdd...' actions, extract ALL relevant entities from the user's command and provide them as a valid JSON string in the 'parameters' field.
-  For 'initiateDelete...' actions, extract the identifier (e.g., customerName, productName, transaction description) and provide it in the 'parameters' field as a JSON string.
-  For 'initiateAddTransaction', 'type' should be 'income' for receita/entrada and 'expense' for despesa/saída.
-  For 'initiateAddCreditEntry', if dueDate is provided, ensure it is in YYYY-MM-DD format. SaleDate is not needed as it defaults to today.
-  For 'initiateAddProduct', all fields (productName, productCode, productPrice, category, stock) should be extracted if provided.
-  If no parameters are extracted for an 'initiate...' action where parameters are expected for direct addition (e.g., adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string, and the client will handle guiding the user.
-  If the command is ambiguous or not understood, return action: 'unknown'.
+  Output should be a JSON object with "action" and "parameters" fields.
+  - If a command can be interpreted as a data query, prefer the query action.
+  - If a command is a general request for information typically found on the dashboard (like KPIs), use action: displayKPIs.
+  - If the command is to start a process like adding or deleting something, use the 'initiate...' actions.
+  - For 'initiateAdd...' actions:
+    - Extract ALL relevant entities from the user's command as specified above.
+    - Provide these extracted entities as a valid JSON string in the 'parameters' field.
+  - For 'initiateDelete...' actions, extract the primary identifier and provide it in the 'parameters' field as a JSON string.
+  - For 'initiateAddTransaction', 'type' should be 'income' for receita/entrada and 'expense' for despesa/saída.
+  - For 'initiateAddCreditEntry', if dueDate is provided, ensure it is in YYYY-MM-DD format. SaleDate is not needed as it defaults to today.
+  - If no parameters are extracted for an 'initiate...' action where parameters are expected for direct addition (e.g., adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string, and the client will handle guiding the user.
+  - If the command is ambiguous, too vague, or not understood, return action: 'unknown'.
   Ensure that the output is valid JSON conforming to the InterpretTextCommandsOutputSchema schema.`,
 });
 

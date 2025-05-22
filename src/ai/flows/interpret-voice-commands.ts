@@ -64,10 +64,10 @@ The application has the following sections/actions (map to the given action):
   - "Quais são meus KPIs?": displayKPIs
 
   Initiate Actions (Add):
-  - "Adicionar novo cliente [nome] [telefone] [email] [endereco]", "Cadastrar cliente [nome] com telefone [telefone] email [email] e endereco [endereco]": action: initiateAddCustomer (extract ALL customerName, phone, email, address if provided by the user)
-  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero] observacoes [texto]", "Registrar fiado para [cliente] de [valor] vencendo em [data no formato AAAA-MM-DD] com whatsapp [numero] e notas [texto]": action: initiateAddCreditEntry (extract ALL customerName, amount, dueDate (YYYY-MM-DD format), whatsappNumber, notes if provided. Sale date defaults to today if not specified)
-  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction (extract type (income/expense), description, amount if provided. Date defaults to today if not specified)
-  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço], categoria [categoria] e estoque [quantidade]": action: initiateAddProduct (extract ALL productName, productCode, productPrice, category, stock if provided)
+  - "Adicionar novo cliente [nome] [telefone] [email] [endereco]", "Cadastrar cliente [nome] com telefone [telefone] email [email] e endereco [endereco]": action: initiateAddCustomer. Extract: customerName (required), phone (required), email (optional), address (optional).
+  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero] observacoes [texto]", "Registrar fiado para [cliente] de [valor] vencendo em [data no formato AAAA-MM-DD] com whatsapp [numero] e notas [texto]": action: initiateAddCreditEntry. Extract: customerName (required), amount (required), dueDate (optional, YYYY-MM-DD format), whatsappNumber (optional), notes (optional). Sale date defaults to today if not specified.
+  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction. Extract: type (required: 'income' or 'expense'), description (required), amount (required). Date defaults to today if not specified.
+  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço], categoria [categoria] e estoque [quantidade]": action: initiateAddProduct. Extract: productName (required), productCode (required), productPrice (required), category (optional), stock (optional).
   - "Enviar relatório mensal", "Gerar relatório para [whatsapp]": action: initiateSendMonthlyReport (extract whatsapp if provided)
 
   Initiate Actions (Delete - guide user to page):
@@ -81,15 +81,16 @@ Interpret the following voice command and provide the corresponding action and p
 Voice Command: {{{voiceCommand}}}
 
 Output should be a JSON object with "action" and "parameters" fields.
-If the command is unclear or doesn't match any known action, return an action of 'unknownCommand'.
-Prioritize specific query actions if the user is asking for specific data.
-Prioritize navigation actions if the user is asking to go to a specific section.
-Prioritize 'initiateAdd...' actions if the user wants to start adding data.
-Prioritize 'initiateDelete...' actions if the user wants to start deleting data.
-For 'initiateAdd...' actions, extract ALL relevant entities from the user's command (e.g., customerName, productName, amount, description, type: 'income' or 'expense', phone, email, address, productCode, productPrice, category, stock, dueDate (YYYY-MM-DD), whatsappNumber, notes).
-For 'initiateDelete...' actions, extract the main identifier (customerName, productName, productCode, transaction description) for the item to be deleted.
-**Provide these parameters as a valid JSON string in the 'parameters' field.**
-If no parameters are extracted where they would be expected for a direct addition (e.g. adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string.
+- If the command is unclear, too vague, or doesn't match any known action, return an action of 'unknownCommand'.
+- Prioritize specific query actions if the user is asking for specific data.
+- Prioritize navigation actions if the user is asking to go to a specific section.
+- Prioritize 'initiateAdd...' actions if the user wants to start adding data.
+- Prioritize 'initiateDelete...' actions if the user wants to start deleting data.
+- For 'initiateAdd...' actions:
+  - Extract ALL relevant entities from the user's command as specified above.
+  - Provide these extracted entities as a valid JSON string in the 'parameters' field.
+- For 'initiateDelete...' actions, extract the primary identifier and provide it in the 'parameters' field as a JSON string.
+- If no parameters are extracted where they would be expected for a direct addition (e.g. adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string.
 Ensure that the output is valid JSON conforming to the InterpretVoiceCommandOutputSchema schema.`,
 });
 
