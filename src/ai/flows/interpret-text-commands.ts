@@ -20,7 +20,7 @@ const InterpretTextCommandsInputSchema = z.object({
   command: z
     .string()
     .describe(
-      'The text command entered by the user. Examples: \'Show me my sales\', \'Go to customer accounts\', \'What are my key performance indicators?\', \'Qual minha receita total?\', \'Leve-me para a caderneta de fiados\', \'Adicionar novo cliente João\', \'Registrar nova despesa de aluguel\''
+      'The text command entered by the user. Examples: \'Show me my sales\', \'Go to customer accounts\', \'What are my key performance indicators?\', \'Qual minha receita total?\', \'Leve-me para a caderneta de fiados\', \'Adicionar novo cliente João telefone (11) 99999-8888 email joao@exemplo.com\', \'Registrar nova despesa de aluguel no valor de 500 reais\' , \'Adicionar produto Camisa Azul código CA001 preço 79.90\''
     ),
 });
 export type InterpretTextCommandsInput = z.infer<typeof InterpretTextCommandsInputSchema>;
@@ -35,7 +35,7 @@ const InterpretTextCommandsOutputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'A JSON string containing parameters for the action. For example, if the action is \'initiateAddCustomer\', the JSON string might be \'{"customerName": "João"}\'. For \'initiateAddTransaction\', it might be \'{"type": "expense", "description": "aluguel", "amount": 500}\'.'
+      'A JSON string containing parameters for the action. Examples: For \'initiateAddCustomer\', it might be \'{"customerName": "João", "phone": "(11) 99999-8888", "email": "joao@exemplo.com"}\'. For \'initiateAddTransaction\', it might be \'{"type": "expense", "description": "aluguel", "amount": 500}\'. For \'initiateAddProduct\', it could be \'{"productName": "Camisa Azul", "productCode": "CA001", "productPrice": 79.90}\'.'
     ),
 });
 export type InterpretTextCommandsOutput = z.infer<typeof InterpretTextCommandsOutputSchema>;
@@ -65,7 +65,7 @@ const prompt = ai.definePrompt({
   - "Caderneta de Fiados", "Fiados", "Contas a receber": action: navigateToCreditNotebook
   - "Registro de Vendas", "Histórico de vendas": action: navigateToSalesRecord
   - "Relatório Mensal", "Ver relatório": action: navigateToMonthlyReport
-  - "Configurações", "Ajustes": action: navigateToSettings
+  - "Configurações", "Ajustes", "Perfil": action: navigateToSettings
   - (Legacy) "Show me my sales": action: navigateToSalesRecord
   - (Legacy) "Go to customer accounts": action: navigateToCustomers
   - (Legacy) "What are my key performance indicators?": action: displayKPIs
@@ -78,10 +78,10 @@ const prompt = ai.definePrompt({
   - "Quais produtos estão com estoque baixo?", "Contar produtos com estoque baixo": action: queryLowStockProductsCount
 
   Initiate Actions:
-  - "Adicionar novo cliente", "Cadastrar cliente [nome]": action: initiateAddCustomer (extract name if provided)
-  - "Adicionar novo fiado", "Registrar fiado para [cliente]": action: initiateAddCreditEntry (extract customer name if provided)
-  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction (extract type, description, amount if provided)
-  - "Adicionar novo produto", "Cadastrar produto [nome]": action: initiateAddProduct (extract name if provided)
+  - "Adicionar novo cliente [nome] [telefone] [email] [endereco]", "Cadastrar cliente [nome] com telefone [telefone] e email [email]": action: initiateAddCustomer (extract customerName, phone, email, address if provided)
+  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero]", "Registrar fiado para [cliente] de [valor]": action: initiateAddCreditEntry (extract customerName, amount, dueDate, whatsappNumber if provided)
+  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction (extract type (income/expense), description, amount if provided)
+  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço]": action: initiateAddProduct (extract productName, productCode, productPrice, category, stock if provided)
   - "Enviar relatório mensal", "Gerar relatório para [whatsapp]": action: initiateSendMonthlyReport (extract whatsapp if provided)
 
 
@@ -92,10 +92,12 @@ const prompt = ai.definePrompt({
   If a command can be interpreted as a data query, prefer the query action.
   If a command is a general request for information typically found on the dashboard (like KPIs), use action: displayKPIs which will be handled on the client.
   If the command is to start a process like adding something, use the 'initiate...' actions.
+  Extract relevant entities and provide them as a valid JSON string in the 'parameters' field.
+  For 'initiateAddTransaction', 'type' should be 'income' for receita/entrada and 'expense' for despesa/saída.
+  For 'initiateAddCreditEntry', if saleDate is not provided, it can be omitted. dueDate is also optional.
+  For 'initiateAddProduct', category and stock are optional.
+  If no parameters are extracted for an 'initiate...' action, the 'parameters' field can be omitted.
   If the command is ambiguous or not understood, return action: 'unknown'.
-  Extract relevant entities as parameters (e.g., customerName, productName, amount, description, type: 'income' or 'expense').
-  **Provide these parameters as a valid JSON string in the 'parameters' field.**
-  If no parameters are extracted, the 'parameters' field can be omitted from the output.
   Ensure that the output is valid JSON conforming to the InterpretTextCommandsOutputSchema schema.`,
 });
 
@@ -111,3 +113,4 @@ const interpretTextCommandsFlow = ai.defineFlow(
   }
 );
 
+```
