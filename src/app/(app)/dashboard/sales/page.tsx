@@ -48,6 +48,9 @@ export default function SalesPage() {
   const [availableProducts, setAvailableProducts] = useState<ProductEntry[]>([]);
   const [availableCustomers, setAvailableCustomers] = useState<CustomerEntry[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
+  
+  const [productSuggestions, setProductSuggestions] = useState<ProductEntry[]>([]);
+  const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export default function SalesPage() {
         console.error("Failed to parse products from localStorage for PDV", error);
         localStorage.removeItem(STORAGE_KEY_PRODUCTS);
         setAvailableProducts([]); 
-        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os produtos para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive" });
+        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os produtos para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvProductLoadError" });
       }
     } else {
         setAvailableProducts([]); 
@@ -74,7 +77,7 @@ export default function SalesPage() {
         console.error("Failed to parse customers from localStorage for PDV", error);
         localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
         setAvailableCustomers([]); 
-        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os clientes para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive" });
+        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os clientes para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvCustomerLoadError" });
       }
     } else {
         setAvailableCustomers([]); 
@@ -111,6 +114,8 @@ export default function SalesPage() {
   const handleAddProductFromInput = () => {
     if (addProductToCartByCode(productCodeInput)) {
       setProductCodeInput("");
+      setProductSuggestions([]);
+      setIsSuggestionsVisible(false);
     }
   };
   
@@ -222,7 +227,7 @@ export default function SalesPage() {
         localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
     } catch (e) {
         console.error("Error updating notebook transactions in localStorage", e);
-        toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive"})
+        toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvNotebookSaveError"})
     }
 
     const salesRecordEntry: SalesRecordEntry = {
@@ -243,7 +248,7 @@ export default function SalesPage() {
         localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify([...existingSalesRecords, salesRecordEntry]));
     } catch (e) {
         console.error("Error updating sales records in localStorage", e);
-        toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive"})
+        toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvSalesRecordSaveError"})
     }
 
     toast({
@@ -254,9 +259,31 @@ export default function SalesPage() {
 
     setCart([]);
     setProductCodeInput("");
+    setProductSuggestions([]);
+    setIsSuggestionsVisible(false);
     setAmountPaidInput("");
     setPaymentMethod(undefined);
     setSelectedCustomerId(undefined);
+  };
+
+  const handleProductCodeInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setProductCodeInput(value);
+
+    if (value.trim() === "") {
+      setProductSuggestions([]);
+      setIsSuggestionsVisible(false);
+      return;
+    }
+
+    const lowercasedValue = value.toLowerCase();
+    const filtered = availableProducts.filter(
+      (product) =>
+        product.code.toLowerCase().includes(lowercasedValue) ||
+        product.name.toLowerCase().includes(lowercasedValue)
+    );
+    setProductSuggestions(filtered.slice(0, 5)); // Show top 5 suggestions
+    setIsSuggestionsVisible(true);
   };
 
   if (!isMounted) {
@@ -308,61 +335,107 @@ export default function SalesPage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2"><Barcode className="h-5 w-5"/> Adicionar Produto</CardTitle>
               </CardHeader>
-              <CardContent className="flex items-end gap-2">
-                <div className="flex-grow">
-                  <Label htmlFor="productCode">Código do Produto</Label>
-                  <Input
-                    id="productCode"
-                    placeholder="Digite ou escaneie o código"
-                    value={productCodeInput}
-                    onChange={(e) => setProductCodeInput(e.target.value)}
-                    onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductFromInput(); }}
-                  />
+              <CardContent className="space-y-2">
+                <div className="flex items-end gap-2">
+                  <div className="flex-grow relative">
+                    <Label htmlFor="productCode">Código ou Nome do Produto</Label>
+                    <Input
+                      id="productCode"
+                      placeholder="Digite código ou nome..."
+                      value={productCodeInput}
+                      onChange={handleProductCodeInputChange}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddProductFromInput();
+                        }
+                      }}
+                      onFocus={() => {
+                        if (productCodeInput.trim() !== "" && productSuggestions.length > 0) {
+                          setIsSuggestionsVisible(true);
+                        }
+                      }}
+                      onBlur={() => {
+                        // Delay hiding to allow click on suggestions
+                        setTimeout(() => {
+                          setIsSuggestionsVisible(false);
+                        }, 150); 
+                      }}
+                      autoComplete="off"
+                    />
+                    {isSuggestionsVisible && productSuggestions.length > 0 && (
+                      <Card className="absolute z-50 mt-1 w-full border bg-background shadow-lg max-h-60 overflow-y-auto">
+                        <CardContent className="p-1">
+                          <ul className="space-y-0.5">
+                            {productSuggestions.map((product) => (
+                              <li key={product.id}>
+                                <Button
+                                  variant="ghost"
+                                  className="w-full justify-start h-auto py-1.5 px-2 text-left"
+                                  onClick={() => { // Modified from onMouseDown to onClick for simplicity, rely on timeout
+                                    addProductToCartByCode(product.code);
+                                    setProductCodeInput('');
+                                    setProductSuggestions([]);
+                                    setIsSuggestionsVisible(false);
+                                  }}
+                                >
+                                  <div className="flex flex-col items-start">
+                                    <span className="text-sm font-medium">{product.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      Código: {product.code} | Preço: R$ {product.price.toFixed(2)}
+                                    </span>
+                                  </div>
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                  <Button onClick={handleAddProductFromInput} className="px-4 shrink-0">Adicionar</Button>
+                  <Dialog open={isCameraScanDialogOpen} onOpenChange={setIsCameraScanDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="icon" title="Escanear com Câmera" className="shrink-0">
+                        <Camera className="h-5 w-5" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Escanear Código de Barras com a Câmera</DialogTitle>
+                        <DialogDescription>
+                          Aponte a câmera para o código de barras do produto. Se a leitura não ocorrer automaticamente, digite o código no campo abaixo.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                          <div className="w-full aspect-video bg-muted rounded-md overflow-hidden flex items-center justify-center">
+                          <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                          </div>
+                          {hasCameraPermission === false && (
+                              <Alert variant="destructive">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  <AlertTitle>Acesso à Câmera Negado</AlertTitle>
+                                  <AlertDescription>
+                                  Habilite a permissão da câmera para escanear.
+                                  </AlertDescription>
+                              </Alert>
+                          )}
+                          <Input
+                              placeholder="Digite o código do produto aqui..."
+                              value={cameraScannedCode}
+                              onChange={(e) => setCameraScannedCode(e.target.value)}
+                              onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductFromCameraDialog();}}
+                              disabled={hasCameraPermission === null || hasCameraPermission === false}
+                          />
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline">Cancelar</Button>
+                        </DialogClose>
+                        <Button type="button" onClick={handleAddProductFromCameraDialog} disabled={!cameraScannedCode.trim() || hasCameraPermission === null || hasCameraPermission === false}>Adicionar Produto</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                <Button onClick={handleAddProductFromInput} className="px-4">Adicionar</Button>
-                <Dialog open={isCameraScanDialogOpen} onOpenChange={setIsCameraScanDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="icon" title="Escanear com Câmera">
-                      <Camera className="h-5 w-5" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Escanear Código de Barras com a Câmera</DialogTitle>
-                      <DialogDescription>
-                        Aponte a câmera para o código de barras do produto. Se a leitura não ocorrer automaticamente, digite o código no campo abaixo.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="w-full aspect-video bg-muted rounded-md overflow-hidden flex items-center justify-center">
-                         <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                        </div>
-                        {hasCameraPermission === false && (
-                            <Alert variant="destructive">
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertTitle>Acesso à Câmera Negado</AlertTitle>
-                                <AlertDescription>
-                                Habilite a permissão da câmera para escanear.
-                                </AlertDescription>
-                            </Alert>
-                        )}
-                         <Input
-                            placeholder="Digite o código do produto aqui..."
-                            value={cameraScannedCode}
-                            onChange={(e) => setCameraScannedCode(e.target.value)}
-                            onKeyPress={(e) => { if (e.key === 'Enter') handleAddProductFromCameraDialog();}}
-                            disabled={hasCameraPermission === null || hasCameraPermission === false}
-                        />
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">Cancelar</Button>
-                      </DialogClose>
-                      <Button type="button" onClick={handleAddProductFromCameraDialog} disabled={!cameraScannedCode.trim() || hasCameraPermission === null || hasCameraPermission === false}>Adicionar Produto</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
               </CardContent>
             </Card>
 
@@ -498,3 +571,6 @@ export default function SalesPage() {
     </div>
   );
 }
+
+
+    
