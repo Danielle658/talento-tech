@@ -24,6 +24,8 @@ import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/pa
 import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
 import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page"; 
 import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page"; 
+import type { Transaction } from "@/app/(app)/dashboard/notebook/page";
+import { STORAGE_KEY_NOTEBOOK } from "@/app/(app)/dashboard/notebook/page";
 
 
 const creditEntrySchema = z.object({
@@ -185,16 +187,54 @@ export default function CreditNotebookPage() {
   };
 
   const handleMarkAsPaid = (id: string) => {
+    const entry = creditEntries.find(e => e.id === id);
+    if (!entry) return;
+
+    const wasPaid = entry.paid;
+    const newPaidStatus = !wasPaid;
+
     setCreditEntries(prev =>
-      prev.map(entry =>
-        entry.id === id ? { ...entry, paid: !entry.paid, paymentDate: !entry.paid ? new Date().toISOString() : undefined } : entry
+      prev.map(e =>
+        e.id === id ? { ...e, paid: newPaidStatus, paymentDate: newPaidStatus ? new Date().toISOString() : undefined } : e
       )
     );
-    const entry = creditEntries.find(e => e.id === id);
-    toast({
-      title: `Status Alterado!`,
-      description: `Fiado de ${entry?.customerName} marcado como ${entry?.paid ? "pendente" : "pago"}.`,
-    });
+
+    if (newPaidStatus) { // Just marked as paid
+      try {
+        const existingNotebookTransactionsRaw = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
+        let notebookTransactions: Transaction[] = existingNotebookTransactionsRaw 
+          ? JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: parseISO(t.date)})) 
+          : [];
+        
+        const incomeTransaction: Transaction = {
+          id: `T-FIADO-${entry.id}-${Date.now().toString().slice(-4)}`,
+          description: `Recebimento Fiado - ${entry.customerName} (Ref Venda: ${format(entry.saleDate, "dd/MM/yy")})`,
+          amount: entry.amount,
+          type: "income",
+          date: new Date(), // Payment date
+        };
+        notebookTransactions = [...notebookTransactions, incomeTransaction].sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0));
+        localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify(notebookTransactions.map(t => ({...t, date: t.date.toISOString()}))));
+        
+        toast({
+          title: `Status Alterado!`,
+          description: `Fiado de ${entry.customerName} marcado como pago. Receita registrada na Caderneta Digital.`,
+        });
+
+      } catch (error) {
+        console.error("Error saving income transaction to notebook:", error);
+        toast({
+          title: `Status Alterado (com erro)!`,
+          description: `Fiado de ${entry.customerName} marcado como pago, mas houve um erro ao registrar a receita na Caderneta Digital.`,
+          variant: "destructive"
+        });
+      }
+    } else { // Just marked as unpaid
+      toast({
+        title: `Status Alterado!`,
+        description: `Fiado de ${entry.customerName} marcado como pendente. Se uma receita foi registrada, ajuste a Caderneta Digital manualmente se necessário.`,
+      });
+    }
   };
 
   const handleDeleteCreditEntry = (id: string) => {
@@ -553,3 +593,5 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
+
+    

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2, User } from "lucide-react";
+import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2, User, BookOpenCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
@@ -21,6 +21,9 @@ import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
 import { STORAGE_KEY_PRODUCTS } from "@/app/(app)/dashboard/products/page";
 import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
 import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page";
+import type { CreditEntry } from "@/app/(app)/dashboard/credit-notebook/page";
+import { STORAGE_KEY_CREDIT_NOTEBOOK } from "@/app/(app)/dashboard/credit-notebook/page";
+import { isValid as isValidDate, parseISO } from 'date-fns';
 
 
 interface PDVProduct {
@@ -202,41 +205,30 @@ export default function SalesPage() {
       toast({ title: "Forma de Pagamento", description: "Selecione uma forma de pagamento.", variant: "destructive" });
       return;
     }
+
+    const selectedCustomer = availableCustomers.find(c => c.id === selectedCustomerId);
+    const customerNameForRecord = selectedCustomer ? selectedCustomer.name : "Cliente Avulso";
+
+    if (paymentMethod === "Fiado" && (!selectedCustomerId || selectedCustomerId === 'default_consumer')) {
+      toast({ title: "Cliente Necessário para Fiado", description: "Por favor, selecione um cliente cadastrado para registrar uma venda como fiado.", variant: "destructive" });
+      return;
+    }
+    
     if (paymentMethod === "Dinheiro" && amountPaid < cartTotal) {
       toast({ title: "Valor Insuficiente", description: "O valor pago é menor que o total da compra.", variant: "destructive" });
       return;
     }
 
     const saleDate = new Date();
-    const selectedCustomer = availableCustomers.find(c => c.id === selectedCustomerId);
-    const customerNameForRecord = selectedCustomer ? selectedCustomer.name : "Cliente Avulso";
 
-    const incomeTransactionDescription = `Venda PDV ${customerNameForRecord ? `(${customerNameForRecord})` : ''} - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`;
-
-    const incomeTransaction: Transaction = {
-      id: `T-SALE-${Date.now().toString().slice(-6)}`,
-      description: incomeTransactionDescription,
-      amount: cartTotal,
-      type: "income",
-      date: saleDate,
-    };
-    
-    try {
-        const existingNotebookTransactionsRaw = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
-        const existingNotebookTransactions: Transaction[] = existingNotebookTransactionsRaw ? JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: new Date(t.date)})) : [];
-        localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
-    } catch (e) {
-        console.error("Error updating notebook transactions in localStorage", e);
-        toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvNotebookSaveError"})
-    }
-
+    // Always record the sale in SalesRecord
     const salesRecordEntry: SalesRecordEntry = {
       id: `SR-${Date.now().toString().slice(-6)}`,
       items: cart.map(item => ({ productId: item.id, name: item.name, quantity: item.quantity, unitPrice: item.price })),
       totalAmount: cartTotal,
       paymentMethod: paymentMethod,
       date: saleDate.toISOString(),
-      amountPaid: paymentMethod === "Dinheiro" ? amountPaid : cartTotal,
+      amountPaid: paymentMethod === "Dinheiro" ? amountPaid : (paymentMethod === "Fiado" ? 0 : cartTotal),
       changeGiven: paymentMethod === "Dinheiro" ? changeDue : 0,
       customerId: selectedCustomerId === 'default_consumer' ? undefined : selectedCustomerId,
       customerName: customerNameForRecord,
@@ -251,11 +243,56 @@ export default function SalesPage() {
         toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvSalesRecordSaveError"})
     }
 
-    toast({
-      title: "Venda Finalizada!",
-      description: `Venda de R$ ${cartTotal.toFixed(2)} para ${customerNameForRecord} paga com ${paymentMethod}. ${paymentMethod === "Dinheiro" ? `Troco: R$ ${changeDue.toFixed(2)}.` : ''}`,
-      className: "bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-700"
-    });
+    if (paymentMethod === "Fiado" && selectedCustomer) {
+      const creditEntry: CreditEntry = {
+        id: `CF-${Date.now().toString().slice(-6)}`,
+        customerName: selectedCustomer.name,
+        amount: cartTotal,
+        saleDate: saleDate,
+        dueDate: undefined, // Or prompt for due date
+        whatsappNumber: selectedCustomer.phone || "",
+        notes: `Venda PDV: ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`,
+        paid: false,
+      };
+      try {
+        const existingCreditEntriesRaw = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+        const existingCreditEntries: CreditEntry[] = existingCreditEntriesRaw 
+          ? JSON.parse(existingCreditEntriesRaw).map((e:any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate): undefined})) 
+          : [];
+        localStorage.setItem(STORAGE_KEY_CREDIT_NOTEBOOK, JSON.stringify([...existingCreditEntries, {...creditEntry, saleDate: creditEntry.saleDate.toISOString()}]));
+        toast({
+          title: "Venda Registrada como Fiado!",
+          description: `Venda de R$ ${cartTotal.toFixed(2)} para ${selectedCustomer.name} adicionada à Caderneta de Fiados.`,
+          className: "bg-blue-100 dark:bg-blue-800 border-blue-300 dark:border-blue-700"
+        });
+      } catch (e) {
+        console.error("Error updating credit notebook in localStorage", e);
+        toast({title: "Erro ao salvar na Caderneta de Fiados", description: "Não foi possível atualizar a caderneta de fiados.", variant: "destructive", toastId: "pdvCreditNotebookSaveError"})
+      }
+    } else { // For non-Fiado payments
+      const incomeTransactionDescription = `Venda PDV ${customerNameForRecord ? `(${customerNameForRecord})` : ''} - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`;
+      const incomeTransaction: Transaction = {
+        id: `T-SALE-${Date.now().toString().slice(-6)}`,
+        description: incomeTransactionDescription,
+        amount: cartTotal,
+        type: "income",
+        date: saleDate,
+      };
+      
+      try {
+          const existingNotebookTransactionsRaw = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
+          const existingNotebookTransactions: Transaction[] = existingNotebookTransactionsRaw ? JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: new Date(t.date)})) : [];
+          localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
+          toast({
+            title: "Venda Finalizada!",
+            description: `Venda de R$ ${cartTotal.toFixed(2)} para ${customerNameForRecord} paga com ${paymentMethod}. ${paymentMethod === "Dinheiro" ? `Troco: R$ ${changeDue.toFixed(2)}.` : ''}`,
+            className: "bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-700"
+          });
+      } catch (e) {
+          console.error("Error updating notebook transactions in localStorage", e);
+          toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvNotebookSaveError"})
+      }
+    }
 
     setCart([]);
     setProductCodeInput("");
@@ -371,7 +408,7 @@ export default function SalesPage() {
                                 <Button
                                   variant="ghost"
                                   className="w-full justify-start h-auto py-1.5 px-2 text-left"
-                                  onClick={() => { // Modified from onMouseDown to onClick for simplicity, rely on timeout
+                                  onClick={() => { 
                                     addProductToCartByCode(product.code);
                                     setProductCodeInput('');
                                     setProductSuggestions([]);
@@ -522,6 +559,7 @@ export default function SalesPage() {
                       <SelectItem value="PIX"><div className="flex items-center gap-2"><Smartphone className="h-4 w-4"/> PIX</div></SelectItem>
                       <SelectItem value="Cartão de Crédito"><div className="flex items-center gap-2"><CreditCard className="h-4 w-4"/> Cartão de Crédito</div></SelectItem>
                       <SelectItem value="Cartão de Débito"><div className="flex items-center gap-2"><CreditCard className="h-4 w-4"/> Cartão de Débito</div></SelectItem>
+                      <SelectItem value="Fiado"><div className="flex items-center gap-2"><BookOpenCheck className="h-4 w-4"/> Fiado</div></SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -559,7 +597,12 @@ export default function SalesPage() {
                     onClick={handleFinalizeSale} 
                     className="w-full text-lg py-6" 
                     size="lg"
-                    disabled={cart.length === 0 || !paymentMethod || (paymentMethod === "Dinheiro" && amountPaidInput !== "" && amountPaid < cartTotal)}
+                    disabled={
+                        cart.length === 0 || 
+                        !paymentMethod || 
+                        (paymentMethod === "Dinheiro" && amountPaidInput !== "" && amountPaid < cartTotal) ||
+                        (paymentMethod === "Fiado" && (!selectedCustomerId || selectedCustomerId === 'default_consumer'))
+                    }
                 >
                   <CheckCircle className="mr-2 h-5 w-5"/> Finalizar Venda
                 </Button>
@@ -571,6 +614,5 @@ export default function SalesPage() {
     </div>
   );
 }
-
 
     
