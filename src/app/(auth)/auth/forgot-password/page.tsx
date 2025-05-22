@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Send, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Por favor, insira um e-mail válido." }),
@@ -37,7 +38,8 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('/api/email/send-password-reset', {
+      // Atualizado para chamar o backend Express
+      const response = await fetch('http://localhost:5000/api/email/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -50,13 +52,13 @@ export default function ForgotPasswordPage() {
       if (response.ok) {
         toast({ 
           title: "Verifique seu E-mail", 
-          description: result.message || \`Se um usuário com o e-mail \${data.email} existir, um link de redefinição de senha foi enviado. Por favor, verifique sua caixa de entrada.\`,
+          description: result.message || `Se um usuário com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado corretamente no backend, um link de redefinição de senha foi enviado.`,
           duration: 7000,
         });
       } else {
         toast({
           title: "Erro ao Solicitar Redefinição",
-          description: result.error || "Não foi possível processar sua solicitação. Tente novamente mais tarde.",
+          description: result.error || "Não foi possível processar sua solicitação. Verifique se o serviço de backend está rodando e configurado. Tente novamente mais tarde.",
           variant: "destructive",
         });
       }
@@ -64,7 +66,7 @@ export default function ForgotPasswordPage() {
       console.error("Erro na chamada da API de redefinição de senha:", error);
       toast({
         title: "Erro de Rede",
-        description: "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
+        description: "Não foi possível conectar ao servidor de e-mail. Verifique sua conexão e se o backend está em execução.",
         variant: "destructive",
       });
     }

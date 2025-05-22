@@ -1,3 +1,4 @@
+
 const nodemailer = require('nodemailer');
 // const jwt = require('jsonwebtoken'); // JWT é usado em generateResetToken
 const { generateResetToken } = require('../utils/generateResetToken');
