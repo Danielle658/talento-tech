@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; // Basic Brazilian phone regex
+const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; 
 
 const customerSchema = z.object({
   name: z.string().min(2, { message: "Nome do cliente é obrigatório." }),
@@ -114,7 +114,7 @@ export default function CustomersPage() {
       return;
     }
     const updatedCustomers = customers.filter(c => c.id !== id);
-    setCustomers(updatedCustomers);
+    setCustomers(updatedCustomers); // State update will trigger useEffect to save to localStorage
     toast({ title: "Cliente Excluído!", description: `${customerToDelete.name} foi removido.`, variant: "destructive" });
   };
 

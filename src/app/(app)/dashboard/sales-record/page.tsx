@@ -107,7 +107,7 @@ export default function SalesRecordPage() {
       return;
     }
     const updatedSalesHistory = salesHistory.filter(sale => sale.id !== saleId);
-    setSalesHistory(updatedSalesHistory);
+    setSalesHistory(updatedSalesHistory); // State update will trigger useEffect to save to localStorage
     toast({
       title: "Registro Excluído",
       description: `O registro de venda ${saleId} foi excluído.`,
@@ -329,5 +329,4 @@ export default function SalesRecordPage() {
     </div>
   );
 }
-
     

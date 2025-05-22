@@ -20,7 +20,7 @@ const productSchema = z.object({
   code: z.string().min(1, { message: "Código/Código de Barras é obrigatório." }),
   price: z.coerce.number().min(0.01, { message: "O preço deve ser positivo." }),
   category: z.string().optional(),
-  stock: z.string().optional(), // Kept as string to allow "N/A" or numeric values
+  stock: z.string().optional(), 
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -94,7 +94,7 @@ export default function ProductsPage() {
     if (!window.confirm(`Tem certeza que deseja excluir o produto "${productToDelete.name}"?`)) return;
 
     const updatedProducts = products.filter(p => p.id !== id);
-    setProducts(updatedProducts);
+    setProducts(updatedProducts); // State update will trigger useEffect to save to localStorage
     
     toast({
       title: "Produto Excluído!",
@@ -265,5 +265,4 @@ export default function ProductsPage() {
     </div>
   );
 }
-
     

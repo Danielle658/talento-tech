@@ -22,8 +22,8 @@ import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
 import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
-import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page"; // Import CustomerEntry type
-import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page"; // Import customer storage key
+import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page"; 
+import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page"; 
 
 
 const creditEntrySchema = z.object({
@@ -40,7 +40,7 @@ export type CreditEntryFormValues = z.infer<typeof creditEntrySchema>;
 export interface CreditEntry extends CreditEntryFormValues {
   id: string;
   paid: boolean;
-  paymentDate?: string; // Store as ISO string for localStorage
+  paymentDate?: string; 
 }
 
 export const STORAGE_KEY_CREDIT_NOTEBOOK = "moneywise-creditEntries";
@@ -136,7 +136,6 @@ export default function CreditNotebookPage() {
   });
 
   const onSubmit = (data: CreditEntryFormValues) => {
-    // Auto-register customer if they don't exist
     let customerAddedToMainList = false;
     try {
         const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
@@ -147,9 +146,9 @@ export default function CreditNotebookPage() {
             const newCustomer: CustomerEntry = {
                 id: `CUST${String(Date.now()).slice(-6)}`,
                 name: data.customerName,
-                phone: data.whatsappNumber || "", // Use WhatsApp number as phone, or empty if not provided
-                email: "", // Email is not collected in this form
-                address: "", // Address is not collected in this form
+                phone: data.whatsappNumber || "", 
+                email: "", 
+                address: "", 
             };
             customers = [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name));
             localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(customers));
@@ -204,10 +203,7 @@ export default function CreditNotebookPage() {
 
     if (window.confirm(`Tem certeza que deseja excluir o fiado de "${entryToDelete.customerName}" no valor de R$ ${entryToDelete.amount.toFixed(2)}?`)) {
       const updatedEntries = creditEntries.filter(e => e.id !== id);
-      setCreditEntries(updatedEntries);
-      if (updatedEntries.length === 0) {
-        localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-      }
+      setCreditEntries(updatedEntries); // State update will trigger useEffect to save to localStorage
       toast({
         title: "Fiado Excluído!",
         description: `O fiado de "${entryToDelete.customerName}" foi removido.`,

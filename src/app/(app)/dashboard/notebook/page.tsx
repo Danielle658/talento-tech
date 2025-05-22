@@ -117,7 +117,7 @@ export default function NotebookPage() {
 
     if (window.confirm(`Tem certeza que deseja excluir a transação "${transactionToDelete.description}"?`)) {
       const updatedTransactions = transactions.filter(t => t.id !== id);
-      setTransactions(updatedTransactions);
+      setTransactions(updatedTransactions); // State update will trigger useEffect to save to localStorage
       toast({
         title: "Transação Excluída!",
         description: `A transação "${transactionToDelete.description}" foi removida.`,
@@ -412,5 +412,4 @@ export default function NotebookPage() {
       </Card>
     </div>;
 }
-
     
