@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, Save, Loader2, Building2, User, Mail, Phone, ScanLine } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Building2, User, Mail, Phone, ScanLine, Image as ImageIcon } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; 
 
 const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
@@ -43,6 +44,7 @@ const accountDetailsSchema = z.object({
     .min(11, { message: "CPF deve ter 11 dígitos." })
     .max(14, { message: "CPF inválido."})
     .refine(value => isValidCPF(value.replace(/[^\d]+/g, '')), { message: "CPF inválido." }),
+  profilePictureDataUri: z.string().optional(),
 });
 
 export type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>;
@@ -52,6 +54,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const form = useForm<AccountDetailsFormValues>({
     resolver: zodResolver(accountDetailsSchema),
@@ -61,6 +64,7 @@ export default function SettingsPage() {
       email: "",
       phone: "",
       cpf: "",
+      profilePictureDataUri: "",
     },
   });
 
@@ -71,10 +75,13 @@ export default function SettingsPage() {
       try {
         const parsedDetails = JSON.parse(storedDetails);
         form.reset(parsedDetails);
+        if (parsedDetails.profilePictureDataUri) {
+          setImagePreview(parsedDetails.profilePictureDataUri);
+        }
       } catch (error) {
         console.error("Failed to parse account details from localStorage", error);
         localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY); 
-        form.reset({ companyName: "", ownerName: "", email: "", phone: "", cpf: ""}); // Reset form to default
+        form.reset({ companyName: "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
         toast({
           title: "Erro ao Carregar Dados da Conta",
           description: "Não foi possível carregar os dados da conta salvos. As informações podem ter sido redefinidas.",
@@ -84,6 +91,35 @@ export default function SettingsPage() {
     }
   }, [form, toast]);
 
+  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({
+          title: "Arquivo Muito Grande",
+          description: "Por favor, selecione uma imagem menor que 2MB.",
+          variant: "destructive",
+        });
+        event.target.value = ""; // Clear the input
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUri = reader.result as string;
+        form.setValue("profilePictureDataUri", dataUri);
+        setImagePreview(dataUri);
+      };
+      reader.onerror = () => {
+        toast({
+          title: "Erro ao Ler Imagem",
+          description: "Não foi possível processar a imagem selecionada.",
+          variant: "destructive",
+        });
+      }
+      reader.readAsDataURL(file);
+    }
+  };
+
   const onSubmit = (data: AccountDetailsFormValues) => {
     setIsSaving(true);
     try {
@@ -92,11 +128,13 @@ export default function SettingsPage() {
         title: "Dados Salvos!",
         description: "As informações da sua conta foram atualizadas com sucesso.",
       });
+      // Trigger re-render of layout to update avatar
+      window.dispatchEvent(new Event('storage'));
     } catch (error) {
       console.error("Failed to save account details to localStorage", error);
       toast({
         title: "Erro ao Salvar",
-        description: "Não foi possível salvar as informações da conta.",
+        description: "Não foi possível salvar as informações da conta. Verifique o console para mais detalhes. Pode ser um problema de limite de armazenamento do navegador se a imagem for muito grande.",
         variant: "destructive",
       });
     }
@@ -107,6 +145,10 @@ export default function SettingsPage() {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
+  const ownerInitials = form.getValues("ownerName")
+    ? form.getValues("ownerName").split(" ").map(n => n[0]).join("").substring(0,2).toUpperCase()
+    : "MW";
+
   return (
     <div className="space-y-6">
       <Card className="max-w-2xl mx-auto">
@@ -115,11 +157,32 @@ export default function SettingsPage() {
             <SettingsIcon className="h-6 w-6 text-primary" />
             <CardTitle className="text-2xl">Configurações da Conta</CardTitle>
           </div>
-          <CardDescription>Gerencie as informações da sua empresa e de contato.</CardDescription>
+          <CardDescription>Gerencie as informações da sua empresa, de contato e foto de perfil.</CardDescription>
         </CardHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
+              <FormItem>
+                <FormLabel>Foto de Perfil</FormLabel>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src={imagePreview || undefined} alt="Foto de perfil" data-ai-hint="user profile"/>
+                    <AvatarFallback>{ownerInitials}</AvatarFallback>
+                  </Avatar>
+                  <Input
+                    id="profilePicture"
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp"
+                    onChange={handleImageChange}
+                    className="max-w-xs"
+                  />
+                </div>
+                <FormDescription>
+                  Recomendamos uma imagem quadrada (PNG, JPG, WEBP, máx 2MB).
+                </FormDescription>
+                <FormMessage>{form.formState.errors.profilePictureDataUri?.message}</FormMessage>
+              </FormItem>
+
               <FormField
                 control={form.control}
                 name="companyName"

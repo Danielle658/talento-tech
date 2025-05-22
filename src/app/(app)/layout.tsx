@@ -1,6 +1,6 @@
 
 "use client";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react'; // Added useState
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,24 +14,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-// Sheet components are not directly used here anymore for sidebar, but Sidebar component might use them internally if needed.
-// import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
   SidebarContent,
   SidebarFooter,
-  SidebarTrigger, // Keep this for controlling the sidebar
+  SidebarTrigger,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  // SidebarMenuSub,
-  // SidebarMenuSubItem,
-  // SidebarMenuSubButton,
   SidebarInset,
-  // SidebarGroup,
-  // SidebarGroupLabel
 } from "@/components/ui/sidebar";
 import { Logo } from '@/components/shared/logo';
 import Link from 'next/link';
@@ -48,14 +41,15 @@ import {
   UserCircle,
   LifeBuoy,
   Loader2,
-  // Bot, // Not used here
-  PanelLeft, // Icon for SidebarTrigger
+  PanelLeft,
   BookUser,
   FilePlus2,
   BarChart3
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
-import { VirtualAssistant } from '@/components/dashboard/virtual-assistant'; // Added import
+import { VirtualAssistant } from '@/components/dashboard/virtual-assistant';
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; // Added import
+import type { AccountDetailsFormValues } from '@/app/(app)/dashboard/settings/page'; // Added import
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Painel Central", tooltip: "Painel" },
@@ -71,12 +65,49 @@ const navItems = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string | undefined>(undefined);
+  const [ownerInitials, setOwnerInitials] = useState<string>("MW");
+
+  const loadProfileData = () => {
+    if (typeof window !== "undefined") {
+      const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+      if (storedDetailsRaw) {
+        try {
+          const storedDetails: AccountDetailsFormValues = JSON.parse(storedDetailsRaw);
+          setProfilePictureUrl(storedDetails.profilePictureDataUri);
+          if (storedDetails.ownerName) {
+            const initials = storedDetails.ownerName.split(" ").map(n => n[0]).join("").substring(0,2).toUpperCase();
+            setOwnerInitials(initials || "MW");
+          } else {
+            setOwnerInitials("MW");
+          }
+        } catch (error) {
+          console.error("Error loading account details for avatar:", error);
+          setProfilePictureUrl(undefined);
+          setOwnerInitials("MW");
+        }
+      } else {
+          setProfilePictureUrl(undefined);
+          setOwnerInitials("MW");
+      }
+    }
+  };
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/auth');
     }
   }, [isAuthenticated, isLoading, router]);
+  
+  useEffect(() => {
+    loadProfileData();
+    // Listen for storage changes to update avatar if settings are changed in another tab (or for immediate effect)
+    window.addEventListener('storage', loadProfileData);
+    return () => {
+      window.removeEventListener('storage', loadProfileData);
+    };
+  }, []);
+
 
   if (isLoading) {
     return (
@@ -87,7 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return null; // Or a redirect component, though useEffect handles it
+    return null;
   }
   
   const handleLogout = () => {
@@ -131,14 +162,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset>
           <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
-            {/* SidebarTrigger now visible on all screen sizes */}
             <SidebarTrigger>
               <PanelLeft className="h-5 w-5" />
               <span className="sr-only">Alternar menu</span>
             </SidebarTrigger>
             
-            {/* Search, Bell, User Menu - adjusted for flex layout */}
-            <div className="flex flex-1 items-center justify-end gap-1 md:gap-2"> {/* Reduced gap for more items */}
+            <div className="flex flex-1 items-center justify-end gap-1 md:gap-2">
               <form className="relative flex-1 sm:flex-initial max-w-xs md:max-w-sm lg:max-w-md">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -151,13 +180,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Bell className="h-5 w-5" />
                 <span className="sr-only">Notificações</span>
               </Button>
-              <VirtualAssistant /> {/* Moved Virtual Assistant here */}
+              <VirtualAssistant />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src="https://placehold.co/100x100.png" alt="@shadcn" data-ai-hint="user profile" />
-                      <AvatarFallback>MW</AvatarFallback>
+                      <AvatarImage src={profilePictureUrl} alt="Foto de perfil do usuário" data-ai-hint="user profile" />
+                      <AvatarFallback>{ownerInitials}</AvatarFallback>
                     </Avatar>
                     <span className="sr-only">Menu do usuário</span>
                   </Button>
@@ -165,18 +194,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <UserCircle className="mr-2 h-4 w-4" />
-                    <span>Perfil</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Configurações</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <LifeBuoy className="mr-2 h-4 w-4" />
-                    <span>Suporte</span>
-                  </DropdownMenuItem>
+                  <Link href="/dashboard/settings" passHref legacyBehavior>
+                    <DropdownMenuItem asChild>
+                       <a><UserCircle className="mr-2 h-4 w-4" />
+                        <span>Perfil</span></a>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/dashboard/settings" passHref legacyBehavior>
+                     <DropdownMenuItem asChild>
+                       <a><Settings className="mr-2 h-4 w-4" />
+                        <span>Configurações</span></a>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/support" passHref legacyBehavior>
+                    <DropdownMenuItem asChild>
+                       <a><LifeBuoy className="mr-2 h-4 w-4" />
+                        <span>Suporte</span></a>
+                    </DropdownMenuItem>
+                  </Link>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
