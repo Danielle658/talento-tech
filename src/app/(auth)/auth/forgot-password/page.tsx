@@ -14,8 +14,6 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Send, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; 
-import type { AccountDetailsFormValues as StoredAccountDetails } from '@/app/(app)/dashboard/settings/page'; 
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Por favor, insira um e-mail válido." }),
@@ -37,32 +35,36 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-
-    let emailFound = false;
+    
     try {
-      const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
-      if (storedDetailsRaw) {
-        const storedDetails: StoredAccountDetails = JSON.parse(storedDetailsRaw);
-        // Make email comparison case-insensitive
-        if (storedDetails.email && storedDetails.email.toLowerCase() === data.email.toLowerCase()) {
-          emailFound = true;
-        }
+      const response = await fetch('/api/email/send-password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: data.email }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({ 
+          title: "Verifique seu E-mail", 
+          description: result.message || \`Se um usuário com o e-mail \${data.email} existir, um link de redefinição de senha foi enviado. Por favor, verifique sua caixa de entrada.\`,
+          duration: 7000,
+        });
+      } else {
+        toast({
+          title: "Erro ao Solicitar Redefinição",
+          description: result.error || "Não foi possível processar sua solicitação. Tente novamente mais tarde.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error("Error reading account details from localStorage:", error);
-    }
-
-    if (emailFound) {
-      toast({ 
-        title: "Verifique seu E-mail (Simulado)", 
-        description: `Simulação: Se uma conta existir para ${data.email}, um e-mail com instruções para redefinir sua senha teria sido enviado. Por favor, verifique sua caixa de entrada (simulado).`,
-        duration: 7000,
-      });
-    } else {
+      console.error("Erro na chamada da API de redefinição de senha:", error);
       toast({
-        title: "E-mail Não Encontrado",
-        description: `Não foi possível encontrar uma conta com o e-mail ${data.email}. Verifique o endereço digitado.`,
+        title: "Erro de Rede",
+        description: "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
         variant: "destructive",
       });
     }

@@ -1,8 +1,7 @@
-
 const nodemailer = require('nodemailer');
 
 // Configuração do transporter do Nodemailer
-// Certifique-se de que as variáveis de ambiente estão definidas no seu arquivo .env
+// As variáveis de ambiente devem ser definidas no seu arquivo .env.local
 const transporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE, // ex: 'gmail'
   host: process.env.EMAIL_HOST,     // ex: 'smtp.gmail.com'
@@ -25,7 +24,7 @@ const transporter = nodemailer.createTransport({
  */
 async function sendPasswordResetEmail(toEmail, resetLink) {
   const mailOptions = {
-    from: \`MoneyWise <\${process.env.EMAIL_FROM_ADDRESS}>\`,
+    from: \`MoneyWise <\${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER}>\`,
     to: toEmail,
     subject: 'Redefinição de Senha - MoneyWise',
     html: \`
@@ -47,7 +46,6 @@ async function sendPasswordResetEmail(toEmail, resetLink) {
         <p>Equipe MoneyWise</p>
       </div>
     \`,
-    // text: \`Olá,\\n\\nVocê solicitou a redefinição da sua senha para o MoneyWise.\\nPor favor, copie e cole o seguinte link no seu navegador para criar uma nova senha:\\n\${resetLink}\\n\\nSe você não solicitou esta redefinição, por favor, ignore este e-mail.\\n\\nObrigado,\\nEquipe MoneyWise\`
   };
 
   try {
@@ -60,9 +58,6 @@ async function sendPasswordResetEmail(toEmail, resetLink) {
   }
 }
 
-// Você pode adicionar outras funções de envio de e-mail aqui (ex: e-mail de boas-vindas)
-
 module.exports = {
   sendPasswordResetEmail,
 };
-    
