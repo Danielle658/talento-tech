@@ -1,12 +1,7 @@
 import type { Metadata, Viewport } from 'next';
-// import { GeistSans } from 'geist/font/sans'; // Removed
-// import { GeistMono } from 'geist/font/mono'; // Removed
 import './globals.css';
 import { AuthProvider } from '@/contexts/auth-provider';
 import { Toaster } from "@/components/ui/toaster";
-
-// const geistSans = GeistSans; // Removed
-// const geistMono = GeistMono; // Removed
 
 export const metadata: Metadata = {
   title: 'MoneyWise',
@@ -24,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning> {/* Changed lang to pt-BR */}
-      <body className={`antialiased`}> {/* Removed font variables */}
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={'antialiased'}>
         <AuthProvider>
           {children}
           <Toaster />
