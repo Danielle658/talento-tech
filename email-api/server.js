@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -6,7 +7,12 @@ const bodyParser = require('body-parser');
 const emailRoutes = require('./routes/emailRoutes');
 
 const app = express();
-app.use(cors());
+
+// Configuração de CORS mais explícita para desenvolvimento
+app.use(cors({
+  origin: '*' // Permite todas as origens
+}));
+
 app.use(bodyParser.json());
 
 app.use('/api/email', emailRoutes);
