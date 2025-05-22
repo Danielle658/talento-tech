@@ -88,7 +88,7 @@ export default function SalesPage() {
   }, [toast]);
 
 
-  const addProductToCartByCode = (code: string) => {
+  const addProductToCartByCode = (code: string): boolean => {
     if (!code.trim()) {
       toast({ title: "Código Inválido", description: "Por favor, insira um código de produto.", variant: "destructive" });
       return false;
@@ -614,5 +614,7 @@ export default function SalesPage() {
     </div>
   );
 }
+
+    
 
     
