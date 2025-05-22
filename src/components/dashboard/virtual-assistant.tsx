@@ -46,26 +46,26 @@ interface BrowserSupport {
 const LOW_STOCK_THRESHOLD = 5;
 
 // Helper function to safely parse localStorage
-function getStoredData<T>(key: string, defaultValue: T[]): T[] {
+function getStoredData<T>(key: string, defaultValue: T[], toastInstance?: ReturnType<typeof useToast>['toast']): T[] {
   try {
     const storedData = localStorage.getItem(key);
     return storedData ? JSON.parse(storedData) : defaultValue;
   } catch (error) {
     console.error(`Error parsing data from localStorage for key ${key}:`, error);
     localStorage.removeItem(key);
-    // toast({ title: `Erro de Dados (${key})`, description: `Dados locais para ${key} parecem estar corrompidos e foram resetados.`, variant: "destructive", duration: 7000});
+    toastInstance?.({ title: `Erro de Dados (${key.replace('moneywise-','')})`, description: `Dados locais para ${key.replace('moneywise-','')} parecem corrompidos e foram resetados.`, variant: "destructive", duration: 7000});
     return defaultValue;
   }
 }
 
 // Helper function to save data to localStorage
-function saveStoredData<T>(key: string, data: T[]): boolean {
+function saveStoredData<T>(key: string, data: T[], toastInstance?: ReturnType<typeof useToast>['toast']): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
     console.error(`Error saving data to localStorage for key ${key}:`, error);
-    // toast({ title: `Erro ao Salvar Dados (${key})`, description: `Não foi possível salvar dados para ${key}.`, variant: "destructive", duration: 7000});
+    toastInstance?.({ title: `Erro ao Salvar Dados (${key.replace('moneywise-','')})`, description: `Não foi possível salvar dados para ${key.replace('moneywise-','')}. Pode ser um problema de limite de armazenamento.`, variant: "destructive", duration: 7000});
     return false;
   }
 }
@@ -182,8 +182,9 @@ export function VirtualAssistant() {
         parsedParameters = JSON.parse(paramsString);
       } catch (e) {
         console.error("Failed to parse parameters JSON string:", paramsString, e);
-        messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando. Por favor, verifique o formato dos parâmetros.";
+        messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando. Por favor, verifique o formato dos parâmetros JSON.";
         addMessage('assistant', messageForChat);
+        speak(messageForChat);
         return messageForChat;
       }
     }
@@ -194,11 +195,11 @@ export function VirtualAssistant() {
     const customerAddressParam = parsedParameters?.address;
 
     const creditAmountParam = parsedParameters?.amount;
-    const creditDueDateParam = parsedParameters?.dueDate; // Expected as string e.g. "AAAA-MM-DD"
+    let creditDueDateParam = parsedParameters?.dueDate; 
     const creditWhatsappParam = parsedParameters?.whatsappNumber;
     const creditNotesParam = parsedParameters?.notes;
     
-    const transactionTypeParam = parsedParameters?.type?.toLowerCase(); // income or expense
+    const transactionTypeParam = parsedParameters?.type?.toLowerCase(); 
     const transactionDescParam = parsedParameters?.description;
     const transactionAmountParam = parsedParameters?.amount;
 
@@ -251,53 +252,49 @@ export function VirtualAssistant() {
 
       case 'querytotalrevenue':
         try {
-          const transactions = getStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, []);
-          const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+          const transactionsData = getStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, [], toast);
+          const totalIncome = transactionsData.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
           messageForChat = `Sua receita total registrada na caderneta digital é de R$ ${totalIncome.toFixed(2)}.`;
         } catch (e) {
           console.error("Error processing queryTotalRevenue:", e);
           messageForChat = "Desculpe, não consegui calcular a receita total. Verifique os dados na Caderneta Digital.";
-          toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados da caderneta para calcular receita.'})
         }
         break;
       case 'querytotalcustomers':
         try {
-          const customers = getStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, []);
-          messageForChat = `Você tem ${customers.length} clientes cadastrados.`;
+          const customersData = getStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, [], toast);
+          messageForChat = `Você tem ${customersData.length} clientes cadastrados.`;
         } catch (e) {
           console.error("Error processing queryTotalCustomers:", e);
           messageForChat = "Desculpe, não consegui contar os clientes. Verifique os dados em Contas de Clientes.";
-          toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de clientes.'})
         }
         break;
       case 'querytotalduefiados':
         try {
-          const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, []);
-          const creditEntries = creditEntriesRaw.map(entry => ({...entry, saleDate: parseISO(entry.saleDate), dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined}));
-          const totalDue = creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
+          const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, [], toast);
+          const creditEntriesData = creditEntriesRaw.map(entry => ({...entry, saleDate: parseISO(entry.saleDate), dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined}));
+          const totalDue = creditEntriesData.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
           messageForChat = `O total pendente na caderneta de fiados é de R$ ${totalDue.toFixed(2)}.`;
         } catch (e) {
           console.error("Error processing queryTotalDueFiados:", e);
           messageForChat = "Desculpe, não consegui calcular o total de fiados. Verifique os dados na Caderneta de Fiados.";
-           toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de fiados.'})
         }
         break;
       case 'querypendingfiadoscount':
         try {
-          const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, []);
-          const creditEntries = creditEntriesRaw.map(entry => ({...entry, saleDate: parseISO(entry.saleDate), dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined}));
-          const pendingCount = creditEntries.filter(entry => !entry.paid).length;
+          const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, [], toast);
+          const creditEntriesData = creditEntriesRaw.map(entry => ({...entry, saleDate: parseISO(entry.saleDate), dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined}));
+          const pendingCount = creditEntriesData.filter(entry => !entry.paid).length;
           messageForChat = `Você tem ${pendingCount} fiados pendentes de pagamento.`;
         } catch (e) {
           console.error("Error processing queryPendingFiadosCount:", e);
           messageForChat = "Desculpe, não consegui contar os fiados pendentes. Verifique os dados.";
-           toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de fiados pendentes.'})
         }
         break;
       case 'querylowstockproductscount':
         try {
-          const products = getStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, []);
-          const lowStockCount = products.filter(p => {
+          const productsData = getStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, [], toast);
+          const lowStockCount = productsData.filter(p => {
             const stockNumber = parseInt(p.stock || "0", 10);
             return !isNaN(stockNumber) && stockNumber > 0 && stockNumber <= LOW_STOCK_THRESHOLD;
           }).length;
@@ -305,13 +302,12 @@ export function VirtualAssistant() {
         } catch (e) {
           console.error("Error processing queryLowStockProductsCount:", e);
           messageForChat = "Desculpe, não consegui verificar o estoque dos produtos. Verifique os dados.";
-          toast({variant: 'destructive', title: 'Erro de Dados', description: 'Falha ao ler dados de produtos para estoque.'})
         }
         break;
 
       case 'initiateaddcustomer':
         if (customerNameParam && customerPhoneParam) {
-          const customers = getStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, []);
+          const customers = getStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, [], toast);
           const newCustomer: CustomerEntry = {
             id: `CUST${String(Date.now()).slice(-6)}`,
             name: customerNameParam,
@@ -319,31 +315,30 @@ export function VirtualAssistant() {
             email: customerEmailParam || "",
             address: customerAddressParam || "",
           };
-          if(saveStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name)))) {
-            messageForChat = `Cliente '${customerNameParam}' adicionado com sucesso. Vou te mostrar na lista de clientes.`;
+          if(saveStoredData<CustomerEntry>(STORAGE_KEY_CUSTOMERS, [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name)), toast)) {
+            messageForChat = `Cliente '${customerNameParam}' adicionado com sucesso! Vou te mostrar na lista de clientes.`;
           } else {
-            messageForChat = `Não foi possível salvar o cliente '${customerNameParam}'. Por favor, tente novamente na página de clientes.`;
+            messageForChat = `Não foi possível salvar o cliente '${customerNameParam}' diretamente. Por favor, tente adicioná-lo na página de clientes.`;
           }
           navigationPath = '/dashboard/customers';
         } else {
-          messageForChat = "Para adicionar um cliente, preciso pelo menos do nome e telefone. Estou te levando para a página de Clientes para você preencher os detalhes.";
+          messageForChat = "Para adicionar um cliente diretamente, preciso pelo menos do nome e telefone. Por exemplo: 'Adicionar cliente João Silva telefone (11) 91234-5678'. Se preferir, estou te levando para a página de Clientes para você preencher os detalhes.";
           navigationPath = '/dashboard/customers';
         }
         break;
 
       case 'initiateaddcreditentry':
         if (customerNameParam && creditAmountParam) {
-            const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, []);
-            // Ensure dates are parsed correctly before mapping for saving
+            const creditEntriesRaw = getStoredData<any>(STORAGE_KEY_CREDIT_NOTEBOOK, [], toast);
             const creditEntries = creditEntriesRaw.map(entry => ({
                 ...entry,
-                saleDate: isValidDate(parseISO(entry.saleDate)) ? parseISO(entry.saleDate) : new Date(), // fallback to now if invalid
+                saleDate: isValidDate(parseISO(entry.saleDate)) ? parseISO(entry.saleDate) : new Date(),
                 dueDate: entry.dueDate && isValidDate(parseISO(entry.dueDate)) ? parseISO(entry.dueDate) : undefined,
             }));
             
             let parsedDueDate: Date | undefined = undefined;
             if (creditDueDateParam) {
-                const date = parseISO(creditDueDateParam);
+                const date = parseISO(creditDueDateParam); // YYYY-MM-DD
                 if(isValidDate(date)) parsedDueDate = date;
                 else console.warn(`Assistente: Data de vencimento inválida recebida: ${creditDueDateParam}`);
             }
@@ -352,36 +347,34 @@ export function VirtualAssistant() {
                 id: `CF${String(Date.now()).slice(-6)}`,
                 customerName: customerNameParam,
                 amount: Number(creditAmountParam),
-                saleDate: new Date(), // saleDate always today for new entries via assistant
+                saleDate: new Date(), 
                 dueDate: parsedDueDate,
                 whatsappNumber: creditWhatsappParam || "",
                 notes: creditNotesParam || "",
                 paid: false,
             };
-            const updatedEntries = [...creditEntries, newEntry]
-                                    .sort((a,b) => b.saleDate.getTime() - a.saleDate.getTime())
-                                    .map(entry => ({
-                                        ...entry,
-                                        saleDate: (entry.saleDate as Date).toISOString(),
-                                        dueDate: entry.dueDate ? (entry.dueDate as Date).toISOString() : undefined,
-                                    })) as unknown as CreditEntry[];
+            const entriesToSave = [...creditEntries, newEntry].sort((a,b) => b.saleDate.getTime() - a.saleDate.getTime());
+            const entriesForStorage = entriesToSave.map(entry => ({
+              ...entry,
+              saleDate: (entry.saleDate as Date).toISOString(), 
+              dueDate: entry.dueDate ? (entry.dueDate as Date).toISOString() : undefined,
+            })) as unknown as CreditEntry[];
 
-
-            if(saveStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, updatedEntries)) {
-                messageForChat = `Fiado de R$ ${Number(creditAmountParam).toFixed(2)} para '${customerNameParam}' adicionado. Vou te mostrar na caderneta de fiados.`;
+            if(saveStoredData<CreditEntry>(STORAGE_KEY_CREDIT_NOTEBOOK, entriesForStorage, toast)) {
+                messageForChat = `Fiado de R$ ${Number(creditAmountParam).toFixed(2)} para '${customerNameParam}' adicionado com sucesso! Vou te mostrar na caderneta de fiados.`;
             } else {
-                messageForChat = `Não foi possível salvar o fiado para '${customerNameParam}'. Por favor, tente novamente na página de fiados.`;
+                messageForChat = `Não foi possível salvar o fiado para '${customerNameParam}' diretamente. Por favor, tente adicioná-lo na página de fiados.`;
             }
             navigationPath = '/dashboard/credit-notebook';
         } else {
-            messageForChat = "Para adicionar um fiado, preciso do nome do cliente e do valor. Estou te levando para a Caderneta de Fiados para você preencher os detalhes.";
+            messageForChat = "Para adicionar um fiado diretamente, preciso do nome do cliente e do valor. Por exemplo: 'Adicionar fiado para Maria Silva valor 50'. Se preferir, estou te levando para a Caderneta de Fiados para você preencher os detalhes.";
             navigationPath = '/dashboard/credit-notebook';
         }
         break;
 
       case 'initiateaddtransaction':
         if (transactionDescParam && transactionAmountParam && (transactionTypeParam === 'income' || transactionTypeParam === 'expense')) {
-            const transactionsRaw = getStoredData<any>(STORAGE_KEY_NOTEBOOK, []);
+            const transactionsRaw = getStoredData<any>(STORAGE_KEY_NOTEBOOK, [], toast);
             const transactions = transactionsRaw.map(t => ({...t, date: isValidDate(parseISO(t.date)) ? parseISO(t.date) : new Date() }));
             
             const newTransaction: Transaction = {
@@ -389,27 +382,27 @@ export function VirtualAssistant() {
                 description: transactionDescParam,
                 amount: Number(transactionAmountParam),
                 type: transactionTypeParam as "income" | "expense",
-                date: new Date(), // date always today for new entries via assistant
+                date: new Date(), 
             };
-            const updatedTransactions = [...transactions, newTransaction]
-                                          .sort((a,b) => b.date.getTime() - a.date.getTime())
-                                          .map(t => ({...t, date: (t.date as Date).toISOString()})) as unknown as Transaction[];
+            const transactionsToSave = [...transactions, newTransaction].sort((a,b) => b.date.getTime() - a.date.getTime());
+            const transactionsForStorage = transactionsToSave.map(t => ({ ...t, date: (t.date as Date).toISOString() })) as unknown as Transaction[];
 
-            if(saveStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, updatedTransactions)) {
-                messageForChat = `${transactionTypeParam === 'income' ? 'Receita' : 'Despesa'} de '${transactionDescParam}' no valor de R$ ${Number(transactionAmountParam).toFixed(2)} registrada. Vou te mostrar na caderneta.`;
+
+            if(saveStoredData<Transaction>(STORAGE_KEY_NOTEBOOK, transactionsForStorage, toast)) {
+                messageForChat = `${transactionTypeParam === 'income' ? 'Receita' : 'Despesa'} de '${transactionDescParam}' no valor de R$ ${Number(transactionAmountParam).toFixed(2)} registrada com sucesso! Vou te mostrar na caderneta.`;
             } else {
-                 messageForChat = `Não foi possível salvar a transação. Por favor, tente novamente na caderneta digital.`;
+                 messageForChat = `Não foi possível salvar a transação diretamente. Por favor, tente adicioná-la na caderneta digital.`;
             }
             navigationPath = '/dashboard/notebook';
         } else {
-            messageForChat = "Para adicionar uma transação, preciso da descrição, valor e tipo (receita ou despesa). Estou te levando para a Caderneta Digital.";
+            messageForChat = "Para adicionar uma transação diretamente, preciso da descrição, valor e tipo (receita ou despesa). Por exemplo: 'Registrar despesa aluguel valor 500'. Se preferir, estou te levando para a Caderneta Digital.";
             navigationPath = '/dashboard/notebook';
         }
         break;
 
       case 'initiateaddproduct':
-        if (productNameParam && productCodeParam && productPriceParam) {
-            const products = getStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, []);
+        if (productNameParam && productCodeParam && productPriceParam !== undefined) { // Price can be 0, so check for undefined
+            const products = getStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, [], toast);
             const newProduct: ProductEntry = {
                 id: `PROD${String(Date.now()).slice(-6)}`,
                 name: productNameParam,
@@ -418,14 +411,14 @@ export function VirtualAssistant() {
                 category: productCategoryParam || "",
                 stock: productStockParam || "",
             };
-            if(saveStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, [...products, newProduct].sort((a,b) => a.name.localeCompare(b.name)))) {
-                messageForChat = `Produto '${productNameParam}' adicionado com código '${productCodeParam}' e preço R$ ${Number(productPriceParam).toFixed(2)}. Vou te mostrar no catálogo.`;
+            if(saveStoredData<ProductEntry>(STORAGE_KEY_PRODUCTS, [...products, newProduct].sort((a,b) => a.name.localeCompare(b.name)), toast)) {
+                messageForChat = `Produto '${productNameParam}' (código '${productCodeParam}', preço R$ ${Number(productPriceParam).toFixed(2)}) adicionado com sucesso! Vou te mostrar no catálogo.`;
             } else {
-                messageForChat = `Não foi possível salvar o produto. Por favor, tente novamente na página de produtos.`;
+                messageForChat = `Não foi possível salvar o produto '${productNameParam}' diretamente. Por favor, tente adicioná-lo na página de produtos.`;
             }
             navigationPath = '/dashboard/products';
         } else {
-             messageForChat = "Para adicionar um produto, preciso do nome, código e preço. Estou te levando para a página de Produtos.";
+             messageForChat = "Para adicionar um produto diretamente, preciso do nome, código e preço. Por exemplo: 'Adicionar produto Caneta Azul código CA001 preço 2.50'. Se preferir, estou te levando para a página de Produtos.";
              navigationPath = '/dashboard/products';
         }
         break;
@@ -444,7 +437,7 @@ export function VirtualAssistant() {
         navigationPath = '/dashboard';
         break;
       case 'showsakes': 
-      case 'showsales': // Common misinterpretation by STT
+      case 'showsales': 
         navigationPath = '/dashboard/sales-record';
         messageForChat = "Ok, abrindo o histórico de vendas.";
         break;
@@ -541,7 +534,6 @@ export function VirtualAssistant() {
     if (isListening) {
       if (recognition) {
         recognition.stop();
-        // processSpokenCommand(userInputForVoice); // Process any captured input when stopped manually
       }
     } else {
       if (!supportedFeatures.speechRecognition || !recognition) {

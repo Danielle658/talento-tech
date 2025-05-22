@@ -20,7 +20,7 @@ const InterpretTextCommandsInputSchema = z.object({
   command: z
     .string()
     .describe(
-      'The text command entered by the user. Examples: \'Show me my sales\', \'Go to customer accounts\', \'What are my key performance indicators?\', \'Qual minha receita total?\', \'Leve-me para a caderneta de fiados\', \'Adicionar novo cliente João telefone (11) 99999-8888 email joao@exemplo.com\', \'Registrar nova despesa de aluguel no valor de 500 reais\' , \'Adicionar produto Camisa Azul código CA001 preço 79.90\''
+      'The text command entered by the user. Examples: \'Show me my sales\', \'Go to customer accounts\', \'What are my key performance indicators?\', \'Qual minha receita total?\', \'Leve-me para a caderneta de fiados\', \'Adicionar novo cliente João telefone (11) 99999-8888 email joao@exemplo.com endereço Rua Teste 123\', \'Registrar nova despesa de aluguel no valor de 500 reais\' , \'Adicionar produto Camisa Azul código CA001 preço 79.90 categoria Vestuário estoque 10\''
     ),
 });
 export type InterpretTextCommandsInput = z.infer<typeof InterpretTextCommandsInputSchema>;
@@ -35,7 +35,7 @@ const InterpretTextCommandsOutputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'A JSON string containing parameters for the action. Examples: For \'initiateAddCustomer\', it might be \'{"customerName": "João", "phone": "(11) 99999-8888", "email": "joao@exemplo.com"}\'. For \'initiateAddTransaction\', it might be \'{"type": "expense", "description": "aluguel", "amount": 500}\'. For \'initiateAddProduct\', it could be \'{"productName": "Camisa Azul", "productCode": "CA001", "productPrice": 79.90}\'.'
+      'A JSON string containing parameters for the action. Examples: For \'initiateAddCustomer\', it might be \'{"customerName": "João", "phone": "(11) 99999-8888", "email": "joao@exemplo.com", "address": "Rua Teste 123"}\'. For \'initiateAddTransaction\', it might be \'{"type": "expense", "description": "aluguel", "amount": 500}\'. For \'initiateAddProduct\', it could be \'{"productName": "Camisa Azul", "productCode": "CA001", "productPrice": 79.90, "category": "Vestuário", "stock": "10"}\'. For \'initiateAddCreditEntry\', it could be \'{"customerName": "Maria", "amount": 100, "dueDate": "2024-12-31", "whatsappNumber":"5511987654321", "notes":"Referente ao item X"}\'.'
     ),
 });
 export type InterpretTextCommandsOutput = z.infer<typeof InterpretTextCommandsOutputSchema>;
@@ -78,10 +78,10 @@ const prompt = ai.definePrompt({
   - "Quais produtos estão com estoque baixo?", "Contar produtos com estoque baixo": action: queryLowStockProductsCount
 
   Initiate Actions:
-  - "Adicionar novo cliente [nome] [telefone] [email] [endereco]", "Cadastrar cliente [nome] com telefone [telefone] e email [email]": action: initiateAddCustomer (extract customerName, phone, email, address if provided)
-  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero]", "Registrar fiado para [cliente] de [valor]": action: initiateAddCreditEntry (extract customerName, amount, dueDate, whatsappNumber if provided)
-  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction (extract type (income/expense), description, amount if provided)
-  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço]": action: initiateAddProduct (extract productName, productCode, productPrice, category, stock if provided)
+  - "Adicionar novo cliente [nome] telefone [telefone] email [email] endereço [endereco]", "Cadastrar cliente [nome] com telefone [telefone] e email [email] e endereco [endereco]": action: initiateAddCustomer (extract customerName, phone, email, address if provided)
+  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero] observacoes [texto]", "Registrar fiado para [cliente] de [valor] vencendo em [data] com whatsapp [numero] e notas [texto]": action: initiateAddCreditEntry (extract customerName, amount, dueDate (YYYY-MM-DD format), whatsappNumber, notes if provided. Sale date defaults to today if not specified by user)
+  - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction (extract type (income/expense), description, amount if provided. Date defaults to today if not specified by user)
+  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço], categoria [categoria] e estoque [quantidade]": action: initiateAddProduct (extract productName, productCode, productPrice, category, stock if provided)
   - "Enviar relatório mensal", "Gerar relatório para [whatsapp]": action: initiateSendMonthlyReport (extract whatsapp if provided)
 
 
@@ -92,11 +92,11 @@ const prompt = ai.definePrompt({
   If a command can be interpreted as a data query, prefer the query action.
   If a command is a general request for information typically found on the dashboard (like KPIs), use action: displayKPIs which will be handled on the client.
   If the command is to start a process like adding something, use the 'initiate...' actions.
-  Extract relevant entities and provide them as a valid JSON string in the 'parameters' field.
+  For 'initiate...' actions, extract ALL relevant entities from the user's command and provide them as a valid JSON string in the 'parameters' field.
   For 'initiateAddTransaction', 'type' should be 'income' for receita/entrada and 'expense' for despesa/saída.
-  For 'initiateAddCreditEntry', if saleDate is not provided, it can be omitted. dueDate is also optional.
-  For 'initiateAddProduct', category and stock are optional.
-  If no parameters are extracted for an 'initiate...' action, the 'parameters' field can be omitted.
+  For 'initiateAddCreditEntry', if dueDate is provided, ensure it is in YYYY-MM-DD format. SaleDate is not needed as it defaults to today.
+  For 'initiateAddProduct', all fields (productName, productCode, productPrice, category, stock) should be extracted if provided.
+  If no parameters are extracted for an 'initiate...' action where parameters are expected for direct addition (e.g., adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string, and the client will handle guiding the user.
   If the command is ambiguous or not understood, return action: 'unknown'.
   Ensure that the output is valid JSON conforming to the InterpretTextCommandsOutputSchema schema.`,
 });

@@ -13,7 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const InterpretVoiceCommandInputSchema = z.object({
-  voiceCommand: z.string().describe('The voice command to interpret. Examples: "Abrir painel central", "Adicionar novo cliente Maria telefone (11) 98765-4321", "Qual minha receita?", "Cadastrar produto Camisa P código CP001 preço 50"'),
+  voiceCommand: z.string().describe('The voice command to interpret. Examples: "Abrir painel central", "Adicionar novo cliente Maria telefone (11) 98765-4321 email maria@exemplo.com endereço Rua das Palmeiras 42", "Qual minha receita?", "Cadastrar produto Camisa P código CP001 preço 50 categoria Roupas estoque 5"'),
 });
 export type InterpretVoiceCommandInput = z.infer<typeof InterpretVoiceCommandInputSchema>;
 
@@ -27,7 +27,7 @@ const InterpretVoiceCommandOutputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'A JSON string containing parameters for the action. Examples: For \'initiateAddCustomer\', it might be \'{"customerName": "Maria", "phone": "(11) 98765-4321"}\'. For \'initiateAddProduct\', it could be \'{"productName": "Camisa P", "productCode": "CP001", "productPrice": 50}\'.'
+      'A JSON string containing parameters for the action. Examples: For \'initiateAddCustomer\', it might be \'{"customerName": "Maria", "phone": "(11) 98765-4321", "email": "maria@exemplo.com", "address": "Rua das Palmeiras 42"}\'. For \'initiateAddProduct\', it could be \'{"productName": "Camisa P", "productCode": "CP001", "productPrice": 50, "category": "Roupas", "stock": "5"}\'. For \'initiateAddCreditEntry\', it could be \'{"customerName": "Pedro", "amount": 200, "dueDate": "2025-01-15", "whatsappNumber": "5521912345678", "notes": "Pagamento em duas vezes"}\''
     ),
 });
 export type InterpretVoiceCommandOutput = z.infer<typeof InterpretVoiceCommandOutputSchema>;
@@ -64,10 +64,10 @@ The application has the following sections/actions (map to the given action):
   - "Quais são meus KPIs?": displayKPIs
 
   Initiate Actions:
-  - "Adicionar novo cliente [nome] [telefone] [email] [endereco]", "Cadastrar cliente [nome] com telefone [telefone]": action: initiateAddCustomer (extract customerName, phone, email, address if provided)
-  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero]", "Registrar fiado para [cliente] de [valor]": action: initiateAddCreditEntry (extract customerName, amount, dueDate, whatsappNumber if provided. Sale date defaults to today if not specified)
+  - "Adicionar novo cliente [nome] [telefone] [email] [endereco]", "Cadastrar cliente [nome] com telefone [telefone] email [email] e endereco [endereco]": action: initiateAddCustomer (extract ALL customerName, phone, email, address if provided by the user)
+  - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero] observacoes [texto]", "Registrar fiado para [cliente] de [valor] vencendo em [data no formato AAAA-MM-DD] com whatsapp [numero] e notas [texto]": action: initiateAddCreditEntry (extract ALL customerName, amount, dueDate (YYYY-MM-DD format), whatsappNumber, notes if provided. Sale date defaults to today if not specified)
   - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction (extract type (income/expense), description, amount if provided. Date defaults to today if not specified)
-  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço]": action: initiateAddProduct (extract productName, productCode, productPrice, category, stock if provided)
+  - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço], categoria [categoria] e estoque [quantidade]": action: initiateAddProduct (extract ALL productName, productCode, productPrice, category, stock if provided)
   - "Enviar relatório mensal", "Gerar relatório para [whatsapp]": action: initiateSendMonthlyReport (extract whatsapp if provided)
 
 
@@ -80,9 +80,9 @@ If the command is unclear or doesn't match any known action, return an action of
 Prioritize specific query actions if the user is asking for specific data.
 Prioritize navigation actions if the user is asking to go to a specific section.
 Prioritize 'initiate...' actions if the user wants to start a process like adding data.
-Extract relevant entities as parameters (e.g., customerName, productName, amount, description, type: 'income' or 'expense', phone, email, address, productCode, productPrice, category, stock, dueDate, whatsappNumber).
+For 'initiate...' actions, extract ALL relevant entities from the user's command (e.g., customerName, productName, amount, description, type: 'income' or 'expense', phone, email, address, productCode, productPrice, category, stock, dueDate (YYYY-MM-DD), whatsappNumber, notes).
 **Provide these parameters as a valid JSON string in the 'parameters' field.**
-If no parameters are extracted, the 'parameters' field can be omitted from the output.
+If no parameters are extracted where they would be expected for a direct addition (e.g. adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string.
 Ensure that the output is valid JSON conforming to the InterpretVoiceCommandOutputSchema schema.`,
 });
 
