@@ -52,7 +52,6 @@ export default function ForgotPasswordPage() {
       const result = await response.json();
 
       if (response.ok) {
-        // Verifica se o e-mail existe no localStorage para uma simulação mais "real"
         const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
         let emailExists = false;
         if (storedDetailsRaw) {
@@ -69,7 +68,7 @@ export default function ForgotPasswordPage() {
         if (emailExists) {
           toast({ 
             title: "Verifique seu E-mail", 
-            description: result.message || `(Simulação) Se um usuário com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend, um link de redefinição de senha foi enviado.`,
+            description: result.message || `(Simulação) Se uma conta com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend, um link de redefinição de senha foi enviado.`,
             duration: 7000,
           });
         } else {
@@ -83,7 +82,7 @@ export default function ForgotPasswordPage() {
       } else {
         toast({
           title: "Erro ao Solicitar Redefinição",
-          description: result.error || "Não foi possível processar sua solicitação. Verifique se o serviço de backend (email-api) está rodando e configurado corretamente na porta 5000. Tente novamente mais tarde.",
+          description: result.error || "Não foi possível processar sua solicitação. Verifique se o servidor de backend (email-api) está rodando e configurado corretamente na porta 5000. Tente novamente mais tarde.",
           variant: "destructive",
           duration: 7000,
         });
@@ -91,10 +90,10 @@ export default function ForgotPasswordPage() {
     } catch (error: any) {
       console.error("Erro detalhado na chamada da API de redefinição de senha:", error);
       toast({
-        title: "Erro de Conexão com o Servidor da API de E-mail",
-        description: "Falha ao conectar com o servidor da API de e-mail. Por favor, verifique: 1. Se o servidor na pasta 'email-api' foi iniciado (com 'npm start' no terminal daquela pasta). 2. Se não há erros no console do servidor 'email-api'. 3. Se a porta 5000 não está bloqueada.",
+        title: "Falha ao Conectar com a API de E-mail",
+        description: `Não foi possível conectar à API em ${apiUrl}. Verifique se: 1. O servidor na pasta 'email-api' foi iniciado (com 'npm start' no terminal daquela pasta e está mostrando "Server running on port 5000"). 2. Se você está usando um ambiente de desenvolvimento remoto (como Cloud Workstations), 'localhost:5000' pode não estar acessível pelo seu navegador; você pode precisar configurar o encaminhamento de porta ou usar a URL pública da API, se disponível. 3. Não há erros no console do servidor 'email-api'. 4. A porta 5000 não está bloqueada por um firewall.`,
         variant: "destructive",
-        duration: 10000, // Aumentado para dar mais tempo de leitura
+        duration: 15000, 
       });
     }
     
