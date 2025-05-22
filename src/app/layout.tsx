@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/toaster";
 export const metadata: Metadata = {
   title: 'MoneyWise',
   description: 'Manage your business finances wisely.',
+  viewport: 'width=device-width, initial-scale=1.0',
 };
 
 export default function RootLayout({
