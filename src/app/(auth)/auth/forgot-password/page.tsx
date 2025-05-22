@@ -44,7 +44,8 @@ export default function ForgotPasswordPage() {
       const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
       if (storedDetailsRaw) {
         const storedDetails: StoredAccountDetails = JSON.parse(storedDetailsRaw);
-        if (storedDetails.email === data.email) {
+        // Make email comparison case-insensitive
+        if (storedDetails.email && storedDetails.email.toLowerCase() === data.email.toLowerCase()) {
           emailFound = true;
         }
       }
