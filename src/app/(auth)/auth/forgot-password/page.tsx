@@ -14,8 +14,8 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Send, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; // Importar a chave
-import type { AccountDetailsFormValues as StoredAccountDetails } from '@/app/(app)/dashboard/settings/page'; // Importar o tipo
+import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; 
+import type { AccountDetailsFormValues as StoredAccountDetails } from '@/app/(app)/dashboard/settings/page'; 
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Por favor, insira um e-mail válido." }),
@@ -50,13 +50,13 @@ export default function ForgotPasswordPage() {
       }
     } catch (error) {
       console.error("Error reading account details from localStorage:", error);
-      // Proceed as if email was not found, but log the error
     }
 
     if (emailFound) {
       toast({ 
-        title: "Verifique seu E-mail", 
-        description: `Se houver uma conta associada a ${data.email}, um link para redefinição de senha foi enviado.`,
+        title: "Verifique seu E-mail (Simulado)", 
+        description: `Simulação: Se uma conta existir para ${data.email}, um e-mail com instruções para redefinir sua senha teria sido enviado. Por favor, verifique sua caixa de entrada (simulado).`,
+        duration: 7000,
       });
     } else {
       toast({
