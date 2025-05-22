@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendPasswordResetEmail(email) {
-  const token = generateResetToken(email);
+  const token = generateResetToken(email); // Pode lançar erro se JWT_SECRET não estiver definido
 
   // Ajustado para corresponder à rota do frontend do Next.js
   const resetLink = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}`;
