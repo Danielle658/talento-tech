@@ -1,15 +1,16 @@
 const nodemailer = require('nodemailer');
+// const jwt = require('jsonwebtoken'); // JWT é usado em generateResetToken
 const { generateResetToken } = require('../utils/generateResetToken');
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT),
-  secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+  secure: false, // false para TLS (porta 587), true para SSL (porta 465)
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    pass: process.env.SMTP_PASS, // Aqui vai a senha de aplicativo gerada
   },
-  // Remove tls rejectUnauthorized para ambientes de desenvolvimento, se necessário, mas use com cautela
+  // Descomente a seção tls abaixo se estiver enfrentando problemas com certificados autoassinados em desenvolvimento
   // tls: {
   //   rejectUnauthorized: false
   // }
@@ -18,13 +19,13 @@ const transporter = nodemailer.createTransport({
 async function sendPasswordResetEmail(email) {
   const token = generateResetToken(email);
 
-  // Ajuste o caminho se a sua página de redefinição de senha no frontend for diferente
+  // Ajustado para corresponder à rota do frontend do Next.js
   const resetLink = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}`;
 
   const mailOptions = {
-    from: `"Suporte MoneyWise" <${process.env.SMTP_USER}>`,
+    from: `"Suporte MoneyWise" <${process.env.SMTP_USER}>`, // Mantido o nome mais descritivo
     to: email,
-    subject: 'Recuperação de Senha - MoneyWise',
+    subject: 'Recuperação de Senha - MoneyWise', // Mantido o assunto mais descritivo
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2 style="color: #556B2F;">Recuperação de Senha</h2>
@@ -43,7 +44,7 @@ async function sendPasswordResetEmail(email) {
         <p>Obrigado,</p>
         <p>Equipe MoneyWise</p>
       </div>
-    `,
+    `, // Mantido o HTML mais rico
   };
 
   try {
@@ -57,9 +58,9 @@ async function sendPasswordResetEmail(email) {
 
 async function sendNotificationEmail(to, subject, message) {
   const mailOptions = {
-    from: `"Notificações MoneyWise" <${process.env.SMTP_USER}>`,
+    from: `"Notificações MoneyWise" <${process.env.SMTP_USER}>`, // Mantido o nome mais descritivo
     to,
-    subject: subject || 'Notificação de MoneyWise',
+    subject: subject || 'Notificação de MoneyWise', // Mantido o assunto padrão
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2 style="color: #556B2F;">Notificação de MoneyWise</h2>
@@ -68,7 +69,7 @@ async function sendNotificationEmail(to, subject, message) {
         <p>Atenciosamente,</p>
         <p>Equipe MoneyWise</p>
       </div>
-    `,
+    `, // Mantido o HTML mais rico
   };
 
   try {

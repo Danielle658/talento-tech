@@ -8,17 +8,19 @@ function generateResetToken(email) {
   return jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 }
 
-function verifyResetToken(token) {
-  if (!process.env.JWT_SECRET) {
-    console.error('A variável de ambiente JWT_SECRET não está definida para verificação.');
-    return null;
-  }
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET);
-  } catch (err) {
-    console.error('Erro ao verificar o token:', err.message);
-    return null; // Token inválido ou expirado
-  }
-}
+// Função verifyResetToken não está no código fornecido pelo usuário para esta versão,
+// mas seria útil em uma implementação completa de redefinição de senha.
+// function verifyResetToken(token) {
+//   if (!process.env.JWT_SECRET) {
+//     console.error('A variável de ambiente JWT_SECRET não está definida para verificação.');
+//     return null;
+//   }
+//   try {
+//     return jwt.verify(token, process.env.JWT_SECRET);
+//   } catch (err) {
+//     console.error('Erro ao verificar o token:', err.message);
+//     return null; // Token inválido ou expirado
+//   }
+// }
 
-module.exports = { generateResetToken, verifyResetToken };
+module.exports = { generateResetToken };
