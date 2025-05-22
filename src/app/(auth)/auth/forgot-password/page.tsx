@@ -52,22 +52,24 @@ export default function ForgotPasswordPage() {
       if (response.ok) {
         toast({ 
           title: "Verifique seu E-mail", 
-          description: result.message || `Se um usuário com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado corretamente no backend, um link de redefinição de senha foi enviado.`,
+          description: result.message || `(Simulação) Se um usuário com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado corretamente no backend, um link de redefinição de senha foi enviado.`,
           duration: 7000,
         });
       } else {
         toast({
           title: "Erro ao Solicitar Redefinição",
-          description: result.error || "Não foi possível processar sua solicitação. Verifique se o serviço de backend está rodando e configurado. Tente novamente mais tarde.",
+          description: result.error || "Não foi possível processar sua solicitação. Verifique se o serviço de backend (email-api) está rodando e configurado corretamente na porta 5000. Tente novamente mais tarde.",
           variant: "destructive",
+          duration: 7000,
         });
       }
     } catch (error) {
       console.error("Erro na chamada da API de redefinição de senha:", error);
       toast({
-        title: "Erro de Rede",
-        description: "Não foi possível conectar ao servidor de e-mail. Verifique sua conexão e se o backend está em execução.",
+        title: "Erro de Conexão com o Servidor",
+        description: "Não foi possível conectar ao servidor de e-mail. Verifique sua conexão com a internet e se o servidor da API de e-mail (localizado na pasta 'email-api') está em execução na porta 5000. Tente novamente.",
         variant: "destructive",
+        duration: 9000,
       });
     }
     
