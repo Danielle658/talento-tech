@@ -25,6 +25,14 @@ const nextConfig: NextConfig = {
       "https://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev" // Origin from the log
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/internal-email/:path*',
+        destination: 'http://localhost:5000/api/email/:path*', // Proxy to Express email API
+      },
+    ]
+  },
 };
 
 export default nextConfig;

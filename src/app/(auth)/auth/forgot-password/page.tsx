@@ -37,8 +37,9 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setIsLoading(true);
     
-    const apiUrl = 'http://localhost:5000/api/email/reset-password';
-    console.log("Tentando conectar à API de e-mail em:", apiUrl);
+    // Alterado para usar a rota de proxy do Next.js
+    const apiUrl = '/api/internal-email/reset-password'; 
+    console.log("Tentando conectar à API de e-mail via proxy em:", apiUrl);
 
     try {
       const response = await fetch(apiUrl, {
@@ -82,16 +83,16 @@ export default function ForgotPasswordPage() {
       } else {
         toast({
           title: "Erro ao Solicitar Redefinição",
-          description: result.error || "Não foi possível processar sua solicitação. Verifique se o servidor de backend (email-api) está rodando e configurado corretamente na porta 5000. Tente novamente mais tarde.",
+          description: result.error || "Não foi possível processar sua solicitação. Verifique se o servidor de backend (email-api) está rodando e configurado corretamente na porta 5000 e se o proxy do Next.js está funcionando. Tente novamente mais tarde.",
           variant: "destructive",
-          duration: 7000,
+          duration: 10000,
         });
       }
     } catch (error: any) {
-      console.error("Erro detalhado na chamada da API de redefinição de senha:", error);
+      console.error("Erro detalhado na chamada da API de redefinição de senha (via proxy):", error);
       toast({
-        title: "Falha ao Conectar com a API de E-mail",
-        description: `Não foi possível conectar à API em ${apiUrl}. Verifique se: 1. O servidor na pasta 'email-api' foi iniciado (com 'npm start' no terminal daquela pasta e está mostrando "Server running on port 5000"). 2. Se você está usando um ambiente de desenvolvimento remoto (como Cloud Workstations), 'localhost:5000' pode não estar acessível pelo seu navegador; você pode precisar configurar o encaminhamento de porta ou usar a URL pública da API, se disponível. 3. Não há erros no console do servidor 'email-api'. 4. A porta 5000 não está bloqueada por um firewall.`,
+        title: "Falha na Requisição para a API de E-mail",
+        description: `Ocorreu um erro ao tentar se comunicar com a API de e-mail através do proxy do Next.js. Verifique se o servidor 'email-api' está rodando corretamente na porta 5000 no ambiente do Cloud Workstation. Detalhes do erro: ${error.message}`,
         variant: "destructive",
         duration: 15000, 
       });
