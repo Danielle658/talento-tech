@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Send, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
+// A constante ACCOUNT_DETAILS_BASE_STORAGE_KEY não é mais usada diretamente aqui para verificar e-mail.
 
 const forgotPasswordSchema = z.object({
   email: z.string().email({ message: "Por favor, insira um e-mail válido." }),
@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setIsLoading(true);
     // A URL agora usa o proxy do Next.js
-    const apiUrl = '/api/internal-email/reset-password'; 
+    const apiUrl = '/api/internal-email/reset-password';
     console.log("Tentando conectar à API de e-mail (via proxy Next.js) em:", apiUrl, " com e-mail:", data.email);
     let rawResponseText = '';
 
@@ -50,10 +50,9 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: data.email }), // Garante que o corpo é um JSON
       });
 
-      rawResponseText = await response.text(); 
+      rawResponseText = await response.text();
 
       if (!response.ok) {
-        // Tenta analisar como JSON primeiro, caso o backend envie um erro JSON estruturado
         try {
           const errorResult = JSON.parse(rawResponseText);
           toast({
@@ -63,7 +62,6 @@ export default function ForgotPasswordPage() {
             duration: 10000,
           });
         } catch (jsonParseError) {
-          // Se não for JSON, é provável que seja HTML (página de erro do proxy ou do backend)
           console.error("A resposta de erro da API não era JSON. Resposta bruta:", rawResponseText);
           toast({
             title: "Erro de Comunicação com API de E-mail",
@@ -73,44 +71,22 @@ export default function ForgotPasswordPage() {
           });
         }
         setIsLoading(false);
-        return; 
-      }
-      
-      // Se a resposta foi OK (2xx), espera-se JSON
-      const result = JSON.parse(rawResponseText);
-      const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
-      let emailExists = false;
-      if (storedDetailsRaw) {
-        try {
-          const storedDetails = JSON.parse(storedDetailsRaw);
-          if (storedDetails.email && storedDetails.email.toLowerCase() === data.email.toLowerCase()) {
-            emailExists = true;
-          }
-        } catch (e) {
-          console.error("Erro ao ler detalhes da conta do localStorage:", e);
-        }
+        return;
       }
 
-      if (emailExists) {
-        toast({
-          title: "Verifique seu E-mail",
-          description: result.message || `(Simulação) Se uma conta com o e-mail ${data.email} existir e o serviço de e-mail estiver configurado e rodando corretamente no backend (porta 5001), um link de redefinição de senha foi enviado.`,
-          duration: 7000,
-        });
-      } else {
-        toast({
-          title: "E-mail Não Encontrado",
-          description: `Não foi possível encontrar uma conta com o e-mail ${data.email}. Verifique o endereço digitado.`,
-          variant: "destructive",
-          duration: 7000,
-        });
-      }
+      // A API de email é responsável por verificar a existência do e-mail.
+      // O frontend apenas informa o usuário sobre a tentativa de envio.
+      toast({
+        title: "Solicitação Enviada",
+        description: `Se o e-mail ${data.email} estiver cadastrado em nosso sistema e o serviço de e-mail estiver configurado corretamente, um link para redefinição de senha será enviado. Verifique sua caixa de entrada e spam.`,
+        duration: 10000,
+      });
       form.reset();
-    } catch (error: any) { // Captura erros de rede (ex: servidor offline)
-      console.error("Erro de rede ao chamar API de redefinição de senha (via proxy):", error);
+    } catch (error: any) {
+      console.error("Erro de rede ao chamar API de redefinição de senha (via proxy):", error, "Resposta bruta (se houver):", rawResponseText);
       toast({
         title: "Falha na Conexão com API de E-mail",
-        description: `Não foi possível conectar à API de e-mail através do proxy Next.js. Verifique se o servidor 'email-api' (que deve estar rodando na porta 5001) está online e se o servidor Next.js pode alcançá-lo. Detalhes: ${error.message}. Se estiver em ambiente de desenvolvimento remoto, pode ser necessário configurar encaminhamento de porta ou usar uma URL pública para a API de e-mail.`,
+        description: `Não foi possível conectar à API de e-mail através do proxy Next.js. Verifique se o servidor 'email-api' (porta 5001) está online e se o servidor Next.js pode alcançá-lo. Detalhes: ${error.message}. Se estiver em ambiente de desenvolvimento remoto, pode ser necessário configurar encaminhamento de porta ou usar uma URL pública para a API de e-mail.`,
         variant: "destructive",
         duration: 15000,
       });

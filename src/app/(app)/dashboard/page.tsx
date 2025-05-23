@@ -9,13 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Transaction, STORAGE_KEY_NOTEBOOK_BASE } from '@/app/(app)/dashboard/notebook/page';
-import { ProductEntry, STORAGE_KEY_PRODUCTS_BASE } from '@/app/(app)/dashboard/products/page';
-import { SalesRecordEntry, STORAGE_KEY_SALES_RECORD_BASE } from '@/app/(app)/dashboard/sales-record/page';
-import { CreditEntry, STORAGE_KEY_CREDIT_NOTEBOOK_BASE } from '@/app/(app)/dashboard/credit-notebook/page.tsx';
-import { CustomerEntry, STORAGE_KEY_CUSTOMERS_BASE } from '@/app/(app)/dashboard/customers/page.tsx';
+import type { Transaction } from '@/app/(app)/dashboard/notebook/page';
+import type { ProductEntry } from '@/app/(app)/dashboard/products/page';
+import type { SalesRecordEntry } from '@/app/(app)/dashboard/sales-record/page';
+import type { CreditEntry } from '@/app/(app)/dashboard/credit-notebook/page.tsx';
+import type { CustomerEntry } from '@/app/(app)/dashboard/customers/page.tsx';
 import { format, parseISO, isValid, subDays, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -24,7 +23,14 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { useAuth } from '@/hooks/use-auth';
-import { getCompanySpecificKey } from '@/lib/constants';
+import { 
+  STORAGE_KEY_NOTEBOOK_BASE,
+  STORAGE_KEY_PRODUCTS_BASE,
+  STORAGE_KEY_SALES_RECORD_BASE,
+  STORAGE_KEY_CREDIT_NOTEBOOK_BASE,
+  STORAGE_KEY_CUSTOMERS_BASE,
+  getCompanySpecificKey 
+} from '@/lib/constants';
 
 
 interface DisplayTransaction {
@@ -47,7 +53,7 @@ interface DisplayProduct {
 const kpiConfigurations = [
   { id: "totalRevenue", title: "Receita Total", icon: DollarSign, defaultDescription: "Calculando..." },
   { id: "totalCustomers", title: "Total de Clientes", icon: Users, defaultDescription: "Aguardando dados" },
-  { id: "pendingInvoices", title: "Fiados Pendentes", icon: FileText, defaultDescription: "R$ 0,00" }, // Changed from Faturas
+  { id: "pendingInvoices", title: "Fiados Pendentes", icon: FileText, defaultDescription: "R$ 0,00" }, 
   { id: "lowStockProducts", title: "Estoque Baixo", icon: Archive, defaultDescription: "Aguardando dados" },
 ];
 
@@ -62,7 +68,7 @@ const salesChartConfig = {
 
 export default function DashboardPage() {
   const { toast } = useToast();
-  const { currentCompany } = useAuth();
+  const { currentCompany, isLoading: isAuthLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
 
   // States for raw data
@@ -93,7 +99,7 @@ export default function DashboardPage() {
         console.error("Error loading transactions from localStorage for", currentCompany, error);
         if (companyNotebookKey) localStorage.removeItem(companyNotebookKey);
         setAllTransactions([]);
-        toast({ variant: "destructive", title: "Erro ao Carregar Caderneta Digital", description: "Os dados da caderneta digital podem estar corrompidos e foram redefinidos."});
+        toast({ variant: "destructive", title: "Erro ao Carregar Caderneta Digital", description: `Os dados da caderneta digital para ${currentCompany} podem estar corrompidos e foram redefinidos.`, toastId: 'dashboardNotebookLoadError' });
       }
 
       try {
@@ -105,7 +111,7 @@ export default function DashboardPage() {
         console.error("Error loading sales records from localStorage for", currentCompany, error);
         if (companySalesKey) localStorage.removeItem(companySalesKey);
         setAllSalesRecords([]);
-        toast({ variant: "destructive", title: "Erro ao Carregar Histórico de Vendas", description: "Os dados do histórico de vendas podem estar corrompidos e foram redefinidos."});
+        toast({ variant: "destructive", title: "Erro ao Carregar Histórico de Vendas", description: `Os dados do histórico de vendas para ${currentCompany} podem estar corrompidos e foram redefinidos.`, toastId: 'dashboardSalesLoadError' });
       }
 
       try {
@@ -117,7 +123,7 @@ export default function DashboardPage() {
         console.error("Error loading product catalog from localStorage for", currentCompany, error);
         if (companyProductsKey) localStorage.removeItem(companyProductsKey);
         setProductCatalog([]);
-        toast({ variant: "destructive", title: "Erro ao Carregar Catálogo de Produtos", description: "Os dados dos produtos podem estar corrompidos e foram redefinidos."});
+        toast({ variant: "destructive", title: "Erro ao Carregar Catálogo de Produtos", description: `Os dados dos produtos para ${currentCompany} podem estar corrompidos e foram redefinidos.`, toastId: 'dashboardProductsStoreError' });
       }
 
       try {
@@ -133,7 +139,7 @@ export default function DashboardPage() {
         console.error("Error loading credit entries from localStorage for", currentCompany, error);
         if (companyCreditKey) localStorage.removeItem(companyCreditKey);
         setAllCreditEntries([]);
-        toast({ variant: "destructive", title: "Erro ao Carregar Caderneta de Fiados", description: "Os dados de fiados podem estar corrompidos e foram redefinidos."});
+        toast({ variant: "destructive", title: "Erro ao Carregar Caderneta de Fiados", description: `Os dados de fiados para ${currentCompany} podem estar corrompidos e foram redefinidos.`, toastId: 'dashboardCreditLoadError' });
       }
 
       try {
@@ -145,7 +151,7 @@ export default function DashboardPage() {
         console.error("Error loading customers from localStorage for", currentCompany, error);
         if (companyCustomersKey) localStorage.removeItem(companyCustomersKey);
         setAllCustomers([]);
-        toast({ variant: "destructive", title: "Erro ao Carregar Clientes", description: "Os dados dos clientes podem estar corrompidos e foram redefinidos."});
+        toast({ variant: "destructive", title: "Erro ao Carregar Clientes", description: `Os dados dos clientes para ${currentCompany} podem estar corrompidos e foram redefinidos.`, toastId: 'dashboardCustomerLoadError' });
       }
     } else if (isMounted && !currentCompany) {
       // Clear data if no company is logged in (e.g., after logout)
@@ -160,12 +166,13 @@ export default function DashboardPage() {
   const recentTransactionsData = useMemo((): DisplayTransaction[] => {
     if (!isMounted || !allTransactions) return [];
     return allTransactions
-      .sort((a, b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0))
+      .filter(t => isValid(t.date))
+      .sort((a, b) => (b.date.getTime()) - (a.date.getTime()))
       .slice(0, 4)
       .map(t => ({
         id: t.id,
         customer: t.description.substring(0, 30) + (t.description.length > 30 ? '...' : ''),
-        date: isValid(t.date) ? format(t.date, "dd/MM/yyyy", { locale: ptBR }) : "Data Inválida",
+        date: format(t.date, "dd/MM/yyyy", { locale: ptBR }),
         amount: `R$ ${t.amount.toFixed(2)}`,
         status: t.type === 'income' ? 'Receita' : 'Despesa',
         type: t.type
@@ -223,9 +230,9 @@ export default function DashboardPage() {
   const totalRevenueKPI = useMemo(() => {
     if (!isMounted || !allTransactions) return { value: "R$ 0,00", description: "Calculando..." };
     const income = allTransactions
-      .filter(t => t.type === 'income')
+      .filter(t => t.type === 'income' && isValid(t.date))
       .reduce((sum, t) => sum + t.amount, 0);
-    return { value: `R$ ${income.toFixed(2)}`, description: allTransactions.length > 0 ? `Baseado em ${allTransactions.filter(t=>t.type === 'income').length} receitas` : "Nenhuma receita registrada" };
+    return { value: `R$ ${income.toFixed(2)}`, description: allTransactions.filter(t=>t.type === 'income').length > 0 ? `Baseado em ${allTransactions.filter(t=>t.type === 'income').length} receitas` : "Nenhuma receita registrada" };
   }, [isMounted, allTransactions]);
 
   const totalCustomersKPI = useMemo(() => {
@@ -233,7 +240,7 @@ export default function DashboardPage() {
     return { value: `${allCustomers.length}`, description: "Total de clientes cadastrados" };
   }, [isMounted, allCustomers]);
 
-  const pendingInvoicesKPI = useMemo(() => { // Renamed from pendingInvoicesKPI
+  const pendingInvoicesKPI = useMemo(() => { 
     if (!isMounted || !allCreditEntries) return { count: "0", amount: "R$ 0,00" };
     const pending = allCreditEntries.filter(entry => !entry.paid && isValid(entry.saleDate));
     const totalDue = pending.reduce((sum, entry) => sum + entry.amount, 0);
@@ -256,7 +263,7 @@ export default function DashboardPage() {
         return { ...kpiConfig, value: totalRevenueKPI.value, description: totalRevenueKPI.description };
       case 'totalCustomers':
         return { ...kpiConfig, value: totalCustomersKPI.value, description: totalCustomersKPI.description };
-      case 'pendingInvoices': // Updated ID
+      case 'pendingInvoices': 
         return { ...kpiConfig, value: pendingInvoicesKPI.count, description: `${pendingInvoicesKPI.count} pendentes (${pendingInvoicesKPI.amount})` };
       case 'lowStockProducts':
         return { ...kpiConfig, value: lowStockProductsKPI.value, description: lowStockProductsKPI.description };
@@ -287,7 +294,7 @@ export default function DashboardPage() {
   }, [isMounted, allSalesRecords]);
 
 
-  if (!isMounted || (isMounted && !currentCompany && isLoading)) { // Show loader if not mounted OR if mounted but no company yet (still loading auth context)
+  if (!isMounted || (isMounted && !currentCompany && isAuthLoading)) { 
     return (
       <div className="flex h-[calc(100vh-8rem)] w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -295,7 +302,7 @@ export default function DashboardPage() {
     );
   }
   
-  if (isMounted && !currentCompany && !isLoading) { // If mounted, no company, and auth loading is finished
+  if (isMounted && !currentCompany && !isAuthLoading) { 
     return (
       <div className="flex h-[calc(100vh-8rem)] w-full items-center justify-center text-center">
         <p className="text-muted-foreground">Por favor, faça login para ver os dados da sua empresa.</p>
@@ -359,7 +366,7 @@ export default function DashboardPage() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground text-center py-4">Nenhuma transação recente encontrada.</p>
+              <p className="text-muted-foreground text-center py-4">Nenhuma transação recente encontrada para {currentCompany}.</p>
             )}
           </DataSection>
 
@@ -390,7 +397,7 @@ export default function DashboardPage() {
                 </TableBody>
               </Table>
              ) : (
-                <p className="text-muted-foreground text-center py-4">Dados de vendas de produtos ainda não disponíveis. Registre vendas no PDV.</p>
+                <p className="text-muted-foreground text-center py-4">Dados de vendas de produtos ainda não disponíveis para {currentCompany}. Registre vendas no PDV.</p>
              )}
           </DataSection>
         </div>
@@ -418,7 +425,6 @@ export default function DashboardPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">Nenhuma notificação nova.</p>
               )}
-              {/* <Button variant="link" className="mt-3 px-0 text-sm">Ver todas as notificações</Button> */}
             </CardContent>
           </Card>
           
@@ -428,7 +434,7 @@ export default function DashboardPage() {
               <CardDescription>Vendas diárias nos últimos 7 dias.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              {dailySalesChartData.some(d => d.Vendas > 0) ? ( // Check if there's any sales data to display
+              {dailySalesChartData.some(d => d.Vendas > 0) ? ( 
                 <ChartContainer config={salesChartConfig} className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailySalesChartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -445,7 +451,7 @@ export default function DashboardPage() {
                         tickLine={false} 
                         axisLine={false} 
                         tickMargin={8}
-                        width={45} // Adjusted width
+                        width={45} 
                         fontSize={12}
                       />
                       <Tooltip
@@ -465,7 +471,7 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
               ) : (
-                <p className="text-muted-foreground text-center py-4">Nenhuma venda registrada nos últimos 7 dias.</p>
+                <p className="text-muted-foreground text-center py-4">Nenhuma venda registrada nos últimos 7 dias para {currentCompany}.</p>
               )}
             </CardContent>
           </Card>
@@ -474,3 +480,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
+
+    
