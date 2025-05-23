@@ -33,7 +33,7 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
-  const [isTokenPresent, setIsTokenPresent] = useState(false); // Simplified from isTokenValid
+  const [isTokenPresent, setIsTokenPresent] = useState(false);
 
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -46,19 +46,17 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
-    const emailFromUrl = searchParams.get('email'); // Expect email in URL too for this flow
+    const emailFromUrl = searchParams.get('email'); // E-mail também vem na URL pela email-api
 
-    if (tokenFromUrl) {
+    if (tokenFromUrl && emailFromUrl) {
       setResetToken(tokenFromUrl);
       setIsTokenPresent(true);
-      if (emailFromUrl) {
-        form.setValue('email', emailFromUrl); // Pre-fill email from URL
-      }
+      form.setValue('email', emailFromUrl); // Pré-preenche o e-mail do link
     } else {
       setIsTokenPresent(false);
       toast({
         title: "Link de Redefinição Inválido",
-        description: "O token de redefinição de senha não foi encontrado na URL. Por favor, solicite um novo link.",
+        description: "O token de redefinição de senha ou e-mail não foi encontrado na URL. Por favor, solicite um novo link.",
         variant: "destructive",
         duration: 7000,
       });
@@ -74,15 +72,15 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      // Call the new Next.js API route
-      const response = await fetch("/api/reset-password", {
+      // Chamar a API Route do Next.js para validar o token
+      const response = await fetch("/api/reset-password", { // Chama a API Route local
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          token: resetToken, // Send the token
-          email: data.email.toLowerCase(),
+          token: resetToken,
+          email: data.email.toLowerCase(), // Email do formulário
           password: data.password,
         }),
       });
@@ -90,7 +88,7 @@ export default function ResetPasswordPage() {
       const result = await response.json();
 
       if (response.ok) {
-        // If API call is successful, update localStorage client-side
+        // Se a API Next.js validou o token, atualize a senha no localStorage
         const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
         let allSimulatedCredentials: any[] = [];
         if (storedCredentialsRaw) {
@@ -100,8 +98,8 @@ export default function ResetPasswordPage() {
                     allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean);
                 }
             } catch (e) {
-                console.error("Error parsing simulated credentials from localStorage:", e);
-                allSimulatedCredentials = []; // Reset if parsing fails
+                console.error("Erro ao analisar credenciais simuladas do localStorage:", e);
+                allSimulatedCredentials = [];
             }
         }
         
@@ -110,7 +108,7 @@ export default function ResetPasswordPage() {
         );
 
         if (userCredentialIndex !== -1) {
-          allSimulatedCredentials[userCredentialIndex].password = data.password; // Store new password (plain text for simulation)
+          allSimulatedCredentials[userCredentialIndex].password = data.password;
           localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
           toast({
             title: "Senha Redefinida!",
@@ -118,7 +116,6 @@ export default function ResetPasswordPage() {
           });
           router.push('/auth');
         } else {
-          // This case should ideally be caught by the API, but as a fallback client-side
           toast({ 
             title: "E-mail Não Encontrado", 
             description: "Não foi possível encontrar uma conta associada a este e-mail para redefinir a senha. Verifique o e-mail digitado.", 
@@ -127,7 +124,6 @@ export default function ResetPasswordPage() {
           });
         }
       } else {
-        // Error from the /api/reset-password API route
         toast({
           title: "Erro ao Redefinir Senha",
           description: result.message || "Ocorreu um erro ao tentar redefinir sua senha.",
@@ -156,7 +152,7 @@ export default function ResetPasswordPage() {
           </CardDescription>
         ) : (
            <CardDescription className="pt-2">
-            Por favor, confirme seu e-mail e defina sua nova senha abaixo.
+            Seu link de redefinição é válido. Por favor, confirme seu e-mail e defina sua nova senha abaixo.
           </CardDescription>
         )}
       </CardHeader>
@@ -173,7 +169,8 @@ export default function ResetPasswordPage() {
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input type="email" placeholder="Confirme o e-mail da sua conta" {...field} className="pl-10" />
+                          {/* O e-mail é pré-preenchido e pode ser desabilitado se preferir */}
+                          <Input type="email" placeholder="Confirme o e-mail da sua conta" {...field} className="pl-10" disabled />
                         </div>
                       </FormControl>
                       <FormMessage />

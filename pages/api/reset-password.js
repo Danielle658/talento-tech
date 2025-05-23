@@ -1,13 +1,8 @@
 
 // pages/api/reset-password.js
-// IMPORTANT: This is a SIMULATED backend. It does not use a real database or secure token validation.
-// It also cannot directly modify localStorage. The localStorage update happens client-side.
-
-import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants'; // Assuming this path is resolvable from pages/api
-
-// In a real app, you'd verify the token against a database,
-// check its expiry, and ensure it's associated with the email.
-// For this simulation, we'll assume the token's presence and matching email is 'valid enough'.
+import jwt from 'jsonwebtoken';
+// A SIMULATED_CREDENTIALS_STORAGE_KEY não é usada aqui, pois a API não deve acessar o localStorage diretamente.
+// A verificação de existência da conta e atualização da senha no localStorage é feita no cliente.
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -17,31 +12,50 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Token, e-mail e nova senha são obrigatórios.' });
     }
 
-    // SIMULATION: In a real scenario, you would:
-    // 1. Validate the token (e.g., decode JWT, check against database, check expiry).
-    // 2. Find the user by the email or token.
-    // 3. Hash the new password.
-    // 4. Update the user's password in the database.
-    // 5. Invalidate the token.
-
-    // For this simulation, we'll just check if an email is provided.
-    // The actual check if the email exists in SIMULATED_CREDENTIALS_STORAGE_KEY
-    // and the password update will happen on the client-side after this API returns success.
-    // This API route mainly serves as a structural placeholder for a real backend endpoint.
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    if (!process.env.JWT_SECRET) {
+      console.error('[API /api/reset-password] Erro: JWT_SECRET não está definido no ambiente do Next.js.');
+      return res.status(500).json({ message: 'Erro de configuração no servidor.' });
     }
-    
-    // Simulate a successful "backend" validation and "update"
-    console.log(`[API /api/reset-password] Simulating password reset for email: ${email} with token: ${token}`);
-    // Here, a real backend would update the database.
-    // Since we can't access localStorage from here, we just return success.
-    // The client will handle the localStorage update.
 
-    return res.status(200).json({ message: 'Senha redefinida com sucesso (simulado pelo backend).' });
+    try {
+      // Verificar o token JWT
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      // O payload do token deve conter o e-mail
+      const emailFromToken = decoded.email;
 
+      if (!emailFromToken) {
+        return res.status(400).json({ message: 'Token inválido (não contém e-mail).' });
+      }
+
+      // Comparar o e-mail do token com o e-mail fornecido no formulário
+      // Convertendo para minúsculas para comparação insensível a maiúsculas/minúsculas
+      if (emailFromToken.toLowerCase() !== email.toLowerCase()) {
+        return res.status(400).json({ message: 'Token não corresponde ao e-mail fornecido.' });
+      }
+
+      // Verificar o comprimento da nova senha
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'A nova senha deve ter pelo menos 6 caracteres.' });
+      }
+
+      // Se todas as verificações passarem, o token é considerado válido para este e-mail.
+      // A atualização da senha no localStorage será feita pelo cliente após esta resposta.
+      console.log(`[API /api/reset-password] Token validado com sucesso para o e-mail: ${email}`);
+      return res.status(200).json({ message: 'Token validado. Prossiga com a redefinição da senha no cliente.' });
+
+    } catch (error) {
+      console.error('[API /api/reset-password] Erro ao verificar token:', error.name, error.message);
+      if (error.name === 'TokenExpiredError') {
+        return res.status(400).json({ message: 'Token expirado. Por favor, solicite um novo link de redefinição.' });
+      }
+      if (error.name === 'JsonWebTokenError') {
+        return res.status(400).json({ message: 'Token inválido ou malformado.' });
+      }
+      return res.status(500).json({ message: 'Erro interno ao validar o token.' });
+    }
   } else {
-    return res.status(405).json({ message: 'Método não permitido' });
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ message: `Método ${req.method} não permitido` });
   }
 }
