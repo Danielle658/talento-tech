@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -22,7 +23,8 @@ const nextConfig: NextConfig = {
     allowedDevOrigins: [
       "http://localhost:3000", // Default Next.js dev port
       "http://localhost:9005", // Your current dev port
-      "https://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev" // Origin from the log
+      "https://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev", // HTTPS version
+      "http://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev" // HTTP version
     ],
   },
   async rewrites() {
