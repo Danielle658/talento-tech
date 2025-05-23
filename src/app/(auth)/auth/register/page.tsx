@@ -62,7 +62,7 @@ const registerSchema = z.object({
   privacyTerms: z.boolean().refine(val => val === true, { message: "Você deve aceitar os termos de privacidade." }),
 }).refine(data => data.password === data.confirmPassword, {
   message: "As senhas não coincidem.",
-  path: ["confirmPassword"], // Atribui o erro ao campo confirmPassword
+  path: ["confirmPassword"], 
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -96,15 +96,16 @@ export default function RegisterPage() {
       companyName: data.companyName,
       ownerName: data.ownerName,
       email: data.email,
-      phone: data.phone,
+      phone: data.phone.replace(/[^\d]+/g, ''), // Salva apenas dígitos do telefone
       cpf: data.cpf.replace(/[^\d]+/g, ''),
       profilePictureDataUri: "", 
     };
 
     const simulatedCredential = {
       companyName: data.companyName,
-      email: data.email, // Salvar e-mail para redefinição de senha
-      password: data.password, // Salvar a senha para simulação
+      email: data.email,
+      password: data.password,
+      phone: data.phone.replace(/[^\d]+/g, ''), // Salva apenas dígitos do telefone
       status: "registered",
     };
 
@@ -119,7 +120,7 @@ export default function RegisterPage() {
         try {
             allSimulatedCredentials = JSON.parse(existingCredsRaw);
             if (!Array.isArray(allSimulatedCredentials)) {
-                allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean); // Garante que seja um array e remove nulos
+                allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean); 
             }
         } catch (e) {
              allSimulatedCredentials = [];
@@ -128,7 +129,6 @@ export default function RegisterPage() {
       
       const companyIndex = allSimulatedCredentials.findIndex(cred => cred && cred.companyName === data.companyName);
       if (companyIndex !== -1) {
-        // Atualiza as credenciais se a empresa já existir
         allSimulatedCredentials[companyIndex] = simulatedCredential;
       } else {
         allSimulatedCredentials.push(simulatedCredential);

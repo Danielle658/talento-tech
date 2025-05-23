@@ -12,13 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { KeyRound, Loader2, CheckCircle, AlertTriangle, ArrowLeft, LogIn, ShieldCheck } from 'lucide-react';
+import { KeyRound, Loader2, CheckCircle, ArrowLeft, ShieldCheck, MessageSquare } from 'lucide-react'; // Adicionado MessageSquare
 import { Logo } from '@/components/shared/logo';
-import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants'; // Para atualizar a senha localmente
-import jwt from 'jsonwebtoken'; // Para decodificar o token (apenas para simulação)
-
+import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants'; 
 
 const resetPasswordSchema = z.object({
+  smsCode: z.string().min(4, { message: "Código SMS deve ter pelo menos 4 dígitos." }).max(6, { message: "Código SMS inválido."}), // Exemplo: "000000"
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
@@ -28,162 +27,157 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
-interface DecodedToken {
-  email?: string;
-  iat?: number;
-  exp?: number;
-}
-
 export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false); // Inicia como false, será true durante o submit
-  const [tokenStatus, setTokenStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [phoneNumberFromUrl, setPhoneNumberFromUrl] = useState<string | null>(null);
+  const [isPhoneNumberValidForReset, setIsPhoneNumberValidForReset] = useState(false);
 
-  const form = useForm<ResetPasswordFormValues>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      password: "",
-      confirmPassword: "",
-    },
-  });
 
   useEffect(() => {
-    const tokenFromUrl = searchParams.get('token');
-    if (tokenFromUrl) {
+    const phone = searchParams.get('phone');
+    if (phone) {
+      const cleanedPhone = phone.replace(/[^\d]+/g, '');
+      setPhoneNumberFromUrl(cleanedPhone);
+      // Verifica se o telefone existe no localStorage (SIMULATED_CREDENTIALS_STORAGE_KEY)
       try {
-        // SIMULAÇÃO: Decodificar o token para obter o e-mail.
-        // Em um app real, o token seria enviado ao backend para validação e obtenção do e-mail.
-        // Aqui, apenas decodificamos o token para fins de demonstração.
-        // A "validade" real do token seria verificada pelo backend.
-        const decoded = jwt.decode(tokenFromUrl) as DecodedToken | null;
-
-        if (decoded && decoded.email) {
-          setUserEmail(decoded.email);
-          setTokenStatus('valid');
+        const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
+        if (storedCredentialsRaw) {
+          const allSimulatedCredentials: any[] = JSON.parse(storedCredentialsRaw);
+          if (Array.isArray(allSimulatedCredentials)) {
+            const credentialExists = allSimulatedCredentials.some(cred => cred && cred.phone && cred.phone.replace(/[^\d]+/g, '') === cleanedPhone);
+            if (credentialExists) {
+              setIsPhoneNumberValidForReset(true);
+            } else {
+              toast({ title: "Telefone Não Encontrado", description: "O número de telefone fornecido não foi encontrado em nossos registros.", variant: "destructive", duration: 7000 });
+            }
+          }
         } else {
-          setTokenStatus('invalid');
-          toast({
-            title: "Link Inválido ou Expirado",
-            description: "O token no link é inválido ou não contém o e-mail esperado.",
-            variant: "destructive",
-            duration: 7000,
-          });
+             toast({ title: "Erro de Dados Locais", description: "Não foi possível verificar o número de telefone nos dados locais.", variant: "destructive", duration: 7000 });
         }
-      } catch (error) {
-        console.error("Erro ao decodificar token:", error);
-        setTokenStatus('invalid');
-        toast({
-          title: "Link Inválido",
-          description: "Ocorreu um erro ao processar o link de redefinição.",
-          variant: "destructive",
-          duration: 7000,
-        });
+      } catch (e) {
+        toast({ title: "Erro ao Verificar Telefone", description: "Ocorreu um problema ao verificar os dados locais.", variant: "destructive", duration: 7000 });
       }
     } else {
-      setTokenStatus('invalid');
       toast({
         title: "Link Inválido",
-        description: "Nenhum token de redefinição encontrado na URL.",
+        description: "Nenhum número de telefone encontrado na URL para redefinição.",
         variant: "destructive",
         duration: 7000,
       });
     }
   }, [searchParams, toast]);
 
+  const form = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      smsCode: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
   const onSubmit = async (data: ResetPasswordFormValues) => {
-    if (tokenStatus !== 'valid' || !userEmail) {
-      toast({ title: "Erro", description: "Não é possível redefinir a senha. Token inválido ou e-mail não identificado.", variant: "destructive" });
+    if (!isPhoneNumberValidForReset || !phoneNumberFromUrl) {
+      toast({ title: "Erro de Validação", description: "Número de telefone inválido ou não fornecido para redefinição.", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simular chamada de API
+    const verifyApiUrl = '/api/internal-sms/verify-sms-code'; // Usa o proxy para a rota de SMS
+    let rawVerifyResponseText = '';
 
     try {
+      const verifyResponse = await fetch(verifyApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumberFromUrl, code: data.smsCode }),
+      });
+
+      rawVerifyResponseText = await verifyResponse.text();
+      const verifyResult = JSON.parse(rawVerifyResponseText);
+
+      if (!verifyResponse.ok) {
+        toast({ title: "Falha na Verificação do Código", description: verifyResult.error || "Código SMS inválido ou expirado. Tente novamente.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      // Se o código SMS foi verificado, atualiza a senha no localStorage
       const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
-      let allSimulatedCredentials: any[] = [];
       if (storedCredentialsRaw) {
-        allSimulatedCredentials = JSON.parse(storedCredentialsRaw);
+        let allSimulatedCredentials: any[] = JSON.parse(storedCredentialsRaw);
         if (!Array.isArray(allSimulatedCredentials)) {
             allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean);
         }
-      }
+        const userCredentialIndex = allSimulatedCredentials.findIndex(cred => cred && cred.phone && cred.phone.replace(/[^\d]+/g, '') === phoneNumberFromUrl.replace(/[^\d]+/g, ''));
 
-      const userCredentialIndex = allSimulatedCredentials.findIndex(cred => cred && cred.email && cred.email.toLowerCase() === userEmail.toLowerCase());
-
-      if (userCredentialIndex !== -1) {
-        allSimulatedCredentials[userCredentialIndex].password = data.password;
-        localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
-        toast({
-          title: "Senha Redefinida!",
-          description: "Sua senha foi alterada com sucesso. Você pode fazer login com sua nova senha.",
-        });
-        router.push('/auth');
+        if (userCredentialIndex !== -1) {
+          allSimulatedCredentials[userCredentialIndex].password = data.password;
+          localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
+          toast({
+            title: "Senha Redefinida!",
+            description: "Sua senha foi alterada com sucesso. Você pode fazer login com sua nova senha.",
+          });
+          router.push('/auth');
+        } else {
+          // Isso não deveria acontecer se isPhoneNumberValidForReset for true, mas é uma salvaguarda
+          toast({ title: "Erro ao Redefinir", description: "Não foi possível encontrar a conta associada ao telefone para redefinir a senha.", variant: "destructive" });
+        }
       } else {
-        toast({
-          title: "Erro ao Redefinir",
-          description: "Não foi possível encontrar a conta associada para redefinir a senha. Tente solicitar um novo link.",
-          variant: "destructive",
-        });
+        toast({ title: "Erro Interno", description: "Não foi possível acessar os dados locais para atualizar a senha.", variant: "destructive" });
       }
-    } catch (error) {
-      console.error("Erro ao atualizar senha no localStorage:", error);
-      toast({
-        title: "Erro Interno",
-        description: "Ocorreu um erro ao tentar atualizar sua senha. Tente novamente.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      let errorMsg = "Ocorreu um erro ao tentar redefinir sua senha.";
+      if (error instanceof SyntaxError && rawVerifyResponseText) {
+          console.error("A resposta de verificação de código não era JSON. Resposta bruta:", rawVerifyResponseText);
+          errorMsg = `A API de verificação retornou uma resposta inesperada. Verifique os logs.`;
+      } else {
+          console.error("Erro ao chamar API de verificação de SMS ou atualizar senha:", error);
+      }
+      toast({ title: "Erro de Processamento", description: errorMsg, variant: "destructive" });
     }
     setIsLoading(false);
   };
-
-  if (tokenStatus === 'loading') {
-    return (
-        <Card className="w-full max-w-md shadow-2xl">
-            <CardHeader className="text-center">
-                <Logo className="justify-center mb-4" />
-                <CardTitle className="text-3xl">Verificando Link</CardTitle>
-                <div className="pt-4 flex justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            </CardHeader>
-            <CardContent>
-                <p className="text-center text-muted-foreground">Aguarde enquanto validamos seu link de acesso...</p>
-            </CardContent>
-             <CardFooter className="flex flex-col items-center space-y-2 text-sm text-muted-foreground pt-4">
-                <Button variant="outline" asChild className="w-full max-w-xs">
-                    <Link href="/auth">
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Acesso
-                    </Link>
-                </Button>
-            </CardFooter>
-        </Card>
-    );
-  }
 
   return (
     <Card className="w-full max-w-md shadow-2xl">
       <CardHeader className="text-center">
         <Logo className="justify-center mb-4" />
         <CardTitle className="text-3xl">Redefinir Senha</CardTitle>
-        {tokenStatus === 'invalid' && (
-          <CardDescription className="text-destructive flex items-center justify-center gap-2 pt-2">
-            <AlertTriangle className="h-4 w-4" /> Link de redefinição inválido ou expirado.
+        {!phoneNumberFromUrl || !isPhoneNumberValidForReset ? (
+          <CardDescription className="text-destructive pt-2">
+             Link inválido ou número de telefone não verificado. Por favor, solicite um novo código.
           </CardDescription>
-        )}
-        {tokenStatus === 'valid' && userEmail && (
+        ) : (
            <CardDescription className="pt-2">
-            Olá! Por favor, defina uma nova senha para a conta associada a <span className="font-semibold">{userEmail}</span>.
+            Redefinindo senha para o número de telefone: <span className="font-semibold">{phoneNumberFromUrl}</span>.
+            Insira o código SMS recebido (para teste, use "000000") e sua nova senha.
           </CardDescription>
         )}
       </CardHeader>
       <CardContent>
-        {tokenStatus === 'valid' ? (
+        {isPhoneNumberValidForReset && phoneNumberFromUrl ? (
             <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+                <FormField
+                  control={form.control}
+                  name="smsCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Código SMS</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <MessageSquare className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input placeholder="Digite o código recebido" {...field} className="pl-10" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                 control={form.control}
                 name="password"
@@ -224,10 +218,10 @@ export default function ResetPasswordPage() {
             </Form>
         ) : (
             <div className="text-center space-y-4">
-                <p>Por favor, solicite um novo link de redefinição se o atual for inválido.</p>
+                <p>Seu link de redefinição é inválido ou o número de telefone não pôde ser verificado. Por favor, solicite um novo código de verificação.</p>
                 <Button asChild className="w-full max-w-xs">
                     <Link href="/auth/forgot-password">
-                        Solicitar Novo Link
+                        Solicitar Novo Código
                     </Link>
                 </Button>
             </div>

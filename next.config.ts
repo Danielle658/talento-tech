@@ -21,16 +21,23 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     allowedDevOrigins: [
-      "http://localhost:9006", // Your current dev port
-      "https://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev", // HTTPS version for 9006
-      "http://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",  // HTTP version for 9006
+      "http://localhost:9006", 
+      "https://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev", 
+      "http://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
+      "https://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
+      "http://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
     ],
   },
   async rewrites() {
     return [
       {
         source: '/api/internal-email/:path*',
-        destination: 'http://localhost:5001/api/email/:path*', // Proxy to Express email API on port 5001
+        destination: 'http://localhost:5001/api/email/:path*', // Proxy para API de E-mail
+      },
+      {
+        source: '/api/internal-sms/:path*', // Novo proxy para rotas SMS
+        // As rotas /request-sms-code e /verify-sms-code estão dentro de /api/email no backend
+        destination: 'http://localhost:5001/api/email/:path*', 
       },
     ]
   },

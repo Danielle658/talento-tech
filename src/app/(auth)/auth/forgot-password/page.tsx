@@ -12,12 +12,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Send, Loader2, ArrowLeft } from 'lucide-react';
+import { Phone, Send, Loader2, ArrowLeft } from 'lucide-react'; // Alterado Mail para Phone
 import { Logo } from '@/components/shared/logo';
-// A constante ACCOUNT_DETAILS_BASE_STORAGE_KEY não é mais usada para verificar e-mail aqui.
+
+const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email({ message: "Por favor, insira um e-mail válido." }),
+  phone: z.string().regex(phoneRegex, { message: "Por favor, insira um número de telefone válido." }),
 });
 
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
@@ -30,15 +31,16 @@ export default function ForgotPasswordPage() {
   const form = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
-      email: "",
+      phone: "",
     },
   });
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     setIsLoading(true);
-    // A URL agora usa o proxy do Next.js
-    const apiUrl = '/api/internal-email/reset-password';
-    console.log("Tentando conectar à API de e-mail (via proxy Next.js) em:", apiUrl, " com e-mail:", data.email);
+    const apiUrl = '/api/internal-sms/request-sms-code'; // Usa o proxy para a rota de SMS
+    const phoneNumber = data.phone.replace(/[^\d]+/g, ''); // Limpa o número de telefone
+
+    console.log("Tentando solicitar código SMS (via proxy Next.js) em:", apiUrl, " para o telefone:", phoneNumber);
     let rawResponseText = '';
 
     try {
@@ -47,23 +49,16 @@ export default function ForgotPasswordPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: data.email }),
+        body: JSON.stringify({ phone: phoneNumber }),
       });
 
       rawResponseText = await response.text();
+      const result = JSON.parse(rawResponseText);
 
       if (!response.ok) {
-        let errorMsg = `A API retornou um erro: ${response.statusText || response.status}. Verifique os logs do servidor 'email-api' (porta 5001).`;
-        try {
-          const errorResult = JSON.parse(rawResponseText);
-          errorMsg = errorResult.error || errorMsg;
-        } catch (jsonParseError) {
-          console.error("A resposta de erro da API não era JSON. Resposta bruta:", rawResponseText);
-          errorMsg = `A API retornou uma resposta inesperada (status ${response.status}). Verifique se o servidor 'email-api' na porta 5001 está rodando e acessível pelo servidor Next.js. Resposta: ${rawResponseText.substring(0,100)}... Se estiver em ambiente de desenvolvimento remoto, pode ser necessário configurar encaminhamento de porta ou usar uma URL pública para a API de e-mail.`;
-        }
         toast({
-            title: "Erro ao Solicitar Link de Acesso",
-            description: errorMsg,
+            title: "Erro ao Solicitar Código SMS",
+            description: result.error || `A API retornou um erro: ${response.statusText || response.status}. Verifique os logs do servidor 'email-api' (porta 5001).`,
             variant: "destructive",
             duration: 15000,
           });
@@ -71,22 +66,29 @@ export default function ForgotPasswordPage() {
         return;
       }
       
-      // A API de email é responsável por verificar a existência do e-mail.
-      // O frontend apenas informa o usuário sobre a tentativa de envio.
       toast({
-        title: "Solicitação Enviada",
-        description: `Se o e-mail ${data.email} estiver associado a uma empresa registrada e o serviço de e-mail estiver configurado corretamente, um link de acesso será enviado. Verifique sua caixa de entrada e spam.`,
+        title: "Solicitação de Código SMS Enviada",
+        description: result.message || `Se o número ${data.phone} estiver associado a uma empresa registrada, um código SMS será enviado (simulado).`,
         duration: 10000,
       });
       form.reset();
+      // Redireciona para a página de reset com o telefone como parâmetro
+      router.push(`/auth/reset-password?phone=${encodeURIComponent(phoneNumber)}`);
     } catch (error: any) {
-      console.error("Erro de rede ao chamar API de recuperação de senha (via proxy):", error, "Resposta bruta (se houver):", rawResponseText);
-      toast({
-        title: "Falha na Conexão com API de E-mail",
-        description: `Não foi possível conectar à API de e-mail através do proxy Next.js. Verifique se o servidor 'email-api' (porta 5001) está online e se o servidor Next.js pode alcançá-lo. Detalhes: ${error.message}. Se estiver em ambiente de desenvolvimento remoto, pode ser necessário configurar encaminhamento de porta ou usar uma URL pública para a API de e-mail.`,
-        variant: "destructive",
-        duration: 15000,
-      });
+        let errorMsg = "Falha na Conexão com API de SMS. Verifique os logs do servidor Next.js e 'email-api'.";
+        if (error instanceof SyntaxError && rawResponseText) {
+            console.error("A resposta de erro da API não era JSON. Resposta bruta:", rawResponseText);
+            errorMsg = `A API retornou uma resposta inesperada. Resposta: ${rawResponseText.substring(0,200)}...`;
+        } else {
+            console.error("Erro de rede ao chamar API de solicitação de SMS (via proxy):", error, "Resposta bruta (se houver):", rawResponseText);
+            errorMsg = `Não foi possível conectar à API de SMS através do proxy Next.js. Verifique se o servidor 'email-api' (porta 5001) está online e se o servidor Next.js pode alcançá-lo. Detalhes: ${error.message}.`;
+        }
+        toast({
+            title: "Falha na Conexão",
+            description: errorMsg + " Se estiver em ambiente de desenvolvimento remoto, pode ser necessário configurar encaminhamento de porta ou usar uma URL pública para a API de SMS.",
+            variant: "destructive",
+            duration: 15000,
+        });
     }
     setIsLoading(false);
   };
@@ -96,21 +98,21 @@ export default function ForgotPasswordPage() {
       <CardHeader className="text-center">
         <Logo className="justify-center mb-4" />
         <CardTitle className="text-3xl">Recuperar Acesso</CardTitle>
-        <CardDescription>Insira o e-mail associado à sua empresa para receber um link de acesso.</CardDescription>
+        <CardDescription>Insira o número de telefone associado à sua empresa para receber um código SMS de verificação.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
             <FormField
               control={form.control}
-              name="email"
+              name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>E-mail da Empresa</FormLabel>
+                  <FormLabel>Número de Telefone da Empresa</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input placeholder="seu@email.com" {...field} className="pl-10" />
+                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input placeholder="(XX) 9XXXX-XXXX" {...field} className="pl-10" />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -119,12 +121,17 @@ export default function ForgotPasswordPage() {
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              Enviar Link de Acesso
+              Enviar Código SMS
             </Button>
           </form>
         </Form>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2 text-sm text-muted-foreground pt-4">
+         <p>Lembrou sua senha?{' '}
+          <Link href="/auth" className="font-medium text-primary hover:underline">
+            Fazer Login
+          </Link>
+        </p>
         <Button variant="outline" asChild className="w-full max-w-xs">
             <Link href="/auth">
                 <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Acesso

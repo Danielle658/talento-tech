@@ -1,5 +1,6 @@
 
 export const ACCOUNT_DETAILS_BASE_STORAGE_KEY = "moneywise-accountDetails";
+// Agora armazena um array de objetos: { companyName: string, email: string, password?: string, phone?: string, status?: string }
 export const SIMULATED_CREDENTIALS_STORAGE_KEY = "moneywise-simulatedCredentials";
 export const REMEMBERED_COMPANY_NAME_KEY = "moneywise-rememberedCompanyName";
 export const AUTH_STATUS_KEY = "moneywise-auth";
@@ -13,13 +14,8 @@ export const STORAGE_KEY_SALES_RECORD_BASE = "moneywise-salesHistory";
 
 export function getCompanySpecificKey(baseKey: string, companyName: string | null): string | null {
   if (!companyName) {
-    // console.warn(`Attempted to get company specific key for baseKey "${baseKey}" without a companyName.`);
     return null;
   }
-  // Limpar e normalizar o companyName para usar como parte da chave
-  // Removendo espaços e convertendo para minúsculas pode ser uma boa prática,
-  // mas para manter a compatibilidade com o login que usa o nome exato, vamos usar o nome como está.
-  // Apenas substituímos espaços por underscores para segurança da chave.
   const sanitizedCompanyName = companyName.replace(/\s+/g, '_');
   return `${baseKey}_${sanitizedCompanyName}`;
 }
