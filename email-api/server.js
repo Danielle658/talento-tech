@@ -1,5 +1,17 @@
 
-require('dotenv').config();
+require('dotenv').config(); // DEVE SER A PRIMEIRA LINHA
+
+// Logs de diagnóstico para verificar se as variáveis de ambiente foram carregadas
+console.log('[email-api] Diagnóstico do .env:');
+console.log('[email-api] SMTP_HOST:', process.env.SMTP_HOST);
+console.log('[email-api] SMTP_PORT:', process.env.SMTP_PORT);
+console.log('[email-api] SMTP_USER:', process.env.SMTP_USER ? 'Definido (não exibir)' : 'NÃO DEFINIDO ou vazio');
+console.log('[email-api] SMTP_PASS:', process.env.SMTP_PASS ? 'Definido (não exibir)' : 'NÃO DEFINIDO ou vazio');
+console.log('[email-api] JWT_SECRET:', process.env.JWT_SECRET ? 'Definido (não exibir)' : 'NÃO DEFINIDO ou vazio');
+console.log('[email-api] CLIENT_URL:', process.env.CLIENT_URL);
+console.log('[email-api] PORT (do .env):', process.env.PORT);
+
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -30,6 +42,5 @@ app.use((err, req, res, next) => {
 });
 
 
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Servidor EMAIL-API rodando na porta ${PORT}`));
-
+const PORT_FROM_ENV = process.env.PORT || 5001; // Usa a variável PORT do .env ou 5001 como padrão
+app.listen(PORT_FROM_ENV, () => console.log(`Servidor EMAIL-API rodando na porta ${PORT_FROM_ENV}`));
