@@ -34,11 +34,11 @@ const nextConfig: NextConfig = {
         source: '/api/internal-email/:path*',
         destination: 'http://localhost:5001/api/email/:path*', // Proxy para API de E-mail
       },
-      {
-        source: '/api/internal-sms/:path*', // Novo proxy para rotas SMS
-        // As rotas /request-sms-code e /verify-sms-code estão dentro de /api/email no backend
-        destination: 'http://localhost:5001/api/email/:path*', 
-      },
+      // Removido proxy para rotas SMS
+      // {
+      //   source: '/api/internal-sms/:path*', 
+      //   destination: 'http://localhost:5001/api/email/:path*', 
+      // },
     ]
   },
 };

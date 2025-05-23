@@ -45,43 +45,8 @@ router.post('/notify', async (req, res) => {
   }
 });
 
-// Rota para solicitar código SMS (simulado)
-router.post('/request-sms-code', async (req, res) => {
-  console.log('[email-api] Rota /request-sms-code chamada.');
-  const { phone } = req.body;
-  if (!phone) {
-    console.error('[email-api] Erro: Número de telefone não fornecido para solicitar código SMS.');
-    return res.status(400).json({ error: 'Número de telefone é obrigatório.' });
-  }
-  // SIMULAÇÃO: Em um sistema real, aqui você chamaria um gateway de SMS.
-  console.log(`[email-api] SIMULAÇÃO: Código SMS solicitado para o telefone: ${phone}. (Nenhum SMS real será enviado)`);
-  // Por segurança, não confirme se o número está cadastrado ou não diretamente na resposta.
-  res.status(200).json({ message: 'Se o número estiver cadastrado, um código SMS (simulado) será considerado enviado.' });
-});
-
-// Rota para verificar código SMS (simulação removida do código fixo)
-router.post('/verify-sms-code', async (req, res) => {
-  console.log('[email-api] Rota /verify-sms-code chamada.');
-  const { phone, code } = req.body;
-
-  if (!phone || !code) {
-    console.error('[email-api] Erro: Telefone ou código não fornecido para verificação SMS.');
-    return res.status(400).json({ error: 'Telefone e código são obrigatórios.' });
-  }
-  console.log(`[email-api] Tentativa de verificação de SMS para telefone: ${phone} com código: ${code}.`);
-
-  // SIMULAÇÃO REMOVIDA: Em um sistema real, aqui você validaria o código contra um valor gerado e armazenado.
-  // Para remover a simulação do "código mágico", vamos apenas aceitar qualquer código fornecido (não vazio).
-  // Isso não é seguro para produção, mas remove a necessidade de digitar "000000".
-  if (code && code.trim() !== "") {
-    console.log(`[email-api] SIMULAÇÃO DE PROTÓTIPO: Código SMS "${code}" aceito para o telefone: ${phone} (verificação real não implementada).`);
-    // Em um sistema real, você poderia gerar um token temporário aqui para autorizar a redefinição de senha.
-    res.status(200).json({ message: 'Código SMS verificado com sucesso (simulado).' });
-  } else {
-    // Esta parte não deveria ser alcançada se a validação acima for suficiente.
-    console.log(`[email-api] SIMULAÇÃO DE PROTÓTIPO: Código SMS "${code}" considerado INVÁLIDO para o telefone: ${phone}.`);
-    res.status(400).json({ error: 'Código SMS inválido ou expirado (simulado).' });
-  }
-});
+// Rotas SMS removidas
+// router.post('/request-sms-code', async (req, res) => { ... });
+// router.post('/verify-sms-code', async (req, res) => { ... });
 
 module.exports = router;
