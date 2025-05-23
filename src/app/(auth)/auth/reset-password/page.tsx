@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { KeyRound, Loader2, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants'; // Importar a chave
+import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants';
 
 const resetPasswordSchema = z.object({
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
@@ -33,15 +33,17 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isValidTokenForDisplay, setIsValidTokenForDisplay] = useState(false);
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
     if (tokenFromUrl) {
       setToken(tokenFromUrl);
+      setIsValidTokenForDisplay(true); // Assume token is valid for display purposes
       // Em um aplicativo real, você faria uma chamada de API aqui para validar o token
-      // Por agora, apenas verificamos se ele existe.
     } else {
       setError("Token de redefinição inválido ou ausente. Solicite um novo link de recuperação.");
+      setIsValidTokenForDisplay(false);
       toast({
         title: "Token Inválido",
         description: "O link de redefinição de senha é inválido ou expirou.",
@@ -73,32 +75,30 @@ export default function ResetPasswordPage() {
     console.log("Tentando redefinir senha com token:", token, "e nova senha:", data.password);
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simula chamada de API
 
-    // SIMULAÇÃO: Atualiza a senha no localStorage
-    // IMPORTANTE: Em um aplicativo real, esta lógica estaria no backend e atualizaria um banco de dados.
-    // Armazenar senhas, mesmo para simulação, no localStorage NÃO É SEGURO PARA PRODUÇÃO.
     try {
       const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
       if (storedCredentialsRaw) {
         const storedCredentials = JSON.parse(storedCredentialsRaw);
-        // Assume que o token validaria qual conta deve ter a senha alterada.
-        // Para esta simulação, vamos assumir que as credenciais salvas (companyName)
-        // correspondem ao "usuário" cujo token foi enviado, embora não tenhamos o email do token aqui.
-        // Esta é uma simplificação para o propósito da simulação.
+        // Em uma aplicação real, o backend validaria o token e encontraria o usuário associado.
+        // Aqui, simplesmente atualizamos as credenciais simuladas existentes.
         storedCredentials.password = data.password;
         localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(storedCredentials));
         console.log("Simulação: Senha atualizada no localStorage para:", storedCredentials.companyName);
+        toast({ 
+          title: "Senha Redefinida!", 
+          description: "Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova senha.",
+          duration: 5000,
+        });
+        form.reset();
+        router.push('/auth'); 
       } else {
-        // Isso não deveria acontecer se o usuário se registrou e está tentando redefinir
-        // a menos que o localStorage tenha sido limpo.
         console.warn("Nenhuma credencial simulada encontrada no localStorage para atualizar a senha.");
         toast({
             title: "Erro na Redefinição (Simulação)",
-            description: "Não foram encontradas credenciais locais para atualizar. Por favor, registre-se primeiro.",
+            description: "Não foram encontradas credenciais locais para atualizar. Por favor, registre-se primeiro ou solicite um novo link se o e-mail estiver correto.",
             variant: "destructive",
         });
-        setIsLoading(false);
-        router.push('/auth/register'); // Redireciona para registro se não há credenciais
-        return;
+         // Não redireciona aqui, permite ao usuário ver a mensagem de erro.
       }
     } catch (e) {
       console.error("Erro ao tentar atualizar senha simulada no localStorage:", e);
@@ -107,19 +107,9 @@ export default function ResetPasswordPage() {
         description: "Não foi possível atualizar a senha armazenada localmente. Esta é uma etapa de simulação.",
         variant: "destructive",
       });
-      setIsLoading(false);
-      return;
     }
     
-    toast({ 
-      title: "Senha Redefinida!", 
-      description: "Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova senha.",
-      duration: 5000,
-    });
-    
     setIsLoading(false);
-    form.reset();
-    router.push('/auth'); 
   };
 
   return (
@@ -127,16 +117,22 @@ export default function ResetPasswordPage() {
       <CardHeader className="text-center">
         <Logo className="justify-center mb-4" />
         <CardTitle className="text-3xl">Definir Nova Senha</CardTitle>
-        {error ? (
-          <CardDescription className="text-destructive flex items-center justify-center gap-2">
+        {error && (
+          <CardDescription className="text-destructive flex items-center justify-center gap-2 pt-2">
             <AlertTriangle className="h-4 w-4" /> {error}
           </CardDescription>
-        ) : (
-          <CardDescription>Crie uma nova senha para sua conta.</CardDescription>
+        )}
+        {isValidTokenForDisplay && !error && (
+           <CardDescription className="pt-2">
+            Você está redefinindo a senha usando um link de recuperação. Por favor, crie uma nova senha abaixo.
+          </CardDescription>
+        )}
+         {!isValidTokenForDisplay && !error && (
+          <CardDescription className="pt-2">Verificando link de redefinição...</CardDescription>
         )}
       </CardHeader>
       <CardContent>
-        {token && !error ? (
+        {isValidTokenForDisplay && !error ? (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
               <FormField

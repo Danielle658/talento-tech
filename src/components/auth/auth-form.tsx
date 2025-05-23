@@ -50,7 +50,7 @@ export function AuthForm() {
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 500)); 
 
     let loginSuccessful = false;
     try {
@@ -81,6 +81,8 @@ export function AuthForm() {
         description: "Nome da empresa ou senha incorretos. Verifique seus dados.",
         variant: "destructive",
       });
+      // Limpa apenas o campo de senha após tentativa falha
+      loginForm.setValue("password", "");
     }
     setIsLoading(false);
   };
