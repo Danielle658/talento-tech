@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { Building2, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
+import { Building2, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
 import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, SIMULATED_CREDENTIALS_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
 
@@ -57,7 +57,12 @@ const registerSchema = z.object({
     .min(11, { message: "CPF deve ter 11 dígitos." })
     .max(14, { message: "CPF inválido."})
     .refine(value => isValidCPF(value.replace(/[^\d]+/g, '')), { message: "CPF inválido." }),
+  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
+  confirmPassword: z.string(),
   privacyTerms: z.boolean().refine(val => val === true, { message: "Você deve aceitar os termos de privacidade." }),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "As senhas não coincidem.",
+  path: ["confirmPassword"], // Atribui o erro ao campo confirmPassword
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -75,6 +80,8 @@ export default function RegisterPage() {
       email: "",
       phone: "",
       cpf: "",
+      password: "",
+      confirmPassword: "",
       privacyTerms: false,
     },
   });
@@ -94,10 +101,11 @@ export default function RegisterPage() {
       profilePictureDataUri: "", 
     };
 
-    // Simulate marking company as "registered"
-    const companyRegistrationData = {
+    const simulatedCredential = {
       companyName: data.companyName,
-      status: "registered", // No password stored
+      email: data.email, // Salvar e-mail para redefinição de senha
+      password: data.password, // Salvar a senha para simulação
+      status: "registered",
     };
 
     try {
@@ -111,23 +119,21 @@ export default function RegisterPage() {
         try {
             allSimulatedCredentials = JSON.parse(existingCredsRaw);
             if (!Array.isArray(allSimulatedCredentials)) {
-                allSimulatedCredentials = [allSimulatedCredentials];
+                allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean); // Garante que seja um array e remove nulos
             }
         } catch (e) {
              allSimulatedCredentials = [];
         }
       }
       
-      const companyExists = allSimulatedCredentials.some(cred => cred.companyName === data.companyName);
-      if (!companyExists) {
-          allSimulatedCredentials.push(companyRegistrationData);
+      const companyIndex = allSimulatedCredentials.findIndex(cred => cred && cred.companyName === data.companyName);
+      if (companyIndex !== -1) {
+        // Atualiza as credenciais se a empresa já existir
+        allSimulatedCredentials[companyIndex] = simulatedCredential;
       } else {
-        // If company "re-registers", update its registration status (though no password to update here)
-        const existingIndex = allSimulatedCredentials.findIndex(cred => cred.companyName === data.companyName);
-        allSimulatedCredentials[existingIndex] = companyRegistrationData;
+        allSimulatedCredentials.push(simulatedCredential);
       }
       localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
-
 
       toast({ title: "Registro bem-sucedido!", description: "Sua empresa foi registrada. Você pode acessar seus dados agora." });
       registerForm.reset();
@@ -234,6 +240,38 @@ export default function RegisterPage() {
                 )}
               />
             </div>
+             <FormField
+                control={registerForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input type="password" placeholder="Crie uma senha" {...field} className="pl-10" />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={registerForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Senha</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input type="password" placeholder="Confirme sua senha" {...field} className="pl-10" />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <FormField
               control={registerForm.control}
               name="privacyTerms"

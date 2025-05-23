@@ -15,12 +15,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, Loader2, Building2 } from 'lucide-react'; // Removido KeyRound
+import { LogIn, Loader2, Building2, KeyRound } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
 import { SIMULATED_CREDENTIALS_STORAGE_KEY, REMEMBERED_COMPANY_NAME_KEY } from '@/lib/constants';
 
 const loginSchema = z.object({
   companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
+  password: z.string().min(1, { message: "Senha é obrigatória." }),
   rememberMe: z.boolean().default(false).optional(),
 });
 
@@ -34,7 +35,7 @@ export function AuthForm() {
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { companyName: "", rememberMe: false },
+    defaultValues: { companyName: "", password: "", rememberMe: false },
   });
 
   useEffect(() => {
@@ -51,17 +52,13 @@ export function AuthForm() {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500)); 
 
-    let companyIsRegistered = false;
+    let companyCredential = null;
     try {
       const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
       if (storedCredentialsRaw) {
-        const allSimulatedCredentials = JSON.parse(storedCredentialsRaw);
-        // Verifica se é um array ou um objeto único (para compatibilidade com versões anteriores)
+        const allSimulatedCredentials: any[] = JSON.parse(storedCredentialsRaw);
         if (Array.isArray(allSimulatedCredentials)) {
-            companyIsRegistered = allSimulatedCredentials.some(cred => cred.companyName === data.companyName && cred.status === "registered");
-        } else if (typeof allSimulatedCredentials === 'object' && allSimulatedCredentials !== null) {
-            // Lógica para objeto único (se aplicável no seu histórico de desenvolvimento)
-            companyIsRegistered = allSimulatedCredentials.companyName === data.companyName && allSimulatedCredentials.status === "registered";
+            companyCredential = allSimulatedCredentials.find(cred => cred && cred.companyName === data.companyName);
         }
       }
     } catch (error) {
@@ -71,9 +68,11 @@ export function AuthForm() {
         description: "Não foi possível verificar os dados da empresa. Tente novamente.",
         variant: "destructive",
       });
+      setIsLoading(false);
+      return;
     }
 
-    if (companyIsRegistered) {
+    if (companyCredential && companyCredential.password === data.password) {
       login(data.companyName); 
       toast({ title: "Acesso Permitido!", description: `Acessando dados da empresa ${data.companyName}.` });
 
@@ -86,9 +85,10 @@ export function AuthForm() {
     } else {
       toast({
         title: "Falha no Acesso",
-        description: "Empresa não encontrada ou não registrada. Verifique o nome ou cadastre sua empresa.",
+        description: "Nome da empresa ou senha incorretos. Verifique os dados ou cadastre sua empresa.",
         variant: "destructive",
       });
+      loginForm.setValue("password", ""); // Limpa o campo de senha
     }
     setIsLoading(false);
   };
@@ -119,6 +119,22 @@ export function AuthForm() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={loginForm.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Senha</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input type="password" placeholder="Digite sua senha" {...field} className="pl-10" />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <div className="flex items-center justify-between">
               <FormField
                 control={loginForm.control}
@@ -135,7 +151,7 @@ export function AuthForm() {
               <Link href="/auth/forgot-password"
                 className="text-sm text-primary hover:underline"
               >
-                Problemas com acesso?
+                Esqueceu a senha?
               </Link>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
