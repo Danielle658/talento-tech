@@ -18,17 +18,19 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendPasswordResetEmail(email) {
-  const token = generateResetToken(email); // Pode lançar erro se JWT_SECRET não estiver definido
+  try {
+    // Mover a geração do token para dentro do try...catch
+    const token = generateResetToken(email); // Pode lançar erro se JWT_SECRET não estiver definido
 
-  // Ajustado para corresponder à rota do frontend do Next.js
-  // Adiciona o e-mail ao link para que a página de reset possa pré-preenchê-lo
-  const resetLink = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+    // Ajustado para corresponder à rota do frontend do Next.js
+    // Adiciona o e-mail ao link para que a página de reset possa pré-preenchê-lo
+    const resetLink = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
-  const mailOptions = {
-    from: `"Suporte MoneyWise" <${process.env.SMTP_USER}>`, // Mantido o nome mais descritivo
-    to: email,
-    subject: 'Recuperação de Senha - MoneyWise', // Mantido o assunto mais descritivo
-    html: `
+    const mailOptions = {
+      from: `"Suporte MoneyWise" <${process.env.SMTP_USER}>`, // Mantido o nome mais descritivo
+      to: email,
+      subject: 'Recuperação de Senha - MoneyWise', // Mantido o assunto mais descritivo
+      html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2 style="color: #556B2F;">Recuperação de Senha</h2>
         <p>Olá,</p>
@@ -47,14 +49,14 @@ async function sendPasswordResetEmail(email) {
         <p>Equipe MoneyWise</p>
       </div>
     `, // Mantido o HTML mais rico
-  };
+    };
 
-  try {
     const info = await transporter.sendMail(mailOptions);
     console.log('[emailService] E-mail de redefinição enviado: %s para %s', info.messageId, email);
   } catch (error) {
-    console.error('[emailService] Erro ao enviar e-mail de redefinição:', error);
-    throw new Error('Não foi possível enviar o e-mail de redefinição.');
+    console.error('[emailService] Erro ao enviar e-mail de redefinição:', error.message, error.stack);
+    // Relançar o erro para que a rota possa tratá-lo e enviar uma resposta JSON
+    throw new Error(error.message || 'Não foi possível enviar o e-mail de redefinição.');
   }
 }
 
@@ -78,8 +80,8 @@ async function sendNotificationEmail(to, subject, message) {
     const info = await transporter.sendMail(mailOptions);
     console.log('[emailService] E-mail de notificação enviado: %s para %s', info.messageId, to);
   } catch (error) {
-    console.error('[emailService] Erro ao enviar e-mail de notificação:', error);
-    throw new Error('Não foi possível enviar o e-mail de notificação.');
+    console.error('[emailService] Erro ao enviar e-mail de notificação:', error.message, error.stack);
+    throw new Error(error.message || 'Não foi possível enviar o e-mail de notificação.');
   }
 }
 
