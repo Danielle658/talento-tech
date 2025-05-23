@@ -15,13 +15,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { KeyRound, LogIn, Loader2, Building2 } from 'lucide-react';
+import { LogIn, Loader2, Building2 } from 'lucide-react'; // Removido KeyRound
 import { Logo } from '@/components/shared/logo';
 import { SIMULATED_CREDENTIALS_STORAGE_KEY, REMEMBERED_COMPANY_NAME_KEY } from '@/lib/constants';
 
 const loginSchema = z.object({
   companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
-  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   rememberMe: z.boolean().default(false).optional(),
 });
 
@@ -35,7 +34,7 @@ export function AuthForm() {
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { companyName: "", password: "", rememberMe: false },
+    defaultValues: { companyName: "", rememberMe: false },
   });
 
   useEffect(() => {
@@ -52,27 +51,31 @@ export function AuthForm() {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500)); 
 
-    let loginSuccessful = false;
+    let companyIsRegistered = false;
     try {
       const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
       if (storedCredentialsRaw) {
-        const storedCredentials = JSON.parse(storedCredentialsRaw);
-        if (storedCredentials.companyName === data.companyName && storedCredentials.password === data.password) {
-          loginSuccessful = true;
+        const allSimulatedCredentials = JSON.parse(storedCredentialsRaw);
+        // Verifica se é um array ou um objeto único (para compatibilidade com versões anteriores)
+        if (Array.isArray(allSimulatedCredentials)) {
+            companyIsRegistered = allSimulatedCredentials.some(cred => cred.companyName === data.companyName && cred.status === "registered");
+        } else if (typeof allSimulatedCredentials === 'object' && allSimulatedCredentials !== null) {
+            // Lógica para objeto único (se aplicável no seu histórico de desenvolvimento)
+            companyIsRegistered = allSimulatedCredentials.companyName === data.companyName && allSimulatedCredentials.status === "registered";
         }
       }
     } catch (error) {
-      console.error("Error reading simulated credentials from localStorage:", error);
+      console.error("Erro ao ler credenciais simuladas do localStorage:", error);
       toast({
-        title: "Erro ao Verificar Credenciais",
-        description: "Não foi possível verificar suas credenciais. Tente novamente.",
+        title: "Erro ao Verificar Empresa",
+        description: "Não foi possível verificar os dados da empresa. Tente novamente.",
         variant: "destructive",
       });
     }
 
-    if (loginSuccessful) {
-      login(data.companyName); // Pass companyName to login context
-      toast({ title: "Login bem-sucedido!", description: "Redirecionando para o painel." });
+    if (companyIsRegistered) {
+      login(data.companyName); 
+      toast({ title: "Acesso Permitido!", description: `Acessando dados da empresa ${data.companyName}.` });
 
       if (data.rememberMe) {
         localStorage.setItem(REMEMBERED_COMPANY_NAME_KEY, data.companyName);
@@ -82,11 +85,10 @@ export function AuthForm() {
       router.push('/dashboard');
     } else {
       toast({
-        title: "Falha no Login",
-        description: "Nome da empresa ou senha incorretos. Verifique seus dados.",
+        title: "Falha no Acesso",
+        description: "Empresa não encontrada ou não registrada. Verifique o nome ou cadastre sua empresa.",
         variant: "destructive",
       });
-      loginForm.setValue("password", "");
     }
     setIsLoading(false);
   };
@@ -96,7 +98,7 @@ export function AuthForm() {
       <CardHeader className="text-center">
         <Logo className="justify-center mb-4" />
         <CardTitle className="text-3xl">Bem-vindo!</CardTitle>
-        <CardDescription>Acesse sua conta para continuar.</CardDescription>
+        <CardDescription>Acesse os dados da sua empresa.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...loginForm}>
@@ -117,22 +119,6 @@ export function AuthForm() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={loginForm.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Senha</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input type="password" placeholder="********" {...field} className="pl-10" />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <div className="flex items-center justify-between">
               <FormField
                 control={loginForm.control}
@@ -142,24 +128,24 @@ export function AuthForm() {
                     <FormControl>
                       <Checkbox checked={field.value} onCheckedChange={field.onChange} id="rememberMe-login" />
                     </FormControl>
-                    <FormLabel htmlFor="rememberMe-login" className="font-normal">Lembrar-me</FormLabel>
+                    <FormLabel htmlFor="rememberMe-login" className="font-normal">Lembrar nome da empresa</FormLabel>
                   </FormItem>
                 )}
               />
               <Link href="/auth/forgot-password"
                 className="text-sm text-primary hover:underline"
               >
-                Esqueceu a senha?
+                Problemas com acesso?
               </Link>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-              Entrar
+              Acessar Dados
             </Button>
           </form>
         </Form>
         <div className="mt-6 text-center text-sm">
-          Não tem uma conta?{' '}
+          Não possui uma empresa registrada?{' '}
           <Link href="/auth/register" className="font-medium text-primary hover:underline">
             Cadastre-se
           </Link>

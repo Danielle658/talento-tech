@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { Building2, KeyRound, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
+import { Building2, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
 import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, SIMULATED_CREDENTIALS_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
 
@@ -57,12 +57,7 @@ const registerSchema = z.object({
     .min(11, { message: "CPF deve ter 11 dígitos." })
     .max(14, { message: "CPF inválido."})
     .refine(value => isValidCPF(value.replace(/[^\d]+/g, '')), { message: "CPF inválido." }),
-  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
-  confirmPassword: z.string(),
   privacyTerms: z.boolean().refine(val => val === true, { message: "Você deve aceitar os termos de privacidade." }),
-}).refine(data => data.password === data.confirmPassword, {
-  message: "As senhas não coincidem.",
-  path: ["confirmPassword"],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -80,8 +75,6 @@ export default function RegisterPage() {
       email: "",
       phone: "",
       cpf: "",
-      password: "",
-      confirmPassword: "",
       privacyTerms: false,
     },
   });
@@ -101,48 +94,46 @@ export default function RegisterPage() {
       profilePictureDataUri: "", 
     };
 
-    // For login simulation, we store credentials globally for now,
-    // or you could namespace this too if simulating multiple distinct registered companies.
-    const simulatedCredentials = {
+    // Simulate marking company as "registered"
+    const companyRegistrationData = {
       companyName: data.companyName,
-      password: data.password,
+      status: "registered", // No password stored
     };
 
     try {
       if (companySpecificAccountDetailsKey) {
         localStorage.setItem(companySpecificAccountDetailsKey, JSON.stringify(accountDetailsToStore));
       }
-      // Check if SIMULATED_CREDENTIALS_STORAGE_KEY already exists and if it's an array.
-      // This part is a simplification. A real app would have a backend user database.
+      
       let allSimulatedCredentials = [];
       const existingCredsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
       if (existingCredsRaw) {
         try {
             allSimulatedCredentials = JSON.parse(existingCredsRaw);
             if (!Array.isArray(allSimulatedCredentials)) {
-                allSimulatedCredentials = [allSimulatedCredentials]; // Convert to array if it's a single object
+                allSimulatedCredentials = [allSimulatedCredentials];
             }
         } catch (e) {
-             allSimulatedCredentials = []; // Reset if parsing fails
+             allSimulatedCredentials = [];
         }
       }
-      // Avoid duplicate company registrations in the simulated global list
+      
       const companyExists = allSimulatedCredentials.some(cred => cred.companyName === data.companyName);
       if (!companyExists) {
-          allSimulatedCredentials.push(simulatedCredentials);
+          allSimulatedCredentials.push(companyRegistrationData);
       } else {
-        // Optionally update password if company re-registers - for this simulation, we'll just ensure it exists
+        // If company "re-registers", update its registration status (though no password to update here)
         const existingIndex = allSimulatedCredentials.findIndex(cred => cred.companyName === data.companyName);
-        allSimulatedCredentials[existingIndex] = simulatedCredentials;
+        allSimulatedCredentials[existingIndex] = companyRegistrationData;
       }
-      localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials.length === 1 && !companyExists ? simulatedCredentials : allSimulatedCredentials));
+      localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
 
 
-      toast({ title: "Registro bem-sucedido!", description: "Você pode fazer login agora. Seus dados foram salvos." });
+      toast({ title: "Registro bem-sucedido!", description: "Sua empresa foi registrada. Você pode acessar seus dados agora." });
       registerForm.reset();
       router.push('/auth');
     } catch (error) {
-      console.error("Failed to save account details or credentials to localStorage", error);
+      console.error("Falha ao salvar detalhes da conta ou credenciais simuladas no localStorage", error);
       toast({ title: "Erro no Registro", description: "Não foi possível salvar os detalhes da conta localmente.", variant: "destructive" });
     }
     
@@ -154,7 +145,7 @@ export default function RegisterPage() {
       <CardHeader className="text-center">
         <Logo className="justify-center mb-4" />
         <CardTitle className="text-3xl">Crie sua Conta</CardTitle>
-        <CardDescription>Preencha os campos abaixo para se registrar no MoneyWise.</CardDescription>
+        <CardDescription>Preencha os campos abaixo para registrar sua empresa no MoneyWise.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...registerForm}>
@@ -245,38 +236,6 @@ export default function RegisterPage() {
             </div>
             <FormField
               control={registerForm.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Senha</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input type="password" placeholder="Crie uma senha forte" {...field} className="pl-10" />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={registerForm.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirmar Senha</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input type="password" placeholder="Confirme sua senha" {...field} className="pl-10" />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={registerForm.control}
               name="privacyTerms"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 pt-2">
@@ -294,21 +253,21 @@ export default function RegisterPage() {
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-              Registrar
+              Registrar Empresa
             </Button>
           </form>
         </Form>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2 text-sm text-muted-foreground pt-4">
         <p>
-          Já possui uma conta?{' '}
+          Já possui uma conta/empresa registrada?{' '}
           <Link href="/auth" className="font-medium text-primary hover:underline">
-            Faça login
+            Acessar
           </Link>
         </p>
         <Button variant="outline" asChild className="w-full max-w-xs">
             <Link href="/auth">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Login
+                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Acesso
             </Link>
         </Button>
       </CardFooter>
