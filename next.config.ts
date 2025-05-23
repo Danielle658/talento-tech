@@ -23,9 +23,7 @@ const nextConfig: NextConfig = {
     allowedDevOrigins: [
       "http://localhost:9006", 
       "https://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev", 
-      "http://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
-      "https://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
-      "http://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
+      "http://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev"
     ],
   },
   async rewrites() {
@@ -34,11 +32,6 @@ const nextConfig: NextConfig = {
         source: '/api/internal-email/:path*',
         destination: 'http://localhost:5001/api/email/:path*', // Proxy para API de E-mail
       },
-      // Removido proxy para rotas SMS
-      // {
-      //   source: '/api/internal-sms/:path*', 
-      //   destination: 'http://localhost:5001/api/email/:path*', 
-      // },
     ]
   },
 };
