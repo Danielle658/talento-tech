@@ -15,8 +15,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
-import { KeyRound, LogIn, Loader2, Building2 } from 'lucide-react'; // Added Building2, removed Mail
+import { KeyRound, LogIn, Loader2, Building2 } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
+import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants';
 
 const loginSchema = z.object({
   companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
@@ -39,12 +40,33 @@ export function AuthForm() {
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log("Login data:", data); // Now logs companyName
-    login(); // Mock login
-    toast({ title: "Login bem-sucedido!", description: "Redirecionando para o painel." });
-    router.push('/dashboard');
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call delay
+
+    let loginSuccessful = false;
+    try {
+      const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
+      if (storedCredentialsRaw) {
+        const storedCredentials = JSON.parse(storedCredentialsRaw);
+        if (storedCredentials.companyName === data.companyName && storedCredentials.password === data.password) {
+          loginSuccessful = true;
+        }
+      }
+    } catch (error) {
+      console.error("Error reading simulated credentials from localStorage:", error);
+      // Potentially toast an error about data corruption if desired, but for login, just fail silently or with generic error
+    }
+
+    if (loginSuccessful) {
+      login(); // This sets the main auth flag
+      toast({ title: "Login bem-sucedido!", description: "Redirecionando para o painel." });
+      router.push('/dashboard');
+    } else {
+      toast({
+        title: "Falha no Login",
+        description: "Nome da empresa ou senha incorretos. Verifique seus dados.",
+        variant: "destructive",
+      });
+    }
     setIsLoading(false);
   };
 

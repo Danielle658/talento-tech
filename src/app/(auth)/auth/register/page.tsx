@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { Building2, KeyRound, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; // Importar a chave
+import { ACCOUNT_DETAILS_STORAGE_KEY, SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants';
 
 // Helper function for CPF validation
 function isValidCPF(cpf: string): boolean {
@@ -88,22 +88,28 @@ export default function RegisterPage() {
 
   const onRegisterSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const accountDetails = {
+    const accountDetailsToStore = {
       companyName: data.companyName,
       ownerName: data.ownerName,
       email: data.email,
       phone: data.phone,
       cpf: data.cpf.replace(/[^\d]+/g, ''), // Store cleaned CPF
+      profilePictureDataUri: "", // Initialize as empty
+    };
+
+    const simulatedCredentials = {
+      companyName: data.companyName,
+      password: data.password, // Storing password for simulation - NOT FOR PRODUCTION
     };
 
     try {
-      localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(accountDetails));
+      localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(accountDetailsToStore));
+      localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(simulatedCredentials));
       toast({ title: "Registro bem-sucedido!", description: "Você pode fazer login agora. Seus dados foram salvos." });
     } catch (error) {
-      console.error("Failed to save account details to localStorage", error);
+      console.error("Failed to save account details or credentials to localStorage", error);
       toast({ title: "Registro bem-sucedido (parcial)!", description: "Você pode fazer login, mas houve um erro ao salvar os detalhes da conta localmente.", variant: "destructive" });
     }
     
