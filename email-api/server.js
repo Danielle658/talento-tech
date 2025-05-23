@@ -8,10 +8,10 @@ const emailRoutes = require('./routes/emailRoutes');
 
 const app = express();
 
-// Configuração de CORS simplificada para permitir todas as origens,
-// já que esta API é chamada internamente pelo proxy do Next.js.
+// Configuração de CORS simplificada para permitir todas as origens.
+// Isso é seguro porque esta API é chamada internamente pelo proxy do Next.js.
 console.log("EMAIL-API: Aplicando configuração CORS para permitir todas as origens.");
-app.use(cors()); // Permite todas as origens
+app.use(cors()); 
 
 app.use(bodyParser.json());
 
@@ -30,4 +30,3 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Servidor EMAIL-API rodando na porta ${PORT}`));
-
