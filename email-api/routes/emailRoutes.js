@@ -5,8 +5,8 @@ const { sendPasswordResetEmail, sendNotificationEmail } = require('../services/e
 
 router.post('/reset-password', async (req, res) => {
   console.log('[email-api] Rota /reset-password chamada.');
-  console.log('[email-api] Corpo da requisição recebido:', req.body);
-  console.log(`[email-api] Cabeçalho Origin da requisição: ${req.headers.origin}`);
+  console.log('[email-api] Corpo da requisição recebido:', JSON.stringify(req.body, null, 2));
+  console.log(`[email-api] Cabeçalho Origin da requisição: ${req.headers.origin || 'N/A (proxy Next.js?)'}`);
 
   const { email } = req.body;
 
@@ -20,14 +20,16 @@ router.post('/reset-password', async (req, res) => {
     console.log(`[email-api] E-mail de recuperação solicitado para: ${email} - Processamento bem-sucedido.`);
     res.status(200).json({ message: 'E-mail de recuperação enviado.' });
   } catch (err) {
-    console.error('[email-api] Erro detalhado ao solicitar redefinição de senha (emailRoutes):', err.message, err.stack);
-    res.status(500).json({ error: 'Erro interno ao tentar enviar e-mail de recuperação. Por favor, tente novamente mais tarde.' });
+    // Log do erro detalhado no console do servidor backend
+    console.error('[email-api] ERRO CAPTURADO na rota /reset-password:', err.message, err.stack, err);
+    // Envia uma resposta JSON genérica para o cliente
+    res.status(500).json({ error: 'Erro interno ao tentar enviar e-mail de recuperação. Por favor, verifique os logs do servidor email-api.' });
   }
 });
 
 router.post('/notify', async (req, res) => {
   console.log('[email-api] Rota /notify chamada.');
-  console.log('[email-api] Corpo da requisição recebido:', req.body);
+  console.log('[email-api] Corpo da requisição recebido:', JSON.stringify(req.body, null, 2));
   const { to, subject, message } = req.body;
 
   if (!to || !subject || !message) {
@@ -40,8 +42,10 @@ router.post('/notify', async (req, res) => {
     console.log(`[email-api] Notificação enviada para: ${to} com assunto: ${subject} - Processamento bem-sucedido.`);
     res.status(200).json({ message: 'Notificação enviada com sucesso.' });
   } catch (err) {
-    console.error('[email-api] Erro detalhado ao enviar notificação (emailRoutes):', err.message, err.stack);
-    res.status(500).json({ error: 'Erro interno ao tentar enviar notificação. Por favor, tente novamente mais tarde.' });
+    // Log do erro detalhado no console do servidor backend
+    console.error('[email-api] ERRO CAPTURADO na rota /notify:', err.message, err.stack, err);
+    // Envia uma resposta JSON genérica para o cliente
+    res.status(500).json({ error: 'Erro interno ao tentar enviar notificação. Por favor, verifique os logs do servidor email-api.' });
   }
 });
 
