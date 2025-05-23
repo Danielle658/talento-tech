@@ -14,6 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { KeyRound, Loader2, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
+import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants'; // Importar a chave
 
 const resetPasswordSchema = z.object({
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
@@ -69,23 +70,56 @@ export default function ResetPasswordPage() {
     }
     setIsLoading(true);
     
-    // Simulação de chamada de API para redefinir a senha
     console.log("Tentando redefinir senha com token:", token, "e nova senha:", data.password);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simula chamada de API
 
-    // Como não temos um backend real para verificar o token ou atualizar a senha,
-    // apenas simulamos o sucesso aqui.
-    // Em um app real, você enviaria o token e a nova senha para sua API.
+    // SIMULAÇÃO: Atualiza a senha no localStorage
+    // IMPORTANTE: Em um aplicativo real, esta lógica estaria no backend e atualizaria um banco de dados.
+    // Armazenar senhas, mesmo para simulação, no localStorage NÃO É SEGURO PARA PRODUÇÃO.
+    try {
+      const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
+      if (storedCredentialsRaw) {
+        const storedCredentials = JSON.parse(storedCredentialsRaw);
+        // Assume que o token validaria qual conta deve ter a senha alterada.
+        // Para esta simulação, vamos assumir que as credenciais salvas (companyName)
+        // correspondem ao "usuário" cujo token foi enviado, embora não tenhamos o email do token aqui.
+        // Esta é uma simplificação para o propósito da simulação.
+        storedCredentials.password = data.password;
+        localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(storedCredentials));
+        console.log("Simulação: Senha atualizada no localStorage para:", storedCredentials.companyName);
+      } else {
+        // Isso não deveria acontecer se o usuário se registrou e está tentando redefinir
+        // a menos que o localStorage tenha sido limpo.
+        console.warn("Nenhuma credencial simulada encontrada no localStorage para atualizar a senha.");
+        toast({
+            title: "Erro na Redefinição (Simulação)",
+            description: "Não foram encontradas credenciais locais para atualizar. Por favor, registre-se primeiro.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        router.push('/auth/register'); // Redireciona para registro se não há credenciais
+        return;
+      }
+    } catch (e) {
+      console.error("Erro ao tentar atualizar senha simulada no localStorage:", e);
+      toast({
+        title: "Erro ao Atualizar Senha (Simulação)",
+        description: "Não foi possível atualizar a senha armazenada localmente. Esta é uma etapa de simulação.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
     
     toast({ 
       title: "Senha Redefinida!", 
-      description: "Sua senha foi alterada com sucesso. Você já pode fazer login.",
+      description: "Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova senha.",
       duration: 5000,
     });
     
     setIsLoading(false);
     form.reset();
-    router.push('/auth'); // Redireciona para a página de login
+    router.push('/auth'); 
   };
 
   return (
