@@ -21,12 +21,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     allowedDevOrigins: [
-      "http://localhost:3000", // Default Next.js dev port
       "http://localhost:9006", // Your current dev port
       "https://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev", // HTTPS version for 9006
       "http://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",  // HTTP version for 9006
-      "https://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev", // HTTPS version for 9005
-      "http://9005-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev"   // HTTP version for 9005
     ],
   },
   async rewrites() {
