@@ -8,9 +8,9 @@ const emailRoutes = require('./routes/emailRoutes');
 
 const app = express();
 
-console.log("Configurando CORS para permitir todas as origens no email-api.");
 // Configuração de CORS simplificada para permitir todas as origens,
 // já que esta API é chamada internamente pelo proxy do Next.js.
+console.log("EMAIL-API: Aplicando configuração CORS para permitir todas as origens.");
 app.use(cors()); // Permite todas as origens
 
 app.use(bodyParser.json());
@@ -19,7 +19,7 @@ app.use('/api/email', emailRoutes);
 
 // Manipulador de erro global para garantir respostas JSON
 app.use((err, req, res, next) => {
-  console.error("Erro não tratado no email-api:", err.stack || err.message || err);
+  console.error("EMAIL-API: Erro não tratado:", err.stack || err.message || err);
   // Se headers já foram enviados, delegar para o manipulador de erro padrão do Express
   if (res.headersSent) {
     return next(err);
@@ -28,5 +28,6 @@ app.use((err, req, res, next) => {
 });
 
 
-const PORT = process.env.PORT || 5001; // Alterado para 5001
-app.listen(PORT, () => console.log(`Servidor email-api rodando na porta ${PORT}`));
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => console.log(`Servidor EMAIL-API rodando na porta ${PORT}`));
+
