@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants';
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "E-mail inválido." }),
-  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
+  password: z.string().min(6, { message: "A nova senha deve ter pelo menos 6 caracteres." }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
   message: "As senhas não coincidem.",
@@ -33,24 +33,7 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
-  const [isTokenValid, setIsTokenValid] = useState(false);
-
-  useEffect(() => {
-    const tokenFromUrl = searchParams.get('token');
-    if (tokenFromUrl) {
-      setResetToken(tokenFromUrl);
-      // Simulação de validade do token apenas pela sua presença.
-      setIsTokenValid(true);
-    } else {
-      setIsTokenValid(false);
-      toast({
-        title: "Link de Redefinição Inválido",
-        description: "O token de redefinição de senha não foi encontrado na URL ou é inválido. Por favor, solicite um novo link.",
-        variant: "destructive",
-        duration: 7000,
-      });
-    }
-  }, [searchParams, toast]);
+  const [isTokenPresent, setIsTokenPresent] = useState(false); // Simplified from isTokenValid
 
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -61,30 +44,73 @@ export default function ResetPasswordPage() {
     },
   });
 
-  const onSubmit = async (data: ResetPasswordFormValues) => {
-    if (!isTokenValid) {
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get('token');
+    const emailFromUrl = searchParams.get('email'); // Expect email in URL too for this flow
+
+    if (tokenFromUrl) {
+      setResetToken(tokenFromUrl);
+      setIsTokenPresent(true);
+      if (emailFromUrl) {
+        form.setValue('email', emailFromUrl); // Pre-fill email from URL
+      }
+    } else {
+      setIsTokenPresent(false);
+      toast({
+        title: "Link de Redefinição Inválido",
+        description: "O token de redefinição de senha não foi encontrado na URL. Por favor, solicite um novo link.",
+        variant: "destructive",
+        duration: 7000,
+      });
+    }
+  }, [searchParams, toast, form]);
+
+  const onSubmit: SubmitHandler<ResetPasswordFormValues> = async (data) => {
+    if (!isTokenPresent || !resetToken) {
       toast({ title: "Token Inválido", description: "Não é possível redefinir a senha com um link inválido ou expirado.", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
-    // Simulação de atualização de senha no localStorage
+
     try {
-      const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
-      if (storedCredentialsRaw) {
-        let allSimulatedCredentials: any[] = JSON.parse(storedCredentialsRaw);
-        if (!Array.isArray(allSimulatedCredentials)) {
-            allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean);
+      // Call the new Next.js API route
+      const response = await fetch("/api/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: resetToken, // Send the token
+          email: data.email.toLowerCase(),
+          password: data.password,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // If API call is successful, update localStorage client-side
+        const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
+        let allSimulatedCredentials: any[] = [];
+        if (storedCredentialsRaw) {
+            try {
+                allSimulatedCredentials = JSON.parse(storedCredentialsRaw);
+                if (!Array.isArray(allSimulatedCredentials)) {
+                    allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean);
+                }
+            } catch (e) {
+                console.error("Error parsing simulated credentials from localStorage:", e);
+                allSimulatedCredentials = []; // Reset if parsing fails
+            }
         }
         
-        // Encontra a credencial pelo e-mail fornecido no formulário (case-insensitive)
         const userCredentialIndex = allSimulatedCredentials.findIndex(
           cred => cred && cred.email && cred.email.toLowerCase() === data.email.toLowerCase()
         );
 
         if (userCredentialIndex !== -1) {
-          // Se o e-mail for encontrado, atualiza a senha
-          allSimulatedCredentials[userCredentialIndex].password = data.password;
+          allSimulatedCredentials[userCredentialIndex].password = data.password; // Store new password (plain text for simulation)
           localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
           toast({
             title: "Senha Redefinida!",
@@ -92,26 +118,29 @@ export default function ResetPasswordPage() {
           });
           router.push('/auth');
         } else {
-          // Se o e-mail não for encontrado nas credenciais armazenadas
+          // This case should ideally be caught by the API, but as a fallback client-side
           toast({ 
             title: "E-mail Não Encontrado", 
-            description: "Não foi possível encontrar uma conta associada a este e-mail para redefinir a senha. Verifique o e-mail digitado ou solicite um novo link de redefinição se suspeitar que o link é para outro e-mail.", 
+            description: "Não foi possível encontrar uma conta associada a este e-mail para redefinir a senha. Verifique o e-mail digitado.", 
             variant: "destructive",
             duration: 7000,
           });
         }
       } else {
-        // Se não houver nenhuma credencial armazenada
-        toast({ 
-            title: "Nenhuma Conta Registrada", 
-            description: "Não há contas registradas no sistema para redefinir a senha. Por favor, registre uma conta primeiro.", 
-            variant: "destructive",
-            duration: 7000,
+        // Error from the /api/reset-password API route
+        toast({
+          title: "Erro ao Redefinir Senha",
+          description: result.message || "Ocorreu um erro ao tentar redefinir sua senha.",
+          variant: "destructive",
         });
       }
     } catch (error: any) {
-      console.error("Erro ao tentar redefinir senha (simulado):", error);
-      toast({ title: "Erro de Processamento", description: "Ocorreu um erro ao tentar redefinir sua senha.", variant: "destructive" });
+      console.error("Erro ao tentar redefinir senha:", error);
+      toast({ 
+        title: "Falha na Conexão", 
+        description: "Ocorreu um erro de conexão ao tentar redefinir sua senha. Verifique sua internet e tente novamente.", 
+        variant: "destructive" 
+      });
     }
     setIsLoading(false);
   };
@@ -121,18 +150,18 @@ export default function ResetPasswordPage() {
       <CardHeader className="text-center">
         <Logo className="justify-center mb-4" />
         <CardTitle className="text-3xl">Redefinir Senha</CardTitle>
-        {!isTokenValid ? (
+        {!isTokenPresent ? (
           <CardDescription className="text-destructive pt-2">
              Link de redefinição inválido ou expirado. Por favor, solicite um novo link.
           </CardDescription>
         ) : (
            <CardDescription className="pt-2">
-            Um link de redefinição foi usado. Por favor, confirme seu e-mail e defina sua nova senha abaixo.
+            Por favor, confirme seu e-mail e defina sua nova senha abaixo.
           </CardDescription>
         )}
       </CardHeader>
       <CardContent>
-        {isTokenValid ? (
+        {isTokenPresent ? (
             <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
                 <FormField
@@ -211,4 +240,3 @@ export default function ResetPasswordPage() {
     </Card>
   );
 }
-

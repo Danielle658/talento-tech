@@ -21,7 +21,8 @@ async function sendPasswordResetEmail(email) {
   const token = generateResetToken(email); // Pode lançar erro se JWT_SECRET não estiver definido
 
   // Ajustado para corresponder à rota do frontend do Next.js
-  const resetLink = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}`;
+  // Adiciona o e-mail ao link para que a página de reset possa pré-preenchê-lo
+  const resetLink = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
   const mailOptions = {
     from: `"Suporte MoneyWise" <${process.env.SMTP_USER}>`, // Mantido o nome mais descritivo
@@ -40,7 +41,7 @@ async function sendPasswordResetEmail(email) {
           </a>
         </p>
         <p>Se você não solicitou esta redefinição, por favor, ignore este e-mail. Sua senha permanecerá inalterada.</p>
-        <p>O link de redefinição é válido por 20 minutos.</p>
+        <p>O link de redefinição é válido por 1 hora.</p>
         <br>
         <p>Obrigado,</p>
         <p>Equipe MoneyWise</p>
@@ -50,9 +51,9 @@ async function sendPasswordResetEmail(email) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log('E-mail de redefinição enviado: %s', info.messageId);
+    console.log('[emailService] E-mail de redefinição enviado: %s para %s', info.messageId, email);
   } catch (error) {
-    console.error('Erro ao enviar e-mail de redefinição (emailService):', error);
+    console.error('[emailService] Erro ao enviar e-mail de redefinição:', error);
     throw new Error('Não foi possível enviar o e-mail de redefinição.');
   }
 }
@@ -75,9 +76,9 @@ async function sendNotificationEmail(to, subject, message) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log('E-mail de notificação enviado: %s', info.messageId);
+    console.log('[emailService] E-mail de notificação enviado: %s para %s', info.messageId, to);
   } catch (error) {
-    console.error('Erro ao enviar e-mail de notificação (emailService):', error);
+    console.error('[emailService] Erro ao enviar e-mail de notificação:', error);
     throw new Error('Não foi possível enviar o e-mail de notificação.');
   }
 }
