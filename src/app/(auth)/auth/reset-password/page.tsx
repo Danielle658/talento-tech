@@ -17,7 +17,7 @@ import { Logo } from '@/components/shared/logo';
 import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants';
 
 const resetPasswordSchema = z.object({
-  email: z.string().email({ message: "E-mail inválido." }), // Adicionado campo de e-mail
+  email: z.string().email({ message: "E-mail inválido." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
@@ -33,20 +33,19 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
-  const [isTokenValid, setIsTokenValid] = useState(false); // Simulação de validade do token
+  const [isTokenValid, setIsTokenValid] = useState(false);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (token) {
-      setResetToken(token);
-      // Simulação: Consideramos o token válido se ele estiver presente.
-      // Em um sistema real, o token seria enviado para o backend para validação.
-      setIsTokenValid(true); 
+    const tokenFromUrl = searchParams.get('token');
+    if (tokenFromUrl) {
+      setResetToken(tokenFromUrl);
+      // Simulação de validade do token apenas pela sua presença.
+      setIsTokenValid(true);
     } else {
       setIsTokenValid(false);
       toast({
         title: "Link de Redefinição Inválido",
-        description: "O link de redefinição de senha é inválido ou expirou. Por favor, solicite um novo.",
+        description: "O token de redefinição de senha não foi encontrado na URL ou é inválido. Por favor, solicite um novo link.",
         variant: "destructive",
         duration: 7000,
       });
@@ -64,7 +63,7 @@ export default function ResetPasswordPage() {
 
   const onSubmit = async (data: ResetPasswordFormValues) => {
     if (!isTokenValid) {
-      toast({ title: "Token Inválido", description: "Não é possível redefinir a senha com um token inválido.", variant: "destructive" });
+      toast({ title: "Token Inválido", description: "Não é possível redefinir a senha com um link inválido ou expirado.", variant: "destructive" });
       return;
     }
 
@@ -77,11 +76,14 @@ export default function ResetPasswordPage() {
         if (!Array.isArray(allSimulatedCredentials)) {
             allSimulatedCredentials = [allSimulatedCredentials].filter(Boolean);
         }
+        
+        // Encontra a credencial pelo e-mail fornecido no formulário (case-insensitive)
         const userCredentialIndex = allSimulatedCredentials.findIndex(
           cred => cred && cred.email && cred.email.toLowerCase() === data.email.toLowerCase()
         );
 
         if (userCredentialIndex !== -1) {
+          // Se o e-mail for encontrado, atualiza a senha
           allSimulatedCredentials[userCredentialIndex].password = data.password;
           localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
           toast({
@@ -90,10 +92,22 @@ export default function ResetPasswordPage() {
           });
           router.push('/auth');
         } else {
-          toast({ title: "E-mail Não Encontrado", description: "Não foi possível encontrar uma conta associada a este e-mail para redefinir a senha.", variant: "destructive" });
+          // Se o e-mail não for encontrado nas credenciais armazenadas
+          toast({ 
+            title: "E-mail Não Encontrado", 
+            description: "Não foi possível encontrar uma conta associada a este e-mail para redefinir a senha. Verifique o e-mail digitado ou solicite um novo link de redefinição se suspeitar que o link é para outro e-mail.", 
+            variant: "destructive",
+            duration: 7000,
+          });
         }
       } else {
-        toast({ title: "Erro Interno", description: "Não foi possível acessar os dados locais para atualizar a senha.", variant: "destructive" });
+        // Se não houver nenhuma credencial armazenada
+        toast({ 
+            title: "Nenhuma Conta Registrada", 
+            description: "Não há contas registradas no sistema para redefinir a senha. Por favor, registre uma conta primeiro.", 
+            variant: "destructive",
+            duration: 7000,
+        });
       }
     } catch (error: any) {
       console.error("Erro ao tentar redefinir senha (simulado):", error);
@@ -113,7 +127,7 @@ export default function ResetPasswordPage() {
           </CardDescription>
         ) : (
            <CardDescription className="pt-2">
-            Por favor, insira seu e-mail e defina sua nova senha abaixo.
+            Um link de redefinição foi usado. Por favor, confirme seu e-mail e defina sua nova senha abaixo.
           </CardDescription>
         )}
       </CardHeader>
@@ -130,7 +144,7 @@ export default function ResetPasswordPage() {
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input type="email" placeholder="Confirme seu e-mail" {...field} className="pl-10" />
+                          <Input type="email" placeholder="Confirme o e-mail da sua conta" {...field} className="pl-10" />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -177,7 +191,7 @@ export default function ResetPasswordPage() {
             </Form>
         ) : (
             <div className="text-center space-y-4">
-                <p>Seu link de redefinição é inválido ou expirado. Por favor, solicite um novo.</p>
+                <p>Seu link de redefinição é inválido ou expirado.</p>
                 <Button asChild className="w-full max-w-xs">
                     <Link href="/auth/forgot-password">
                         Solicitar Novo Link
@@ -197,3 +211,4 @@ export default function ResetPasswordPage() {
     </Card>
   );
 }
+
