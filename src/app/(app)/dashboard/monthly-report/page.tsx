@@ -1,42 +1,54 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { BarChart3, Send, Loader2, FileDown } from "lucide-react"; // Added FileDown
+import { BarChart3, Send, Loader2, FileDown } from "lucide-react"; 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
+import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function MonthlyReportPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [accountDetails, setAccountDetails] = useState<AccountDetailsFormValues | null>(null);
 
+  const accountDetailsStorageKey = useMemo(() => getCompanySpecificKey(ACCOUNT_DETAILS_BASE_STORAGE_KEY, currentCompany), [currentCompany]);
+
   useEffect(() => {
     setIsMounted(true);
-    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
-    if (storedAccountDetails) {
-        try {
-            const parsedDetails: AccountDetailsFormValues = JSON.parse(storedAccountDetails);
-            setAccountDetails(parsedDetails);
-            if (parsedDetails.phone) {
-                setWhatsappNumber(parsedDetails.phone.replace(/\D/g, '')); 
-            }
-        } catch (error) {
-            console.error("Failed to parse account details from localStorage for monthly report", error);
-            localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY);
-            setAccountDetails(null);
-            toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'monthlyReportAccountLoadError'});
-        }
+    if (accountDetailsStorageKey) {
+      const storedAccountDetails = localStorage.getItem(accountDetailsStorageKey);
+      if (storedAccountDetails) {
+          try {
+              const parsedDetails: AccountDetailsFormValues = JSON.parse(storedAccountDetails);
+              setAccountDetails(parsedDetails);
+              if (parsedDetails.phone) {
+                  setWhatsappNumber(parsedDetails.phone.replace(/\D/g, '')); 
+              }
+          } catch (error) {
+              console.error("Failed to parse account details from localStorage for monthly report for", currentCompany, error);
+              localStorage.removeItem(accountDetailsStorageKey);
+              setAccountDetails(null);
+              toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'monthlyReportAccountLoadError'});
+          }
+      } else {
+        setAccountDetails(null);
+        setWhatsappNumber(""); // Clear if no details found
+      }
+    } else if (currentCompany === null && isMounted) {
+      setAccountDetails(null);
+      setWhatsappNumber("");
     }
-  }, [toast]);
+  }, [toast, accountDetailsStorageKey, currentCompany, isMounted]);
 
 
   const handleSendWhatsAppSummary = async () => {
@@ -50,11 +62,10 @@ export default function MonthlyReportPage() {
     }
 
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate short processing
+    await new Promise(resolve => setTimeout(resolve, 500)); 
 
     const currentMonthYear = format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
-    const companyNameToUse = accountDetails?.companyName || "Sua Empresa";
-    // Placeholder for actual report data - In a real app, this would be dynamically generated.
+    const companyNameToUse = accountDetails?.companyName || currentCompany || "Sua Empresa";
     const reportMessage = `Olá! Segue o resumo do seu relatório mensal da MoneyWise (${companyNameToUse}) para ${currentMonthYear}. Em breve, este relatório incluirá dados financeiros detalhados da sua empresa.\\n\\nVocê pode gerar uma versão em PDF do relatório exemplo através da opção 'Baixar/Imprimir Relatório (PDF)' no app.`;
     
     const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(reportMessage)}`;
@@ -71,12 +82,11 @@ export default function MonthlyReportPage() {
   
   const handleDownloadPdfReport = async () => {
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate short processing
+    await new Promise(resolve => setTimeout(resolve, 500)); 
 
     const currentMonthYear = format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
-    const companyNameToUse = accountDetails?.companyName || "Sua Empresa";
+    const companyNameToUse = accountDetails?.companyName || currentCompany || "Sua Empresa";
     
-    // Placeholder for actual report data
     const reportData = {
         totalRevenue: "R$ 1.234,56",
         totalExpenses: "R$ 789,01",
@@ -129,8 +139,6 @@ export default function MonthlyReportPage() {
               <p><strong>Novos Clientes:</strong> 5</p>
             </div>
             
-            <!-- Adicionar mais seções de dados aqui no futuro -->
-
             <div class="report-footer">
               Gerado por MoneyWise em ${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
             </div>
@@ -160,8 +168,18 @@ export default function MonthlyReportPage() {
   };
 
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && !accountDetailsStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar os Relatórios Mensais.</p>
+      </div>
+    );
   }
 
   return (
@@ -173,7 +191,7 @@ export default function MonthlyReportPage() {
             <CardTitle className="text-2xl">Relatório Mensal</CardTitle>
           </div>
           <CardDescription>
-            Gere um resumo mensal (atualmente um exemplo) e envie-o para seu WhatsApp ou baixe uma versão para impressão (PDF).
+            Gere um resumo mensal (exemplo) e envie-o para seu WhatsApp ou baixe uma versão para impressão (PDF). Empresa: {currentCompany || "Nenhuma"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -190,7 +208,7 @@ export default function MonthlyReportPage() {
                 disabled={isProcessing}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Este número é pré-preenchido com o telefone das configurações da sua conta, mas você pode alterá-lo se necessário.
+                Este número é pré-preenchido com o telefone das configurações da sua conta ({currentCompany}), se disponível.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -224,4 +242,3 @@ export default function MonthlyReportPage() {
     </div>
   );
 }
-

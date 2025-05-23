@@ -12,7 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, Save, Loader2, Building2, User, Mail, Phone, ScanLine, Image as ImageIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants'; 
+import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants'; 
+import { useAuth } from '@/hooks/use-auth';
 
 const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
 function isValidCPF(cpf: string): boolean {
@@ -52,14 +53,17 @@ export type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const { currentCompany, isLoading: isAuthLoading } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  const accountDetailsStorageKey = useMemo(() => getCompanySpecificKey(ACCOUNT_DETAILS_BASE_STORAGE_KEY, currentCompany), [currentCompany]);
+
   const form = useForm<AccountDetailsFormValues>({
     resolver: zodResolver(accountDetailsSchema),
     defaultValues: {
-      companyName: "",
+      companyName: currentCompany || "", // Initialize with currentCompany from auth context
       ownerName: "",
       email: "",
       phone: "",
@@ -70,43 +74,88 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    const storedDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
-    if (storedDetails) {
-      try {
-        const parsedDetails = JSON.parse(storedDetails);
-        form.reset(parsedDetails);
-        if (parsedDetails.profilePictureDataUri) {
-          setImagePreview(parsedDetails.profilePictureDataUri);
+    if (accountDetailsStorageKey) {
+      const storedDetails = localStorage.getItem(accountDetailsStorageKey);
+      if (storedDetails) {
+        try {
+          const parsedDetails = JSON.parse(storedDetails);
+          form.reset(parsedDetails);
+          if (parsedDetails.profilePictureDataUri) {
+            setImagePreview(parsedDetails.profilePictureDataUri);
+          }
+        } catch (error) {
+          console.error("Failed to parse account details from localStorage for", currentCompany, error);
+          localStorage.removeItem(accountDetailsStorageKey); 
+          form.reset({ companyName: currentCompany || "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
+          toast({
+            title: "Erro ao Carregar Dados da Conta",
+            description: "Não foi possível carregar os dados da conta salvos. As informações podem ter sido redefinidas.",
+            variant: "destructive",
+          });
         }
-      } catch (error) {
-        console.error("Failed to parse account details from localStorage", error);
-        localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY); 
-        form.reset({ companyName: "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
-        toast({
-          title: "Erro ao Carregar Dados da Conta",
-          description: "Não foi possível carregar os dados da conta salvos. As informações podem ter sido redefinidas.",
-          variant: "destructive",
-        });
+      } else {
+        // Se não houver dados salvos, mas há uma empresa logada, preencha o nome da empresa
+        form.reset({ companyName: currentCompany || "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
       }
+    } else if (currentCompany === null && isMounted) {
+        form.reset({ companyName: "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
+        setImagePreview(null);
     }
-  }, [form, toast]);
+  }, [form, toast, accountDetailsStorageKey, currentCompany, isMounted]);
+
+  // Reset form if company changes
+  useEffect(() => {
+    if (currentCompany && isMounted) {
+      form.setValue("companyName", currentCompany); // Ensure companyName is updated if context changes
+      // Reload other details for the new company
+      if (accountDetailsStorageKey) {
+        const storedDetails = localStorage.getItem(accountDetailsStorageKey);
+        if (storedDetails) {
+          try {
+            const parsedDetails = JSON.parse(storedDetails);
+            form.reset(parsedDetails); // This will set companyName from storage if it exists
+            if (parsedDetails.profilePictureDataUri) {
+              setImagePreview(parsedDetails.profilePictureDataUri);
+            } else {
+              setImagePreview(null);
+            }
+          } catch (e) { /* already handled by main load effect */ }
+        } else {
+          // Reset other fields if no details found for this company, but keep companyName
+          form.reset({
+            companyName: currentCompany,
+            ownerName: "",
+            email: "",
+            phone: "",
+            cpf: "",
+            profilePictureDataUri: "",
+          });
+          setImagePreview(null);
+        }
+      }
+    } else if (!currentCompany && isMounted) {
+        form.reset({ companyName: "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
+        setImagePreview(null);
+    }
+  }, [currentCompany, accountDetailsStorageKey, form, isMounted]);
+
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+      if (file.size > 2 * 1024 * 1024) { 
         toast({
           title: "Arquivo Muito Grande",
           description: "Por favor, selecione uma imagem menor que 2MB.",
           variant: "destructive",
         });
-        event.target.value = ""; // Clear the input
+        event.target.value = ""; 
         return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUri = reader.result as string;
-        form.setValue("profilePictureDataUri", dataUri);
+        form.setValue("profilePictureDataUri", dataUri, { shouldValidate: true });
         setImagePreview(dataUri);
       };
       reader.onerror = () => {
@@ -121,33 +170,48 @@ export default function SettingsPage() {
   };
 
   const onSubmit = (data: AccountDetailsFormValues) => {
+    if (!accountDetailsStorageKey) {
+      toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar as configurações.", variant: "destructive"});
+      return;
+    }
     setIsSaving(true);
     try {
-      localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(data));
+      // Ensure companyName from form (which should match currentCompany) is used
+      const dataToSave = { ...data, companyName: currentCompany || data.companyName };
+      localStorage.setItem(accountDetailsStorageKey, JSON.stringify(dataToSave));
       toast({
         title: "Dados Salvos!",
         description: "As informações da sua conta foram atualizadas com sucesso.",
       });
-      // Trigger re-render of layout to update avatar
       window.dispatchEvent(new Event('storage'));
     } catch (error) {
-      console.error("Failed to save account details to localStorage", error);
+      console.error("Failed to save account details to localStorage for", currentCompany, error);
       toast({
         title: "Erro ao Salvar",
-        description: "Não foi possível salvar as informações da conta. Verifique o console para mais detalhes. Pode ser um problema de limite de armazenamento do navegador se a imagem for muito grande.",
+        description: "Não foi possível salvar as informações da conta. Verifique o console para mais detalhes.",
         variant: "destructive",
       });
     }
     setIsSaving(false);
   };
 
-  if (!isMounted) {
+  if (!isMounted || isAuthLoading || (isMounted && !currentCompany && !accountDetailsStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <SettingsIcon className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar as Configurações da Conta.</p>
+      </div>
+    );
   }
 
   const ownerInitials = form.getValues("ownerName")
     ? form.getValues("ownerName").split(" ").map(n => n[0]).join("").substring(0,2).toUpperCase()
-    : "MW";
+    : (currentCompany ? currentCompany.substring(0,2).toUpperCase() : "MW");
 
   return (
     <div className="space-y-6">
@@ -157,7 +221,7 @@ export default function SettingsPage() {
             <SettingsIcon className="h-6 w-6 text-primary" />
             <CardTitle className="text-2xl">Configurações da Conta</CardTitle>
           </div>
-          <CardDescription>Gerencie as informações da sua empresa, de contato e foto de perfil.</CardDescription>
+          <CardDescription>Gerencie as informações da sua empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -192,9 +256,10 @@ export default function SettingsPage() {
                     <FormControl>
                       <div className="relative">
                         <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="Sua Empresa LTDA" {...field} className="pl-10" />
+                        <Input placeholder="Sua Empresa LTDA" {...field} className="pl-10" disabled/> 
                       </div>
                     </FormControl>
+                    <FormDescription>O nome da empresa é definido no login e não pode ser alterado aqui.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

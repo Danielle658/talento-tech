@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { Building2, KeyRound, User, Phone, ScanLine, Mail, ShieldCheck, UserPlus, Loader2, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { ACCOUNT_DETAILS_STORAGE_KEY, SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants';
+import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, SIMULATED_CREDENTIALS_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
 
 // Helper function for CPF validation
 function isValidCPF(cpf: string): boolean {
@@ -46,7 +46,7 @@ function isValidCPF(cpf: string): boolean {
   return true;
 }
 
-const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; // Adjusted for Brazilian mobile numbers
+const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
 
 const registerSchema = z.object({
   companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
@@ -55,7 +55,7 @@ const registerSchema = z.object({
   phone: z.string().regex(phoneRegex, { message: "Número de telefone inválido. Use formato (XX) 9XXXX-XXXX ou similar." }),
   cpf: z.string()
     .min(11, { message: "CPF deve ter 11 dígitos." })
-    .max(14, { message: "CPF inválido."}) // Allow for masked input like 000.000.000-00
+    .max(14, { message: "CPF inválido."})
     .refine(value => isValidCPF(value.replace(/[^\d]+/g, '')), { message: "CPF inválido." }),
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   confirmPassword: z.string(),
@@ -90,32 +90,63 @@ export default function RegisterPage() {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     
+    const companySpecificAccountDetailsKey = getCompanySpecificKey(ACCOUNT_DETAILS_BASE_STORAGE_KEY, data.companyName);
+
     const accountDetailsToStore = {
       companyName: data.companyName,
       ownerName: data.ownerName,
       email: data.email,
       phone: data.phone,
-      cpf: data.cpf.replace(/[^\d]+/g, ''), // Store cleaned CPF
-      profilePictureDataUri: "", // Initialize as empty
+      cpf: data.cpf.replace(/[^\d]+/g, ''),
+      profilePictureDataUri: "", 
     };
 
+    // For login simulation, we store credentials globally for now,
+    // or you could namespace this too if simulating multiple distinct registered companies.
     const simulatedCredentials = {
       companyName: data.companyName,
-      password: data.password, // Storing password for simulation - NOT FOR PRODUCTION
+      password: data.password,
     };
 
     try {
-      localStorage.setItem(ACCOUNT_DETAILS_STORAGE_KEY, JSON.stringify(accountDetailsToStore));
-      localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(simulatedCredentials));
+      if (companySpecificAccountDetailsKey) {
+        localStorage.setItem(companySpecificAccountDetailsKey, JSON.stringify(accountDetailsToStore));
+      }
+      // Check if SIMULATED_CREDENTIALS_STORAGE_KEY already exists and if it's an array.
+      // This part is a simplification. A real app would have a backend user database.
+      let allSimulatedCredentials = [];
+      const existingCredsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
+      if (existingCredsRaw) {
+        try {
+            allSimulatedCredentials = JSON.parse(existingCredsRaw);
+            if (!Array.isArray(allSimulatedCredentials)) {
+                allSimulatedCredentials = [allSimulatedCredentials]; // Convert to array if it's a single object
+            }
+        } catch (e) {
+             allSimulatedCredentials = []; // Reset if parsing fails
+        }
+      }
+      // Avoid duplicate company registrations in the simulated global list
+      const companyExists = allSimulatedCredentials.some(cred => cred.companyName === data.companyName);
+      if (!companyExists) {
+          allSimulatedCredentials.push(simulatedCredentials);
+      } else {
+        // Optionally update password if company re-registers - for this simulation, we'll just ensure it exists
+        const existingIndex = allSimulatedCredentials.findIndex(cred => cred.companyName === data.companyName);
+        allSimulatedCredentials[existingIndex] = simulatedCredentials;
+      }
+      localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials.length === 1 && !companyExists ? simulatedCredentials : allSimulatedCredentials));
+
+
       toast({ title: "Registro bem-sucedido!", description: "Você pode fazer login agora. Seus dados foram salvos." });
+      registerForm.reset();
+      router.push('/auth');
     } catch (error) {
       console.error("Failed to save account details or credentials to localStorage", error);
-      toast({ title: "Registro bem-sucedido (parcial)!", description: "Você pode fazer login, mas houve um erro ao salvar os detalhes da conta localmente.", variant: "destructive" });
+      toast({ title: "Erro no Registro", description: "Não foi possível salvar os detalhes da conta localmente.", variant: "destructive" });
     }
     
-    registerForm.reset();
     setIsLoading(false);
-    router.push('/auth'); // Redirect to login page
   };
 
   return (

@@ -1,6 +1,6 @@
 
 "use client";
-import { useEffect, useState } from 'react'; // Added useState
+import { useEffect, useState, useMemo } from 'react'; 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -48,7 +48,7 @@ import {
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
 import { VirtualAssistant } from '@/components/dashboard/virtual-assistant';
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
+import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
 import type { AccountDetailsFormValues } from '@/app/(app)/dashboard/settings/page';
 
 const navItems = [
@@ -63,35 +63,40 @@ const navItems = [
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading, logout, currentCompany } = useAuth();
   const router = useRouter();
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | undefined>(undefined);
   const [ownerInitials, setOwnerInitials] = useState<string>("MW");
 
-  const loadProfileData = () => {
-    if (typeof window !== "undefined") {
-      const storedDetailsRaw = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
+  const accountDetailsStorageKey = useMemo(() => getCompanySpecificKey(ACCOUNT_DETAILS_BASE_STORAGE_KEY, currentCompany), [currentCompany]);
+
+  const loadProfileData = useCallback(() => {
+    if (typeof window !== "undefined" && accountDetailsStorageKey) {
+      const storedDetailsRaw = localStorage.getItem(accountDetailsStorageKey);
       if (storedDetailsRaw) {
         try {
           const storedDetails: AccountDetailsFormValues = JSON.parse(storedDetailsRaw);
           setProfilePictureUrl(storedDetails.profilePictureDataUri);
           if (storedDetails.ownerName) {
             const initials = storedDetails.ownerName.split(" ").map(n => n[0]).join("").substring(0,2).toUpperCase();
-            setOwnerInitials(initials || "MW");
+            setOwnerInitials(initials || (currentCompany ? currentCompany.substring(0,2).toUpperCase() : "MW"));
           } else {
-            setOwnerInitials("MW");
+            setOwnerInitials(currentCompany ? currentCompany.substring(0,2).toUpperCase() : "MW");
           }
         } catch (error) {
-          console.error("Error loading account details for avatar:", error);
+          console.error("Error loading account details for avatar for", currentCompany, error);
           setProfilePictureUrl(undefined);
-          setOwnerInitials("MW");
+          setOwnerInitials(currentCompany ? currentCompany.substring(0,2).toUpperCase() : "MW");
         }
       } else {
           setProfilePictureUrl(undefined);
-          setOwnerInitials("MW");
+          setOwnerInitials(currentCompany ? currentCompany.substring(0,2).toUpperCase() : "MW");
       }
+    } else if (typeof window !== "undefined" && !currentCompany) { // Clear if no company
+        setProfilePictureUrl(undefined);
+        setOwnerInitials("MW");
     }
-  };
+  }, [accountDetailsStorageKey, currentCompany]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -101,12 +106,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
     loadProfileData();
-    // Listen for storage changes to update avatar if settings are changed in another tab (or for immediate effect)
     window.addEventListener('storage', loadProfileData);
     return () => {
       window.removeEventListener('storage', loadProfileData);
     };
-  }, []);
+  }, [loadProfileData]); // Depend on loadProfileData as it now depends on accountDetailsStorageKey
 
 
   if (isLoading) {
@@ -118,7 +122,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return null;
+    return null; // Or a redirect component if preferred
   }
   
   const handleLogout = () => {
@@ -168,14 +172,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarTrigger>
             
             <div className="flex flex-1 items-center justify-end gap-1 md:gap-2">
-              <form className="relative flex-1 sm:flex-initial max-w-xs md:max-w-sm lg:max-w-md">
+              {/* Search form can be re-added later if needed */}
+              {/* <form className="relative flex-1 sm:flex-initial max-w-xs md:max-w-sm lg:max-w-md">
                 <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   type="search"
                   placeholder="Pesquisar..."
                   className="pl-8 w-full"
                 />
-              </form>
+              </form> */}
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Bell className="h-5 w-5" />
                 <span className="sr-only">Notificações</span>
@@ -192,7 +197,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                  <DropdownMenuLabel>{currentCompany || "Minha Conta"}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <Link href="/dashboard/settings" passHref legacyBehavior>
                     <DropdownMenuItem asChild>

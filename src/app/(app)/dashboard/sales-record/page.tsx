@@ -16,6 +16,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useAuth } from '@/hooks/use-auth';
+import { STORAGE_KEY_SALES_RECORD_BASE, getCompanySpecificKey } from '@/lib/constants';
 
 interface SoldItem {
   productId: string;
@@ -36,10 +38,9 @@ export interface SalesRecordEntry {
   customerName?: string;
 }
 
-export const STORAGE_KEY_SALES_RECORD = "moneywise-salesHistory";
-
 export default function SalesRecordPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [salesHistory, setSalesHistory] = useState<SalesRecordEntry[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,31 +49,38 @@ export default function SalesRecordPage() {
   const [selectedSale, setSelectedSale] = useState<SalesRecordEntry | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
+  const salesRecordStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_SALES_RECORD_BASE, currentCompany), [currentCompany]);
 
   useEffect(() => {
     setIsMounted(true);
-    const storedSales = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
-    if (storedSales) {
-      try {
-        setSalesHistory(JSON.parse(storedSales).sort((a: SalesRecordEntry, b: SalesRecordEntry) => (isValid(parseISO(b.date)) ? parseISO(b.date).getTime() : 0) - (isValid(parseISO(a.date)) ? parseISO(a.date).getTime() : 0)));
-      } catch (error) {
-        console.error("Failed to parse sales history from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
+    if (salesRecordStorageKey) {
+      const storedSales = localStorage.getItem(salesRecordStorageKey);
+      if (storedSales) {
+        try {
+          setSalesHistory(JSON.parse(storedSales).sort((a: SalesRecordEntry, b: SalesRecordEntry) => (isValid(parseISO(b.date)) ? parseISO(b.date).getTime() : 0) - (isValid(parseISO(a.date)) ? parseISO(a.date).getTime() : 0)));
+        } catch (error) {
+          console.error("Failed to parse sales history from localStorage for", currentCompany, error);
+          localStorage.removeItem(salesRecordStorageKey);
+          setSalesHistory([]);
+          toast({ title: "Erro ao Carregar Histórico de Vendas", description: "Não foi possível carregar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'salesRecordLoadError' });
+        }
+      } else {
         setSalesHistory([]);
-        toast({ title: "Erro ao Carregar Histórico de Vendas", description: "Não foi possível carregar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'salesRecordLoadError' });
       }
-    } else {
+    } else if (currentCompany === null && isMounted) {
       setSalesHistory([]);
     }
-  }, [toast]);
+  }, [toast, salesRecordStorageKey, currentCompany, isMounted]);
 
   useEffect(() => {
-    if (isMounted && salesHistory.length > 0) {
-      localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify(salesHistory));
-    } else if (isMounted && salesHistory.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
+    if (isMounted && salesRecordStorageKey) {
+      if (salesHistory.length > 0) {
+        localStorage.setItem(salesRecordStorageKey, JSON.stringify(salesHistory));
+      } else {
+        localStorage.removeItem(salesRecordStorageKey);
+      }
     }
-  }, [salesHistory, isMounted]);
+  }, [salesHistory, isMounted, salesRecordStorageKey]);
 
   const filteredSales = useMemo(() => {
     if (!isMounted) return [];
@@ -106,8 +114,7 @@ export default function SalesRecordPage() {
     if (!window.confirm(`Tem certeza que deseja excluir o registro de venda ${saleId}? Esta ação não pode ser desfeita e não afetará os lançamentos na Caderneta Digital.`)) {
       return;
     }
-    const updatedSalesHistory = salesHistory.filter(sale => sale.id !== saleId);
-    setSalesHistory(updatedSalesHistory); // State update will trigger useEffect to save to localStorage
+    setSalesHistory(prev => prev.filter(sale => sale.id !== saleId));
     toast({
       title: "Registro Excluído",
       description: `O registro de venda ${saleId} foi excluído.`,
@@ -142,15 +149,25 @@ export default function SalesRecordPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `historico_vendas_moneywise_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
+    link.setAttribute("download", `historico_vendas_moneywise_${currentCompany || 'geral'}_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     toast({ title: "Dados Exportados", description: "O histórico de vendas foi exportado como CSV.", });
   };
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && !salesRecordStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <History className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar o Histórico de Vendas.</p>
+      </div>
+    );
   }
 
   return (
@@ -168,7 +185,7 @@ export default function SalesRecordPage() {
                 </Button>
             </div>
           </div>
-          <CardDescription>Visualize todas as vendas registradas. Os dados são salvos localmente no seu navegador.</CardDescription>
+          <CardDescription>Visualize todas as vendas registradas. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="mb-6 p-4 border rounded-lg bg-card shadow">
@@ -198,6 +215,7 @@ export default function SalesRecordPage() {
                         <SelectItem value="PIX">PIX</SelectItem>
                         <SelectItem value="Cartão de Crédito">Cartão de Crédito</SelectItem>
                         <SelectItem value="Cartão de Débito">Cartão de Débito</SelectItem>
+                        <SelectItem value="Fiado">Fiado</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -232,7 +250,7 @@ export default function SalesRecordPage() {
           {filteredSales.length === 0 ? (
             <div className="text-center py-10">
               <History className="mx-auto h-12 w-12 text-muted-foreground" />
-              <p className="mt-4 text-lg font-medium">Nenhum registro de venda encontrado.</p>
+              <p className="mt-4 text-lg font-medium">Nenhum registro de venda encontrado para {currentCompany}.</p>
               <p className="text-muted-foreground">Tente ajustar os filtros ou registre novas vendas no PDV.</p>
             </div>
           ) : (
@@ -260,12 +278,14 @@ export default function SalesRecordPage() {
                         <Badge variant={
                             sale.paymentMethod === "Dinheiro" ? "secondary" :
                             sale.paymentMethod === "PIX" ? "default" :
+                            sale.paymentMethod === "Fiado" ? "outline" : // Added style for Fiado
                             "outline"
                         }
                         className={cn(
                             sale.paymentMethod === "PIX" && "bg-green-600 hover:bg-green-700 text-white",
                             sale.paymentMethod === "Cartão de Crédito" && "bg-blue-500 hover:bg-blue-600 text-white",
-                            sale.paymentMethod === "Cartão de Débito" && "bg-sky-500 hover:bg-sky-600 text-white"
+                            sale.paymentMethod === "Cartão de Débito" && "bg-sky-500 hover:bg-sky-600 text-white",
+                            sale.paymentMethod === "Fiado" && "border-orange-500 text-orange-600 bg-orange-500/10 hover:bg-orange-500/20" // Fiado badge style
                         )}
                         >{sale.paymentMethod}</Badge>
                       </TableCell>
@@ -329,4 +349,3 @@ export default function SalesRecordPage() {
     </div>
   );
 }
-    

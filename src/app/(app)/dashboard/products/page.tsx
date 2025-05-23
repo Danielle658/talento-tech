@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Briefcase, PlusCircle, Trash2, DollarSign, Package, Tag, Barcode, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/hooks/use-auth';
+import { STORAGE_KEY_PRODUCTS_BASE, getCompanySpecificKey } from '@/lib/constants';
 
 
 const productSchema = z.object({
@@ -29,38 +31,45 @@ export interface ProductEntry extends ProductFormValues {
   id: string;
 }
 
-export const STORAGE_KEY_PRODUCTS = "moneywise-products";
-
 export default function ProductsPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [products, setProducts] = useState<ProductEntry[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-    const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-    if (storedProducts) {
-      try {
-        setProducts(JSON.parse(storedProducts));
-      } catch (error) {
-        console.error("Failed to parse products from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_PRODUCTS);
-        setProducts([]);
-        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os dados do catálogo de produtos. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'productsLoadError' });
-      }
-    } else {
-      setProducts([]);
-    }
-  }, [toast]);
+  const productsStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_PRODUCTS_BASE, currentCompany), [currentCompany]);
 
   useEffect(() => {
-    if (isMounted && products.length > 0) {
-      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
-    } else if (isMounted && products.length === 0) {
-        localStorage.removeItem(STORAGE_KEY_PRODUCTS);
+    setIsMounted(true);
+    if (productsStorageKey) {
+      const storedProducts = localStorage.getItem(productsStorageKey);
+      if (storedProducts) {
+        try {
+          setProducts(JSON.parse(storedProducts));
+        } catch (error) {
+          console.error("Failed to parse products from localStorage for", currentCompany, error);
+          localStorage.removeItem(productsStorageKey);
+          setProducts([]);
+          toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os dados do catálogo de produtos. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'productsLoadError' });
+        }
+      } else {
+        setProducts([]);
+      }
+    } else if (currentCompany === null && isMounted) {
+      setProducts([]);
     }
-  }, [products, isMounted]);
+  }, [toast, productsStorageKey, currentCompany, isMounted]);
+
+  useEffect(() => {
+    if (isMounted && productsStorageKey) {
+      if (products.length > 0) {
+        localStorage.setItem(productsStorageKey, JSON.stringify(products));
+      } else {
+          localStorage.removeItem(productsStorageKey);
+      }
+    }
+  }, [products, isMounted, productsStorageKey]);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -74,6 +83,10 @@ export default function ProductsPage() {
   });
 
   const onSubmit = (data: ProductFormValues) => {
+    if (!productsStorageKey) {
+       toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar o produto.", variant: "destructive"});
+       return;
+    }
     const newProduct: ProductEntry = {
       ...data,
       id: `PROD${String(Date.now()).slice(-6)}`,
@@ -93,8 +106,7 @@ export default function ProductsPage() {
 
     if (!window.confirm(`Tem certeza que deseja excluir o produto "${productToDelete.name}"?`)) return;
 
-    const updatedProducts = products.filter(p => p.id !== id);
-    setProducts(updatedProducts); // State update will trigger useEffect to save to localStorage
+    setProducts(prev => prev.filter(p => p.id !== id));
     
     toast({
       title: "Produto Excluído!",
@@ -103,8 +115,18 @@ export default function ProductsPage() {
     });
   };
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && !productsStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar o Catálogo de Produtos.</p>
+      </div>
+    );
   }
 
   return (
@@ -219,13 +241,13 @@ export default function ProductsPage() {
               </DialogContent>
             </Dialog>
           </div>
-          <CardDescription>Gerencie seu catálogo de produtos e serviços. Os dados são salvos localmente.</CardDescription>
+          <CardDescription>Gerencie seu catálogo de produtos e serviços. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
         <CardContent>
           {products.length === 0 ? (
             <div className="text-center py-10">
               <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
-              <p className="mt-4 text-lg font-medium">Nenhum produto ou serviço cadastrado.</p>
+              <p className="mt-4 text-lg font-medium">Nenhum produto ou serviço cadastrado para {currentCompany}.</p>
               <p className="text-muted-foreground">Clique em "Adicionar Novo" para começar.</p>
             </div>
           ) : (
@@ -265,4 +287,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-    

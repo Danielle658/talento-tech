@@ -14,7 +14,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { KeyRound, Loader2, CheckCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { SIMULATED_CREDENTIALS_STORAGE_KEY } from '@/lib/constants';
+import { SIMULATED_CREDENTIALS_STORAGE_KEY, ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
+import type { AccountDetailsFormValues } from '@/app/(app)/dashboard/settings/page'; // Import for type
 
 const resetPasswordSchema = z.object({
   password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
@@ -34,13 +35,47 @@ export default function ResetPasswordPage() {
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isValidTokenForDisplay, setIsValidTokenForDisplay] = useState(false);
+  const [emailFromToken, setEmailFromToken] = useState<string | null>(null); // To find the company
 
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token');
     if (tokenFromUrl) {
       setToken(tokenFromUrl);
-      setIsValidTokenForDisplay(true); // Assume token is valid for display purposes
-      // Em um aplicativo real, você faria uma chamada de API aqui para validar o token
+      // SIMULATE TOKEN VERIFICATION AND EMAIL EXTRACTION
+      // In a real app, you'd call a backend to verify the token and get the associated email.
+      // For simulation, we'll assume the token is a JWT and try to decode it.
+      // This is NOT secure for production, as JWTs can be decoded client-side if not properly handled.
+      try {
+        // A very basic simulation of extracting email if token was like "email:JWT_PAYLOAD_PART"
+        // This is highly simplified and not how real JWT verification works.
+        // A real JWT would be decoded using a library and its signature verified with the JWT_SECRET.
+        const decodedEmail = "simulated-email-from-token@example.com"; // Placeholder
+        // Here we'd normally call an API to verify the token. Since we can't,
+        // we'll just assume it's valid for this simulation if it exists.
+        // To link it to a company, we need to search for this email in account details.
+        
+        // Search for company by email (simulation)
+        let companyFound: string | null = null;
+        // This is a very inefficient way to find a company by email in a real scenario.
+        // Ideally, the token itself would directly link to a user/company ID.
+        // For this simulation, we can't iterate through all possible company localStorage keys.
+        // So, we'll just display a generic message.
+        
+        // For simulation, we will assume the token is valid IF it exists in the URL.
+        // The actual check of which user it belongs to is hard without iterating all possible localStorage keys
+        // or having the email/company in the token (which we don't currently do in the backend JWT generation for simplicity).
+        
+        // For this step, we can't reliably get the email from the token without a backend
+        // or making the token itself contain the email (which we are not doing in email-api/utils/generateResetToken.js)
+        // The email sent for reset is already known by the user.
+        // The critical part is that the token itself is "valid" (exists).
+
+        setIsValidTokenForDisplay(true);
+        // setEmailFromToken(decodedEmail); // We can't actually get this without a backend
+      } catch (e) {
+        setError("Token de redefinição inválido ou corrompido.");
+        setIsValidTokenForDisplay(false);
+      }
     } else {
       setError("Token de redefinição inválido ou ausente. Solicite um novo link de recuperação.");
       setIsValidTokenForDisplay(false);
@@ -71,44 +106,75 @@ export default function ResetPasswordPage() {
       return;
     }
     setIsLoading(true);
-    
-    console.log("Tentando redefinir senha com token:", token, "e nova senha:", data.password);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simula chamada de API
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
+    // SIMULATION: In a real app, the backend would validate the token and update the password.
+    // Here, we try to find the company based on the email the user *thinks* they are resetting for.
+    // This is not secure and is only for frontend simulation.
+    // A real system would use the token to identify the user/company directly.
+
+    // For this simulation, we'll assume the token is valid and proceed.
+    // The actual "who" is being reset is implicitly the user who received the email.
+    // We need to find WHICH company's credentials to update.
+    // This is tricky without a backend that links token to user/company.
+    // For the purpose of this simulation, we'll try to find the *first* company if multiple are registered
+    // or ideally, if the token contained an identifier (which it doesn't simply).
+
+    // A simple approach for simulation: update the *first* set of credentials found.
+    // This is not robust for multiple accounts.
     try {
-      const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
-      if (storedCredentialsRaw) {
-        const storedCredentials = JSON.parse(storedCredentialsRaw);
-        // Em uma aplicação real, o backend validaria o token e encontraria o usuário associado.
-        // Aqui, simplesmente atualizamos as credenciais simuladas existentes.
-        storedCredentials.password = data.password;
-        localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(storedCredentials));
-        console.log("Simulação: Senha atualizada no localStorage para:", storedCredentials.companyName);
-        toast({ 
-          title: "Senha Redefinida!", 
-          description: "Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova senha.",
-          duration: 5000,
-        });
-        form.reset();
-        router.push('/auth'); 
-      } else {
-        console.warn("Nenhuma credencial simulada encontrada no localStorage para atualizar a senha.");
+        const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
+        if (storedCredentialsRaw) {
+            let allSimulatedCredentials = JSON.parse(storedCredentialsRaw);
+            let credsToUpdate;
+
+            if (Array.isArray(allSimulatedCredentials) && allSimulatedCredentials.length > 0) {
+                // If it's an array, update the first one for simplicity in this simulation.
+                // A real app would have a way to identify the specific account from the token.
+                credsToUpdate = allSimulatedCredentials[0];
+            } else if (typeof allSimulatedCredentials === 'object' && allSimulatedCredentials !== null && !Array.isArray(allSimulatedCredentials)) {
+                // If it's a single object (old format or only one user)
+                credsToUpdate = allSimulatedCredentials;
+            }
+
+            if (credsToUpdate) {
+                credsToUpdate.password = data.password;
+                // Save back: if it was an array, update that specific element.
+                if (Array.isArray(allSimulatedCredentials)) {
+                    localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(allSimulatedCredentials));
+                } else {
+                    localStorage.setItem(SIMULATED_CREDENTIALS_STORAGE_KEY, JSON.stringify(credsToUpdate));
+                }
+                
+                toast({ 
+                    title: "Senha Redefinida!", 
+                    description: `Sua senha (para a empresa ${credsToUpdate.companyName || 'associada a este link'}) foi alterada com sucesso. Você já pode fazer login com sua nova senha.`,
+                    duration: 7000,
+                });
+                form.reset();
+                router.push('/auth'); 
+            } else {
+                toast({
+                    title: "Erro na Redefinição (Simulação)",
+                    description: "Não foram encontradas credenciais simuladas para atualizar. Por favor, verifique se você já se registrou.",
+                    variant: "destructive",
+                });
+            }
+        } else {
+            toast({
+                title: "Erro na Redefinição (Simulação)",
+                description: "Nenhuma credencial simulada encontrada. Por favor, registre-se primeiro.",
+                variant: "destructive",
+            });
+        }
+    } catch (e) {
+        console.error("Erro ao tentar atualizar senha simulada no localStorage:", e);
         toast({
-            title: "Erro na Redefinição (Simulação)",
-            description: "Não foram encontradas credenciais locais para atualizar. Por favor, registre-se primeiro ou solicite um novo link se o e-mail estiver correto.",
+            title: "Erro ao Atualizar Senha (Simulação)",
+            description: "Não foi possível atualizar a senha armazenada localmente.",
             variant: "destructive",
         });
-         // Não redireciona aqui, permite ao usuário ver a mensagem de erro.
-      }
-    } catch (e) {
-      console.error("Erro ao tentar atualizar senha simulada no localStorage:", e);
-      toast({
-        title: "Erro ao Atualizar Senha (Simulação)",
-        description: "Não foi possível atualizar a senha armazenada localmente. Esta é uma etapa de simulação.",
-        variant: "destructive",
-      });
     }
-    
     setIsLoading(false);
   };
 
@@ -124,12 +190,13 @@ export default function ResetPasswordPage() {
         )}
         {isValidTokenForDisplay && !error && (
            <CardDescription className="pt-2">
-            Você está redefinindo a senha usando um link de recuperação. Por favor, crie uma nova senha abaixo.
+            Você está usando um link de recuperação. Por favor, crie uma nova senha abaixo.
           </CardDescription>
         )}
-         {!isValidTokenForDisplay && !error && (
+         {!isValidTokenForDisplay && !error && !isLoading && (
           <CardDescription className="pt-2">Verificando link de redefinição...</CardDescription>
         )}
+         {isLoading && <div className="pt-2"><Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" /></div>}
       </CardHeader>
       <CardContent>
         {isValidTokenForDisplay && !error ? (

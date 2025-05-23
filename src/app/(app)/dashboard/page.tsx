@@ -4,18 +4,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { DataSection } from '@/components/dashboard/data-section';
-import { DollarSign, Users, FileText, Archive, BarChartBig, TrendingUp, AlertCircle, Package, BellRing, AlertTriangle, FileClock, Loader2 } from 'lucide-react';
+import { DollarSign, Users, FileText, Archive, BarChartBig, AlertTriangle, Package, BellRing, FileClock, Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Transaction, STORAGE_KEY_NOTEBOOK } from '@/app/(app)/dashboard/notebook/page';
-import { ProductEntry, STORAGE_KEY_PRODUCTS } from '@/app/(app)/dashboard/products/page';
-import { SalesRecordEntry, STORAGE_KEY_SALES_RECORD } from '@/app/(app)/dashboard/sales-record/page';
-import { CreditEntry, STORAGE_KEY_CREDIT_NOTEBOOK } from '@/app/(app)/dashboard/credit-notebook/page.tsx';
-import { CustomerEntry, STORAGE_KEY_CUSTOMERS } from '@/app/(app)/dashboard/customers/page.tsx';
+import { Transaction, STORAGE_KEY_NOTEBOOK_BASE } from '@/app/(app)/dashboard/notebook/page';
+import { ProductEntry, STORAGE_KEY_PRODUCTS_BASE } from '@/app/(app)/dashboard/products/page';
+import { SalesRecordEntry, STORAGE_KEY_SALES_RECORD_BASE } from '@/app/(app)/dashboard/sales-record/page';
+import { CreditEntry, STORAGE_KEY_CREDIT_NOTEBOOK_BASE } from '@/app/(app)/dashboard/credit-notebook/page.tsx';
+import { CustomerEntry, STORAGE_KEY_CUSTOMERS_BASE } from '@/app/(app)/dashboard/customers/page.tsx';
 import { format, parseISO, isValid, subDays, isSameDay, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import type { ChartConfig } from "@/components/ui/chart";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { useAuth } from '@/hooks/use-auth';
+import { getCompanySpecificKey } from '@/lib/constants';
 
 
 interface DisplayTransaction {
@@ -45,7 +47,7 @@ interface DisplayProduct {
 const kpiConfigurations = [
   { id: "totalRevenue", title: "Receita Total", icon: DollarSign, defaultDescription: "Calculando..." },
   { id: "totalCustomers", title: "Total de Clientes", icon: Users, defaultDescription: "Aguardando dados" },
-  { id: "pendingInvoices", title: "Faturas Pendentes", icon: FileText, defaultDescription: "R$ 0,00" },
+  { id: "pendingInvoices", title: "Fiados Pendentes", icon: FileText, defaultDescription: "R$ 0,00" }, // Changed from Faturas
   { id: "lowStockProducts", title: "Estoque Baixo", icon: Archive, defaultDescription: "Aguardando dados" },
 ];
 
@@ -60,75 +62,100 @@ const salesChartConfig = {
 
 export default function DashboardPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
+
+  // States for raw data
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [allSalesRecords, setAllSalesRecords] = useState<SalesRecordEntry[]>([]);
   const [productCatalog, setProductCatalog] = useState<ProductEntry[]>([]);
   const [allCreditEntries, setAllCreditEntries] = useState<CreditEntry[]>([]);
   const [allCustomers, setAllCustomers] = useState<CustomerEntry[]>([]);
 
-
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && currentCompany) {
+      const companyNotebookKey = getCompanySpecificKey(STORAGE_KEY_NOTEBOOK_BASE, currentCompany);
+      const companySalesKey = getCompanySpecificKey(STORAGE_KEY_SALES_RECORD_BASE, currentCompany);
+      const companyProductsKey = getCompanySpecificKey(STORAGE_KEY_PRODUCTS_BASE, currentCompany);
+      const companyCreditKey = getCompanySpecificKey(STORAGE_KEY_CREDIT_NOTEBOOK_BASE, currentCompany);
+      const companyCustomersKey = getCompanySpecificKey(STORAGE_KEY_CUSTOMERS_BASE, currentCompany);
+
       try {
-        const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
-        setAllTransactions(storedTransactions ? JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})) : []);
+        if (companyNotebookKey) {
+          const storedTransactions = localStorage.getItem(companyNotebookKey);
+          setAllTransactions(storedTransactions ? JSON.parse(storedTransactions).map((t: any) => ({...t, date: parseISO(t.date)})) : []);
+        }
       } catch (error) {
-        console.error("Error loading transactions from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
+        console.error("Error loading transactions from localStorage for", currentCompany, error);
+        if (companyNotebookKey) localStorage.removeItem(companyNotebookKey);
         setAllTransactions([]);
         toast({ variant: "destructive", title: "Erro ao Carregar Caderneta Digital", description: "Os dados da caderneta digital podem estar corrompidos e foram redefinidos."});
       }
 
       try {
-        const storedSales = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
-        setAllSalesRecords(storedSales ? JSON.parse(storedSales) : []);
+        if (companySalesKey) {
+          const storedSales = localStorage.getItem(companySalesKey);
+          setAllSalesRecords(storedSales ? JSON.parse(storedSales) : []);
+        }
       } catch (error) {
-        console.error("Error loading sales records from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_SALES_RECORD);
+        console.error("Error loading sales records from localStorage for", currentCompany, error);
+        if (companySalesKey) localStorage.removeItem(companySalesKey);
         setAllSalesRecords([]);
         toast({ variant: "destructive", title: "Erro ao Carregar Histórico de Vendas", description: "Os dados do histórico de vendas podem estar corrompidos e foram redefinidos."});
       }
 
       try {
-        const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-        setProductCatalog(storedProducts ? JSON.parse(storedProducts) : []);
+        if (companyProductsKey) {
+          const storedProducts = localStorage.getItem(companyProductsKey);
+          setProductCatalog(storedProducts ? JSON.parse(storedProducts) : []);
+        }
       } catch (error) {
-        console.error("Error loading product catalog from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_PRODUCTS);
+        console.error("Error loading product catalog from localStorage for", currentCompany, error);
+        if (companyProductsKey) localStorage.removeItem(companyProductsKey);
         setProductCatalog([]);
         toast({ variant: "destructive", title: "Erro ao Carregar Catálogo de Produtos", description: "Os dados dos produtos podem estar corrompidos e foram redefinidos."});
       }
 
       try {
-        const storedCreditEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-        setAllCreditEntries(storedCreditEntries ? JSON.parse(storedCreditEntries).map((entry: any) => ({
-            ...entry,
-            saleDate: parseISO(entry.saleDate),
-            dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
-          })) : []);
+        if (companyCreditKey) {
+          const storedCreditEntries = localStorage.getItem(companyCreditKey);
+          setAllCreditEntries(storedCreditEntries ? JSON.parse(storedCreditEntries).map((entry: any) => ({
+              ...entry,
+              saleDate: parseISO(entry.saleDate),
+              dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
+            })) : []);
+        }
       } catch (error) {
-        console.error("Error loading credit entries from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+        console.error("Error loading credit entries from localStorage for", currentCompany, error);
+        if (companyCreditKey) localStorage.removeItem(companyCreditKey);
         setAllCreditEntries([]);
         toast({ variant: "destructive", title: "Erro ao Carregar Caderneta de Fiados", description: "Os dados de fiados podem estar corrompidos e foram redefinidos."});
       }
 
       try {
-        const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
-        setAllCustomers(storedCustomers ? JSON.parse(storedCustomers) : []);
+        if (companyCustomersKey) {
+          const storedCustomers = localStorage.getItem(companyCustomersKey);
+          setAllCustomers(storedCustomers ? JSON.parse(storedCustomers) : []);
+        }
       } catch (error) {
-        console.error("Error loading customers from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
+        console.error("Error loading customers from localStorage for", currentCompany, error);
+        if (companyCustomersKey) localStorage.removeItem(companyCustomersKey);
         setAllCustomers([]);
         toast({ variant: "destructive", title: "Erro ao Carregar Clientes", description: "Os dados dos clientes podem estar corrompidos e foram redefinidos."});
       }
+    } else if (isMounted && !currentCompany) {
+      // Clear data if no company is logged in (e.g., after logout)
+      setAllTransactions([]);
+      setAllSalesRecords([]);
+      setProductCatalog([]);
+      setAllCreditEntries([]);
+      setAllCustomers([]);
     }
-  }, [isMounted, toast]);
+  }, [isMounted, currentCompany, toast]);
 
   const recentTransactionsData = useMemo((): DisplayTransaction[] => {
     if (!isMounted || !allTransactions) return [];
@@ -206,7 +233,7 @@ export default function DashboardPage() {
     return { value: `${allCustomers.length}`, description: "Total de clientes cadastrados" };
   }, [isMounted, allCustomers]);
 
-  const pendingInvoicesKPI = useMemo(() => {
+  const pendingInvoicesKPI = useMemo(() => { // Renamed from pendingInvoicesKPI
     if (!isMounted || !allCreditEntries) return { count: "0", amount: "R$ 0,00" };
     const pending = allCreditEntries.filter(entry => !entry.paid && isValid(entry.saleDate));
     const totalDue = pending.reduce((sum, entry) => sum + entry.amount, 0);
@@ -229,7 +256,7 @@ export default function DashboardPage() {
         return { ...kpiConfig, value: totalRevenueKPI.value, description: totalRevenueKPI.description };
       case 'totalCustomers':
         return { ...kpiConfig, value: totalCustomersKPI.value, description: totalCustomersKPI.description };
-      case 'pendingInvoices':
+      case 'pendingInvoices': // Updated ID
         return { ...kpiConfig, value: pendingInvoicesKPI.count, description: `${pendingInvoicesKPI.count} pendentes (${pendingInvoicesKPI.amount})` };
       case 'lowStockProducts':
         return { ...kpiConfig, value: lowStockProductsKPI.value, description: lowStockProductsKPI.description };
@@ -260,20 +287,29 @@ export default function DashboardPage() {
   }, [isMounted, allSalesRecords]);
 
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && isLoading)) { // Show loader if not mounted OR if mounted but no company yet (still loading auth context)
     return (
       <div className="flex h-[calc(100vh-8rem)] w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
+  
+  if (isMounted && !currentCompany && !isLoading) { // If mounted, no company, and auth loading is finished
+    return (
+      <div className="flex h-[calc(100vh-8rem)] w-full items-center justify-center text-center">
+        <p className="text-muted-foreground">Por favor, faça login para ver os dados da sua empresa.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h1 className="text-3xl font-bold tracking-tight">Painel Central</h1>
-            <p className="text-muted-foreground">Visão geral do seu negócio.</p>
+            <p className="text-muted-foreground">Visão geral do seu negócio: {currentCompany || "Empresa não identificada"}.</p>
         </div>
       </div>
 
@@ -382,7 +418,7 @@ export default function DashboardPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">Nenhuma notificação nova.</p>
               )}
-              <Button variant="link" className="mt-3 px-0 text-sm">Ver todas as notificações</Button>
+              {/* <Button variant="link" className="mt-3 px-0 text-sm">Ver todas as notificações</Button> */}
             </CardContent>
           </Card>
           
@@ -392,7 +428,7 @@ export default function DashboardPage() {
               <CardDescription>Vendas diárias nos últimos 7 dias.</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              {dailySalesChartData.length > 0 ? (
+              {dailySalesChartData.some(d => d.Vendas > 0) ? ( // Check if there's any sales data to display
                 <ChartContainer config={salesChartConfig} className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailySalesChartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -405,11 +441,11 @@ export default function DashboardPage() {
                         fontSize={12}
                       />
                       <YAxis 
-                        tickFormatter={(value) => `R$${value/1000}k`} 
+                        tickFormatter={(value) => `R$${Number.isInteger(value/1000) ? value/1000 : (value/1000).toFixed(1)}k`}
                         tickLine={false} 
                         axisLine={false} 
                         tickMargin={8}
-                        width={40}
+                        width={45} // Adjusted width
                         fontSize={12}
                       />
                       <Tooltip
@@ -438,4 +474,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

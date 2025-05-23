@@ -21,6 +21,8 @@ import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartConfig } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useAuth } from '@/hooks/use-auth';
+import { STORAGE_KEY_NOTEBOOK_BASE, getCompanySpecificKey } from '@/lib/constants';
 
 
 const transactionSchema = z.object({
@@ -36,8 +38,6 @@ export interface Transaction extends TransactionFormValues {
   id: string;
 }
 
-export const STORAGE_KEY_NOTEBOOK = "moneywise-transactions";
-
 const chartConfig = {
   income: {
     label: "Receitas",
@@ -52,40 +52,49 @@ const chartConfig = {
 
 export default function NotebookPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-    const storedTransactions = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
-    if (storedTransactions) {
-      try {
-        const parsedTransactions: Transaction[] = JSON.parse(storedTransactions).map((t: any) => ({
-          ...t,
-          date: parseISO(t.date),
-        }));
-        setTransactions(parsedTransactions.sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0)));
-      } catch (error) {
-        console.error("Failed to parse transactions from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
-        setTransactions([]);
-        toast({ title: "Erro ao Carregar Transações", description: "Não foi possível carregar os dados da caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'notebookLoadError' });
-      }
-    } else {
-      setTransactions([]);
-    }
-  }, [toast]);
+  const notebookStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_NOTEBOOK_BASE, currentCompany), [currentCompany]);
 
   useEffect(() => {
-    if (isMounted && transactions.length > 0) {
-      localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify(
-        transactions.map(t => ({...t, date: isValid(t.date) ? t.date.toISOString() : new Date().toISOString() }))
-      ));
-    } else if (isMounted && transactions.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_NOTEBOOK);
+    setIsMounted(true);
+    if (notebookStorageKey) {
+      const storedTransactions = localStorage.getItem(notebookStorageKey);
+      if (storedTransactions) {
+        try {
+          const parsedTransactions: Transaction[] = JSON.parse(storedTransactions).map((t: any) => ({
+            ...t,
+            date: parseISO(t.date),
+          }));
+          setTransactions(parsedTransactions.sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0)));
+        } catch (error) {
+          console.error("Failed to parse transactions from localStorage for", currentCompany, error);
+          localStorage.removeItem(notebookStorageKey);
+          setTransactions([]);
+          toast({ title: "Erro ao Carregar Transações", description: "Não foi possível carregar os dados da caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'notebookLoadError' });
+        }
+      } else {
+        setTransactions([]);
+      }
+    } else if (currentCompany === null && isMounted) {
+      setTransactions([]);
     }
-  }, [transactions, isMounted]);
+  }, [toast, notebookStorageKey, currentCompany, isMounted]);
+
+  useEffect(() => {
+    if (isMounted && notebookStorageKey) {
+      if (transactions.length > 0) {
+        localStorage.setItem(notebookStorageKey, JSON.stringify(
+          transactions.map(t => ({...t, date: isValid(t.date) ? t.date.toISOString() : new Date().toISOString() }))
+        ));
+      } else {
+        localStorage.removeItem(notebookStorageKey);
+      }
+    }
+  }, [transactions, isMounted, notebookStorageKey]);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -98,6 +107,10 @@ export default function NotebookPage() {
   });
 
   const onSubmitTransaction = (data: TransactionFormValues) => {
+    if (!notebookStorageKey) {
+       toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar a transação.", variant: "destructive"});
+       return;
+    }
     const newTransaction: Transaction = {
       ...data,
       id: `T${String(Date.now()).slice(-6)}`,
@@ -116,8 +129,7 @@ export default function NotebookPage() {
     if (!transactionToDelete) return;
 
     if (window.confirm(`Tem certeza que deseja excluir a transação "${transactionToDelete.description}"?`)) {
-      const updatedTransactions = transactions.filter(t => t.id !== id);
-      setTransactions(updatedTransactions); // State update will trigger useEffect to save to localStorage
+      setTransactions(prev => prev.filter(t => t.id !== id));
       toast({
         title: "Transação Excluída!",
         description: `A transação "${transactionToDelete.description}" foi removida.`,
@@ -160,8 +172,18 @@ export default function NotebookPage() {
     return data;
   }, [transactions, isMounted]);
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && !notebookStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+  
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar a Caderneta Digital.</p>
+      </div>
+    );
   }
 
   return <div className="space-y-6">
@@ -280,7 +302,7 @@ export default function NotebookPage() {
               </DialogContent>
             </Dialog>
           </div>
-          <CardDescription>Gerencie suas receitas, despesas e acompanhe o fluxo de caixa. Os dados são salvos localmente no seu navegador.</CardDescription>
+          <CardDescription>Gerencie suas receitas e despesas. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           <div className="grid gap-4 md:grid-cols-3">
@@ -363,7 +385,7 @@ export default function NotebookPage() {
             {transactions.length === 0 ? (
                 <div className="text-center py-10">
                     <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-4 text-lg font-medium">Nenhuma transação registrada ainda.</p>
+                    <p className="mt-4 text-lg font-medium">Nenhuma transação registrada ainda para {currentCompany}.</p>
                     <p className="text-muted-foreground">Clique em "Adicionar Transação" para começar.</p>
                 </div>
             ) : (
@@ -412,4 +434,3 @@ export default function NotebookPage() {
       </Card>
     </div>;
 }
-    

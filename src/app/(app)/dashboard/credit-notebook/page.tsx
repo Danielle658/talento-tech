@@ -21,11 +21,10 @@ import { format, parseISO, isValid, isToday, isPast, startOfDay } from "date-fns
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
-import { ACCOUNT_DETAILS_STORAGE_KEY } from '@/lib/constants';
+import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, STORAGE_KEY_CUSTOMERS_BASE, STORAGE_KEY_NOTEBOOK_BASE, STORAGE_KEY_CREDIT_NOTEBOOK_BASE, getCompanySpecificKey } from '@/lib/constants';
 import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page"; 
-import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page"; 
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page";
-import { STORAGE_KEY_NOTEBOOK } from "@/app/(app)/dashboard/notebook/page";
+import { useAuth } from '@/hooks/use-auth';
 
 
 const creditEntrySchema = z.object({
@@ -45,61 +44,78 @@ export interface CreditEntry extends CreditEntryFormValues {
   paymentDate?: string; 
 }
 
-export const STORAGE_KEY_CREDIT_NOTEBOOK = "moneywise-creditEntries";
-
 export default function CreditNotebookPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [creditEntries, setCreditEntries] = useState<CreditEntry[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [accountDetails, setAccountDetails] = useState<AccountDetailsFormValues | null>(null);
 
+  const creditStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_CREDIT_NOTEBOOK_BASE, currentCompany), [currentCompany]);
+  const customersStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_CUSTOMERS_BASE, currentCompany), [currentCompany]);
+  const notebookStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_NOTEBOOK_BASE, currentCompany), [currentCompany]);
+  const accountDetailsStorageKey = useMemo(() => getCompanySpecificKey(ACCOUNT_DETAILS_BASE_STORAGE_KEY, currentCompany), [currentCompany]);
+
+
   useEffect(() => {
     setIsMounted(true);
-    const storedEntries = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
-    if (storedEntries) {
-      try {
-        const parsedEntries: CreditEntry[] = JSON.parse(storedEntries).map((entry: any) => ({
-          ...entry,
-          saleDate: parseISO(entry.saleDate),
-          dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
-        }));
-        setCreditEntries(parsedEntries.sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
-      } catch (error) {
-        console.error("Failed to parse credit entries from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+    if (creditStorageKey) {
+      const storedEntries = localStorage.getItem(creditStorageKey);
+      if (storedEntries) {
+        try {
+          const parsedEntries: CreditEntry[] = JSON.parse(storedEntries).map((entry: any) => ({
+            ...entry,
+            saleDate: parseISO(entry.saleDate),
+            dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
+          }));
+          setCreditEntries(parsedEntries.sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
+        } catch (error) {
+          console.error("Failed to parse credit entries from localStorage for", currentCompany, error);
+          localStorage.removeItem(creditStorageKey);
+          setCreditEntries([]);
+          toast({ title: "Erro ao Carregar Fiados", description: "Não foi possível carregar os dados da caderneta de fiados. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'creditLoadError' });
+        }
+      } else {
         setCreditEntries([]);
-        toast({ title: "Erro ao Carregar Fiados", description: "Não foi possível carregar os dados da caderneta de fiados. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'creditLoadError' });
       }
-    } else {
-      setCreditEntries([]);
+    } else if (currentCompany === null && isMounted) {
+      setCreditEntries([]); // Clear data if no company context
     }
 
-    const storedAccountDetails = localStorage.getItem(ACCOUNT_DETAILS_STORAGE_KEY);
-    if (storedAccountDetails) {
-        try {
-            setAccountDetails(JSON.parse(storedAccountDetails));
-        } catch (error) {
-            console.error("Failed to parse account details from localStorage for credit notebook", error);
-            localStorage.removeItem(ACCOUNT_DETAILS_STORAGE_KEY);
-            setAccountDetails(null);
-            toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta para usar nos comprovantes. Os dados podem ter sido redefinidos.", variant: "destructive", duration: 7000, toastId: 'creditAccountLoadError' });
-        }
+    if (accountDetailsStorageKey) {
+      const storedAccountDetails = localStorage.getItem(accountDetailsStorageKey);
+      if (storedAccountDetails) {
+          try {
+              setAccountDetails(JSON.parse(storedAccountDetails));
+          } catch (error) {
+              console.error("Failed to parse account details from localStorage for credit notebook for", currentCompany, error);
+              localStorage.removeItem(accountDetailsStorageKey);
+              setAccountDetails(null);
+              toast({ title: "Erro ao Carregar Detalhes da Conta", description: "Não foi possível carregar os detalhes da sua conta. Os dados podem ter sido redefinidos.", variant: "destructive", duration: 7000, toastId: 'creditAccountLoadError' });
+          }
+      } else {
+        setAccountDetails(null);
+      }
+    } else if (currentCompany === null && isMounted) {
+      setAccountDetails(null);
     }
-  }, [toast]);
+  }, [toast, creditStorageKey, accountDetailsStorageKey, currentCompany, isMounted]);
 
   useEffect(() => {
-    if (isMounted && creditEntries.length > 0) {
-      localStorage.setItem(STORAGE_KEY_CREDIT_NOTEBOOK, JSON.stringify(creditEntries.map(entry => ({
-        ...entry,
-        saleDate: isValid(entry.saleDate) ? entry.saleDate.toISOString() : new Date().toISOString(),
-        dueDate: entry.dueDate && isValid(entry.dueDate) ? entry.dueDate.toISOString() : undefined,
-      }))));
-    } else if (isMounted && creditEntries.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+    if (isMounted && creditStorageKey) {
+      if (creditEntries.length > 0) {
+        localStorage.setItem(creditStorageKey, JSON.stringify(creditEntries.map(entry => ({
+          ...entry,
+          saleDate: isValid(entry.saleDate) ? entry.saleDate.toISOString() : new Date().toISOString(),
+          dueDate: entry.dueDate && isValid(entry.dueDate) ? entry.dueDate.toISOString() : undefined,
+        }))));
+      } else {
+         localStorage.removeItem(creditStorageKey);
+      }
     }
 
-    if (isMounted) {
+    if (isMounted && currentCompany) {
       const today = startOfDay(new Date());
       const dueTodayEntries = creditEntries.filter(entry =>
         !entry.paid &&
@@ -109,7 +125,8 @@ export default function CreditNotebookPage() {
       );
 
       if (dueTodayEntries.length > 0) {
-        const lastToastDate = localStorage.getItem('moneywise-credit-due-toast-date');
+        const companyDueToastKey = `moneywise-credit-due-toast-date_${currentCompany}`;
+        const lastToastDate = localStorage.getItem(companyDueToastKey);
         const todayStr = format(today, 'yyyy-MM-dd');
 
         if (lastToastDate !== todayStr) {
@@ -119,11 +136,11 @@ export default function CreditNotebookPage() {
                 duration: 7000,
                 toastId: 'creditDueToast'
             });
-            localStorage.setItem('moneywise-credit-due-toast-date', todayStr);
+            localStorage.setItem(companyDueToastKey, todayStr);
         }
       }
     }
-  }, [creditEntries, isMounted, toast]);
+  }, [creditEntries, isMounted, toast, creditStorageKey, currentCompany]);
 
   const form = useForm<CreditEntryFormValues>({
     resolver: zodResolver(creditEntrySchema),
@@ -138,9 +155,13 @@ export default function CreditNotebookPage() {
   });
 
   const onSubmit = (data: CreditEntryFormValues) => {
+    if (!customersStorageKey || !creditStorageKey) {
+      toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar o fiado.", variant: "destructive"});
+      return;
+    }
     let customerAddedToMainList = false;
     try {
-        const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
+        const storedCustomers = localStorage.getItem(customersStorageKey);
         let customers: CustomerEntry[] = storedCustomers ? JSON.parse(storedCustomers) : [];
         const customerExists = customers.some(c => c.name.toLowerCase() === data.customerName.toLowerCase());
 
@@ -153,11 +174,11 @@ export default function CreditNotebookPage() {
                 address: "", 
             };
             customers = [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name));
-            localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(customers));
+            localStorage.setItem(customersStorageKey, JSON.stringify(customers));
             customerAddedToMainList = true;
         }
     } catch (error) {
-        console.error("Error auto-registering customer:", error);
+        console.error("Error auto-registering customer for", currentCompany, error);
         toast({
             title: "Erro ao Registrar Cliente Automaticamente",
             description: "Não foi possível adicionar o novo cliente à lista principal de clientes.",
@@ -187,6 +208,10 @@ export default function CreditNotebookPage() {
   };
 
   const handleMarkAsPaid = (id: string) => {
+    if (!notebookStorageKey) {
+       toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível atualizar o status do fiado.", variant: "destructive"});
+       return;
+    }
     const entry = creditEntries.find(e => e.id === id);
     if (!entry) return;
 
@@ -199,9 +224,9 @@ export default function CreditNotebookPage() {
       )
     );
 
-    if (newPaidStatus) { // Just marked as paid
+    if (newPaidStatus) { 
       try {
-        const existingNotebookTransactionsRaw = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
+        const existingNotebookTransactionsRaw = localStorage.getItem(notebookStorageKey);
         let notebookTransactions: Transaction[] = existingNotebookTransactionsRaw 
           ? JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: parseISO(t.date)})) 
           : [];
@@ -211,10 +236,10 @@ export default function CreditNotebookPage() {
           description: `Recebimento Fiado - ${entry.customerName} (Ref Venda: ${format(entry.saleDate, "dd/MM/yy")})`,
           amount: entry.amount,
           type: "income",
-          date: new Date(), // Payment date
+          date: new Date(), 
         };
         notebookTransactions = [...notebookTransactions, incomeTransaction].sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0));
-        localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify(notebookTransactions.map(t => ({...t, date: t.date.toISOString()}))));
+        localStorage.setItem(notebookStorageKey, JSON.stringify(notebookTransactions.map(t => ({...t, date: t.date.toISOString()}))));
         
         toast({
           title: `Status Alterado!`,
@@ -222,14 +247,14 @@ export default function CreditNotebookPage() {
         });
 
       } catch (error) {
-        console.error("Error saving income transaction to notebook:", error);
+        console.error("Error saving income transaction to notebook for", currentCompany, error);
         toast({
           title: `Status Alterado (com erro)!`,
           description: `Fiado de ${entry.customerName} marcado como pago, mas houve um erro ao registrar a receita na Caderneta Digital.`,
           variant: "destructive"
         });
       }
-    } else { // Just marked as unpaid
+    } else { 
       toast({
         title: `Status Alterado!`,
         description: `Fiado de ${entry.customerName} marcado como pendente. Se uma receita foi registrada, ajuste a Caderneta Digital manualmente se necessário.`,
@@ -242,8 +267,7 @@ export default function CreditNotebookPage() {
     if (!entryToDelete) return;
 
     if (window.confirm(`Tem certeza que deseja excluir o fiado de "${entryToDelete.customerName}" no valor de R$ ${entryToDelete.amount.toFixed(2)}?`)) {
-      const updatedEntries = creditEntries.filter(e => e.id !== id);
-      setCreditEntries(updatedEntries);
+      setCreditEntries(prev => prev.filter(e => e.id !== id));
       toast({
         title: "Fiado Excluído!",
         description: `O fiado de "${entryToDelete.customerName}" foi removido.`,
@@ -355,9 +379,20 @@ export default function CreditNotebookPage() {
     return creditEntries.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
   }, [creditEntries, isMounted]);
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && !creditStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
+  
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <BookUser className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar a Caderneta de Fiados.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6">
@@ -500,13 +535,13 @@ export default function CreditNotebookPage() {
               </DialogContent>
             </Dialog>
           </div>
-          <CardDescription>Gerencie os registros de vendas a prazo e fiados. Os dados são salvos localmente no seu navegador.</CardDescription>
+          <CardDescription>Gerencie os registros de vendas a prazo e fiados. Os dados são salvos localmente para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
         <CardContent>
           {creditEntries.length === 0 ? (
             <div className="text-center py-10">
               <BookUser className="mx-auto h-12 w-12 text-muted-foreground" />
-              <p className="mt-4 text-lg font-medium">Nenhum fiado registrado ainda.</p>
+              <p className="mt-4 text-lg font-medium">Nenhum fiado registrado ainda para {currentCompany}.</p>
               <p className="text-muted-foreground">Clique em "Adicionar Novo Fiado" para começar.</p>
             </div>
           ) : (
@@ -593,5 +628,3 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
-
-    

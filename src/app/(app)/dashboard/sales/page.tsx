@@ -14,16 +14,18 @@ import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, Cre
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
-import { STORAGE_KEY_NOTEBOOK } from "@/app/(app)/dashboard/notebook/page";
+import { STORAGE_KEY_NOTEBOOK_BASE } from "@/app/(app)/dashboard/notebook/page";
 import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
-import { STORAGE_KEY_SALES_RECORD } from "@/app/(app)/dashboard/sales-record/page";
+import { STORAGE_KEY_SALES_RECORD_BASE } from "@/app/(app)/dashboard/sales-record/page";
 import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
-import { STORAGE_KEY_PRODUCTS } from "@/app/(app)/dashboard/products/page";
+import { STORAGE_KEY_PRODUCTS_BASE } from "@/app/(app)/dashboard/products/page";
 import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
-import { STORAGE_KEY_CUSTOMERS } from "@/app/(app)/dashboard/customers/page";
+import { STORAGE_KEY_CUSTOMERS_BASE } from "@/app/(app)/dashboard/customers/page";
 import type { CreditEntry } from "@/app/(app)/dashboard/credit-notebook/page";
-import { STORAGE_KEY_CREDIT_NOTEBOOK } from "@/app/(app)/dashboard/credit-notebook/page";
+import { STORAGE_KEY_CREDIT_NOTEBOOK_BASE } from "@/app/(app)/dashboard/credit-notebook/page";
 import { isValid as isValidDate, parseISO } from 'date-fns';
+import { useAuth } from '@/hooks/use-auth';
+import { getCompanySpecificKey } from '@/lib/constants';
 
 
 interface PDVProduct {
@@ -39,6 +41,7 @@ interface CartItem extends PDVProduct {
 
 export default function SalesPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [productCodeInput, setProductCodeInput] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [amountPaidInput, setAmountPaidInput] = useState("");
@@ -55,37 +58,51 @@ export default function SalesPage() {
   const [productSuggestions, setProductSuggestions] = useState<ProductEntry[]>([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
+  const productsStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_PRODUCTS_BASE, currentCompany), [currentCompany]);
+  const customersStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_CUSTOMERS_BASE, currentCompany), [currentCompany]);
+  const salesRecordStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_SALES_RECORD_BASE, currentCompany), [currentCompany]);
+  const notebookStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_NOTEBOOK_BASE, currentCompany), [currentCompany]);
+  const creditNotebookStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_CREDIT_NOTEBOOK_BASE, currentCompany), [currentCompany]);
+
 
   useEffect(() => {
     setIsMounted(true);
-    const storedProducts = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-    if (storedProducts) {
-      try {
-        setAvailableProducts(JSON.parse(storedProducts));
-      } catch (error) {
-        console.error("Failed to parse products from localStorage for PDV", error);
-        localStorage.removeItem(STORAGE_KEY_PRODUCTS);
-        setAvailableProducts([]); 
-        toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os produtos para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvProductLoadError" });
+    if (productsStorageKey) {
+      const storedProducts = localStorage.getItem(productsStorageKey);
+      if (storedProducts) {
+        try {
+          setAvailableProducts(JSON.parse(storedProducts));
+        } catch (error) {
+          console.error("Failed to parse products from localStorage for PDV for", currentCompany, error);
+          localStorage.removeItem(productsStorageKey);
+          setAvailableProducts([]); 
+          toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os produtos para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvProductLoadError" });
+        }
+      } else {
+          setAvailableProducts([]); 
       }
-    } else {
-        setAvailableProducts([]); 
+    } else if (currentCompany === null && isMounted) {
+      setAvailableProducts([]);
     }
 
-    const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
-    if (storedCustomers) {
-      try {
-        setAvailableCustomers(JSON.parse(storedCustomers));
-      } catch (error) {
-        console.error("Failed to parse customers from localStorage for PDV", error);
-        localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
-        setAvailableCustomers([]); 
-        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os clientes para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvCustomerLoadError" });
+    if (customersStorageKey) {
+      const storedCustomers = localStorage.getItem(customersStorageKey);
+      if (storedCustomers) {
+        try {
+          setAvailableCustomers(JSON.parse(storedCustomers));
+        } catch (error) {
+          console.error("Failed to parse customers from localStorage for PDV for", currentCompany, error);
+          localStorage.removeItem(customersStorageKey);
+          setAvailableCustomers([]); 
+          toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os clientes para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvCustomerLoadError" });
+        }
+      } else {
+          setAvailableCustomers([]); 
       }
-    } else {
-        setAvailableCustomers([]); 
+    } else if (currentCompany === null && isMounted) {
+      setAvailableCustomers([]);
     }
-  }, [toast]);
+  }, [toast, productsStorageKey, customersStorageKey, currentCompany, isMounted]);
 
 
   const addProductToCartByCode = (code: string): boolean => {
@@ -197,6 +214,10 @@ export default function SalesPage() {
   }, [amountPaid, cartTotal, cart.length, paymentMethod]);
 
   const handleFinalizeSale = () => {
+    if (!salesRecordStorageKey || !notebookStorageKey || !creditNotebookStorageKey) {
+      toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível finalizar a venda.", variant: "destructive"});
+      return;
+    }
     if (cart.length === 0) {
       toast({ title: "Carrinho Vazio", description: "Adicione produtos ao carrinho antes de finalizar.", variant: "destructive" });
       return;
@@ -221,7 +242,6 @@ export default function SalesPage() {
 
     const saleDate = new Date();
 
-    // Always record the sale in SalesRecord
     const salesRecordEntry: SalesRecordEntry = {
       id: `SR-${Date.now().toString().slice(-6)}`,
       items: cart.map(item => ({ productId: item.id, name: item.name, quantity: item.quantity, unitPrice: item.price })),
@@ -235,11 +255,11 @@ export default function SalesPage() {
     };
 
     try {
-        const existingSalesRecordsRaw = localStorage.getItem(STORAGE_KEY_SALES_RECORD);
+        const existingSalesRecordsRaw = localStorage.getItem(salesRecordStorageKey);
         const existingSalesRecords: SalesRecordEntry[] = existingSalesRecordsRaw ? JSON.parse(existingSalesRecordsRaw) : [];
-        localStorage.setItem(STORAGE_KEY_SALES_RECORD, JSON.stringify([...existingSalesRecords, salesRecordEntry]));
+        localStorage.setItem(salesRecordStorageKey, JSON.stringify([...existingSalesRecords, salesRecordEntry]));
     } catch (e) {
-        console.error("Error updating sales records in localStorage", e);
+        console.error("Error updating sales records in localStorage for", currentCompany, e);
         toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvSalesRecordSaveError"})
     }
 
@@ -249,27 +269,27 @@ export default function SalesPage() {
         customerName: selectedCustomer.name,
         amount: cartTotal,
         saleDate: saleDate,
-        dueDate: undefined, // Or prompt for due date
+        dueDate: undefined, 
         whatsappNumber: selectedCustomer.phone || "",
         notes: `Venda PDV: ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`,
         paid: false,
       };
       try {
-        const existingCreditEntriesRaw = localStorage.getItem(STORAGE_KEY_CREDIT_NOTEBOOK);
+        const existingCreditEntriesRaw = localStorage.getItem(creditNotebookStorageKey);
         const existingCreditEntries: CreditEntry[] = existingCreditEntriesRaw 
           ? JSON.parse(existingCreditEntriesRaw).map((e:any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate): undefined})) 
           : [];
-        localStorage.setItem(STORAGE_KEY_CREDIT_NOTEBOOK, JSON.stringify([...existingCreditEntries, {...creditEntry, saleDate: creditEntry.saleDate.toISOString()}]));
+        localStorage.setItem(creditNotebookStorageKey, JSON.stringify([...existingCreditEntries, {...creditEntry, saleDate: creditEntry.saleDate.toISOString()}]));
         toast({
           title: "Venda Registrada como Fiado!",
           description: `Venda de R$ ${cartTotal.toFixed(2)} para ${selectedCustomer.name} adicionada à Caderneta de Fiados.`,
           className: "bg-blue-100 dark:bg-blue-800 border-blue-300 dark:border-blue-700"
         });
       } catch (e) {
-        console.error("Error updating credit notebook in localStorage", e);
+        console.error("Error updating credit notebook in localStorage for", currentCompany, e);
         toast({title: "Erro ao salvar na Caderneta de Fiados", description: "Não foi possível atualizar a caderneta de fiados.", variant: "destructive", toastId: "pdvCreditNotebookSaveError"})
       }
-    } else { // For non-Fiado payments
+    } else { 
       const incomeTransactionDescription = `Venda PDV ${customerNameForRecord ? `(${customerNameForRecord})` : ''} - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`;
       const incomeTransaction: Transaction = {
         id: `T-SALE-${Date.now().toString().slice(-6)}`,
@@ -280,16 +300,16 @@ export default function SalesPage() {
       };
       
       try {
-          const existingNotebookTransactionsRaw = localStorage.getItem(STORAGE_KEY_NOTEBOOK);
+          const existingNotebookTransactionsRaw = localStorage.getItem(notebookStorageKey);
           const existingNotebookTransactions: Transaction[] = existingNotebookTransactionsRaw ? JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: new Date(t.date)})) : [];
-          localStorage.setItem(STORAGE_KEY_NOTEBOOK, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
+          localStorage.setItem(notebookStorageKey, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
           toast({
             title: "Venda Finalizada!",
             description: `Venda de R$ ${cartTotal.toFixed(2)} para ${customerNameForRecord} paga com ${paymentMethod}. ${paymentMethod === "Dinheiro" ? `Troco: R$ ${changeDue.toFixed(2)}.` : ''}`,
             className: "bg-green-100 dark:bg-green-800 border-green-300 dark:border-green-700"
           });
       } catch (e) {
-          console.error("Error updating notebook transactions in localStorage", e);
+          console.error("Error updating notebook transactions in localStorage for", currentCompany, e);
           toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvNotebookSaveError"})
       }
     }
@@ -319,13 +339,24 @@ export default function SalesPage() {
         product.code.toLowerCase().includes(lowercasedValue) ||
         product.name.toLowerCase().includes(lowercasedValue)
     );
-    setProductSuggestions(filtered.slice(0, 5)); // Show top 5 suggestions
+    setProductSuggestions(filtered.slice(0, 5)); 
     setIsSuggestionsVisible(true);
   };
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && !productsStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
+
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar o Ponto de Venda.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6">
@@ -335,7 +366,7 @@ export default function SalesPage() {
             <ShoppingCart className="h-7 w-7 text-primary" />
             <CardTitle className="text-2xl">Ponto de Venda (PDV)</CardTitle>
           </div>
-          <CardDescription>Registre vendas rapidamente. Os dados são salvos localmente.</CardDescription>
+          <CardDescription>Registre vendas rapidamente. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
@@ -392,7 +423,6 @@ export default function SalesPage() {
                         }
                       }}
                       onBlur={() => {
-                        // Delay hiding to allow click on suggestions
                         setTimeout(() => {
                           setIsSuggestionsVisible(false);
                         }, 150); 
@@ -614,7 +644,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-    
-
-    

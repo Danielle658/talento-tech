@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/hooks/use-auth';
+import { STORAGE_KEY_CUSTOMERS_BASE, getCompanySpecificKey } from '@/lib/constants';
 
 const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; 
 
@@ -29,39 +31,46 @@ export interface CustomerEntry extends CustomerFormValues {
   id: string;
 }
 
-export const STORAGE_KEY_CUSTOMERS = "moneywise-customers";
-
 export default function CustomersPage() {
   const { toast } = useToast();
+  const { currentCompany } = useAuth();
   const [customers, setCustomers] = useState<CustomerEntry[]>([]);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerEntry | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-    const storedCustomers = localStorage.getItem(STORAGE_KEY_CUSTOMERS);
-    if (storedCustomers) {
-      try {
-        setCustomers(JSON.parse(storedCustomers));
-      } catch (error) {
-        console.error("Failed to parse customers from localStorage", error);
-        localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
-        setCustomers([]);
-        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os dados dos clientes. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'customerLoadError' });
-      }
-    } else {
-        setCustomers([]);
-    }
-  }, [toast]);
+  const customersStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_CUSTOMERS_BASE, currentCompany), [currentCompany]);
 
   useEffect(() => {
-    if (isMounted && customers.length > 0) {
-      localStorage.setItem(STORAGE_KEY_CUSTOMERS, JSON.stringify(customers));
-    } else if (isMounted && customers.length === 0) {
-      localStorage.removeItem(STORAGE_KEY_CUSTOMERS);
+    setIsMounted(true);
+    if (customersStorageKey) {
+      const storedCustomers = localStorage.getItem(customersStorageKey);
+      if (storedCustomers) {
+        try {
+          setCustomers(JSON.parse(storedCustomers));
+        } catch (error) {
+          console.error("Failed to parse customers from localStorage for", currentCompany, error);
+          localStorage.removeItem(customersStorageKey);
+          setCustomers([]);
+          toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os dados dos clientes. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: 'customerLoadError' });
+        }
+      } else {
+          setCustomers([]);
+      }
+    } else if (currentCompany === null && isMounted) {
+      setCustomers([]);
     }
-  }, [customers, isMounted]);
+  }, [toast, customersStorageKey, currentCompany, isMounted]);
+
+  useEffect(() => {
+    if (isMounted && customersStorageKey) {
+      if (customers.length > 0) {
+        localStorage.setItem(customersStorageKey, JSON.stringify(customers));
+      } else {
+        localStorage.removeItem(customersStorageKey);
+      }
+    }
+  }, [customers, isMounted, customersStorageKey]);
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
@@ -82,6 +91,10 @@ export default function CustomersPage() {
   }, [editingCustomer, form, isFormDialogOpen]);
 
   const onSubmit = (data: CustomerFormValues) => {
+     if (!customersStorageKey) {
+      toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar o cliente.", variant: "destructive"});
+      return;
+    }
     if (editingCustomer) {
       setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c).sort((a,b) => a.name.localeCompare(b.name)));
       toast({ title: "Cliente Atualizado!", description: `${data.name} foi atualizado com sucesso.` });
@@ -113,8 +126,7 @@ export default function CustomersPage() {
     if (!window.confirm(`Tem certeza que deseja excluir o cliente "${customerToDelete.name}"? Esta ação não pode ser desfeita.`)) {
       return;
     }
-    const updatedCustomers = customers.filter(c => c.id !== id);
-    setCustomers(updatedCustomers); // State update will trigger useEffect to save to localStorage
+    setCustomers(prev => prev.filter(c => c.id !== id));
     toast({ title: "Cliente Excluído!", description: `${customerToDelete.name} foi removido.`, variant: "destructive" });
   };
 
@@ -123,9 +135,20 @@ export default function CustomersPage() {
     setEditingCustomer(null);
   };
 
-  if (!isMounted) {
+  if (!isMounted || (isMounted && !currentCompany && !customersStorageKey)) { // Check if storage key is also ready (derived from currentCompany)
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
+  
+  if (isMounted && !currentCompany) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen text-center">
+        <Users className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium">Nenhuma empresa selecionada.</p>
+        <p className="text-muted-foreground">Por favor, faça login para acessar as Contas de Clientes.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6">
@@ -231,13 +254,13 @@ export default function CustomersPage() {
               </DialogContent>
             </Dialog>
           </div>
-          <CardDescription>Gerencie as informações e o histórico dos seus clientes. Os dados são salvos localmente.</CardDescription>
+          <CardDescription>Gerencie as informações dos seus clientes. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
         <CardContent>
           {customers.length === 0 ? (
              <div className="text-center py-10">
                 <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-                <p className="mt-4 text-lg font-medium">Nenhum cliente cadastrado ainda.</p>
+                <p className="mt-4 text-lg font-medium">Nenhum cliente cadastrado ainda para {currentCompany}.</p>
                 <p className="text-muted-foreground">Clique em "Adicionar Novo Cliente" para começar.</p>
             </div>
           ) : (
@@ -278,5 +301,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    

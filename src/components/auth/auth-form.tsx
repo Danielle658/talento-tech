@@ -63,10 +63,15 @@ export function AuthForm() {
       }
     } catch (error) {
       console.error("Error reading simulated credentials from localStorage:", error);
+      toast({
+        title: "Erro ao Verificar Credenciais",
+        description: "Não foi possível verificar suas credenciais. Tente novamente.",
+        variant: "destructive",
+      });
     }
 
     if (loginSuccessful) {
-      login(); 
+      login(data.companyName); // Pass companyName to login context
       toast({ title: "Login bem-sucedido!", description: "Redirecionando para o painel." });
 
       if (data.rememberMe) {
@@ -81,7 +86,6 @@ export function AuthForm() {
         description: "Nome da empresa ou senha incorretos. Verifique seus dados.",
         variant: "destructive",
       });
-      // Limpa apenas o campo de senha após tentativa falha
       loginForm.setValue("password", "");
     }
     setIsLoading(false);
