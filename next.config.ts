@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
       "http://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev"
     ],
   },
-  async rewrites() {
-    return []
-  },
+  // A seção rewrites foi removida pois a email-api não está mais em uso.
 };
+
+export default nextConfig;

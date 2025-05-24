@@ -1,11 +1,31 @@
 
-// Esta página não é mais utilizada e pode ser removida.
-// A funcionalidade "Redefinir Senha" foi desabilitada.
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, ShieldAlert } from 'lucide-react';
 
-export default function ResetPasswordPage() {
+export default function ResetPasswordDisabledPage() {
   return (
-    <div className="p-4 text-center">
-      <p>A funcionalidade de redefinição de senha foi desabilitada.</p>
-    </div>
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <ShieldAlert className="mx-auto h-12 w-12 text-destructive mb-4" />
+        <CardTitle className="text-2xl">Funcionalidade Desabilitada</CardTitle>
+        <CardDescription>
+          A redefinição de senha não está disponível no momento.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="text-center">
+        <p className="text-muted-foreground">
+          Esta funcionalidade foi desativada.
+        </p>
+      </CardContent>
+      <CardFooter className="flex flex-col items-center">
+        <Button variant="outline" asChild className="w-full">
+          <Link href="/auth">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Login
+          </Link>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
