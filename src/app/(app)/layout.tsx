@@ -157,7 +157,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} passHref legacyBehavior>
+                  <Link href={item.href} passHref>
                     <SidebarMenuButton tooltip={item.tooltip} isActive={pathname === item.href}>
                       <item.icon />
                       <span>{item.label}</span>
@@ -170,7 +170,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarFooter className="p-4">
             <SidebarMenu>
               <SidebarMenuItem>
-                  <Link href="/dashboard/settings" passHref legacyBehavior>
+                  <Link href="/dashboard/settings" passHref>
                     <SidebarMenuButton tooltip="Configurações da Conta" isActive={pathname === "/dashboard/settings"}>
                       <Settings />
                       <span>Configurações</span>
@@ -206,16 +206,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>{currentCompany || "Minha Conta"}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <Link href="/dashboard/settings" passHref legacyBehavior>
-                    <DropdownMenuItem asChild>
-                       <a><UserCircle className="mr-2 h-4 w-4" />
-                        <span>Perfil</span></a>
+                  <Link href="/dashboard/settings" passHref>
+                    <DropdownMenuItem>
+                       <UserCircle className="mr-2 h-4 w-4" />
+                        <span>Perfil</span>
                     </DropdownMenuItem>
                   </Link>
-                  <Link href="/support" passHref legacyBehavior>
-                    <DropdownMenuItem asChild>
-                       <a><LifeBuoy className="mr-2 h-4 w-4" />
-                        <span>Suporte</span></a>
+                  <Link href="/support" passHref>
+                    <DropdownMenuItem>
+                       <LifeBuoy className="mr-2 h-4 w-4" />
+                        <span>Suporte</span>
                     </DropdownMenuItem>
                   </Link>
                   <DropdownMenuSeparator />
