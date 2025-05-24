@@ -20,7 +20,7 @@ const InterpretTextCommandsInputSchema = z.object({
   command: z
     .string()
     .describe(
-      'The text command entered by the user. Examples: \'Show me my sales\', \'Go to customer accounts\', \'What are my key performance indicators?\', \'Qual minha receita total?\', \'Leve-me para a caderneta de fiados\', \'Adicionar novo cliente João telefone (11) 99999-8888 email joao@exemplo.com endereço Rua Teste 123\', \'Registrar nova despesa de aluguel no valor de 500 reais\' , \'Adicionar produto Camisa Azul código CA001 preço 79.90 categoria Vestuário estoque 10\', \'Excluir cliente Maria\', \'Remover produto Camisa Azul\''
+      'The text command entered by the user. Examples: \'Show me my sales\', \'Go to customer accounts\', \'What are my key performance indicators?\', \'Qual minha receita total?\', \'Leve-me para a caderneta de fiados\', \'Adicionar novo cliente João telefone (11) 99999-8888 email joao@exemplo.com endereço Rua Teste 123\', \'Registrar nova despesa de aluguel no valor de 500 reais\' , \'Adicionar produto Camisa Azul código CA001 preço 79.90 categoria Vestuário estoque 10\', \'Excluir cliente Maria\', \'Remover produto Camisa Azul\', \'Editar cliente João Silva\''
     ),
 });
 export type InterpretTextCommandsInput = z.infer<typeof InterpretTextCommandsInputSchema>;
@@ -29,13 +29,13 @@ const InterpretTextCommandsOutputSchema = z.object({
   action: z
     .string()
     .describe(
-      'The action to perform based on the command. Examples: \'navigateToDashboard\', \'navigateToNotebook\', \'navigateToCustomers\', \'navigateToSales\', \'navigateToProducts\', \'navigateToCreditNotebook\', \'navigateToSalesRecord\', \'navigateToMonthlyReport\', \'navigateToSettings\', \'queryTotalRevenue\', \'queryTotalCustomers\', \'queryTotalDueFiados\', \'queryPendingFiadosCount\', \'queryLowStockProductsCount\', \'initiateAddCustomer\', \'initiateAddCreditEntry\', \'initiateAddTransaction\', \'initiateAddProduct\', \'initiateSendMonthlyReport\', \'displayKPIs\', \'initiateDeleteCustomer\', \'initiateDeleteProduct\', \'initiateDeleteTransaction\', \'initiateDeleteCreditEntry\'. If the command is not understood, return \'unknown\''
+      'The action to perform based on the command. Examples: \'navigateToDashboard\', \'navigateToNotebook\', \'navigateToCustomers\', \'navigateToSales\', \'navigateToProducts\', \'navigateToCreditNotebook\', \'navigateToSalesRecord\', \'navigateToMonthlyReport\', \'navigateToSettings\', \'queryTotalRevenue\', \'queryTotalCustomers\', \'queryTotalDueFiados\', \'queryPendingFiadosCount\', \'queryLowStockProductsCount\', \'initiateAddCustomer\', \'initiateAddCreditEntry\', \'initiateAddTransaction\', \'initiateAddProduct\', \'initiateSendMonthlyReport\', \'displayKPIs\', \'initiateDeleteCustomer\', \'initiateDeleteProduct\', \'initiateDeleteTransaction\', \'initiateDeleteCreditEntry\', \'initiateEditCustomer\', \'initiateEditProduct\'. If the command is not understood, return \'unknown\''
     ),
   parameters: z
     .string()
     .optional()
     .describe(
-      'A JSON string containing parameters for the action. Examples: For \'initiateAddCustomer\', it might be \'{"customerName": "João", "phone": "(11) 99999-8888", "email": "joao@exemplo.com", "address": "Rua Teste 123"}\'. For \'initiateAddTransaction\', it might be \'{"type": "expense", "description": "aluguel", "amount": 500}\'. For \'initiateAddProduct\', it could be \'{"productName": "Camisa Azul", "productCode": "CA001", "productPrice": 79.90, "category": "Vestuário", "stock": "10"}\'. For \'initiateAddCreditEntry\', it could be \'{"customerName": "Maria", "amount": 100, "dueDate": "2024-12-31", "whatsappNumber":"5511987654321", "notes":"Referente ao item X"}\'. For \'initiateDeleteCustomer\', it could be \'{"customerName": "Maria"}\'. For \'initiateDeleteProduct\', it could be \'{"productName": "Camisa Azul"}\' or \'{"productCode": "CA001"}\'. For \'initiateDeleteTransaction\', it could be \'{"description": "aluguel"}\'.'
+      'A JSON string containing parameters for the action. Examples: For \'initiateAddCustomer\', it might be \'{"customerName": "João", "phone": "(11) 99999-8888", "email": "joao@exemplo.com", "address": "Rua Teste 123"}\'. For \'initiateAddTransaction\', it might be \'{"type": "expense", "description": "aluguel", "amount": 500}\'. For \'initiateAddProduct\', it could be \'{"productName": "Camisa Azul", "productCode": "CA001", "productPrice": 79.90, "category": "Vestuário", "stock": "10"}\'. For \'initiateAddCreditEntry\', it could be \'{"customerName": "Maria", "amount": 100, "dueDate": "2024-12-31", "whatsappNumber":"5511987654321", "notes":"Referente ao item X"}\'. For \'initiateDeleteCustomer\' or \'initiateEditCustomer\', it could be \'{"customerName": "Maria"}\'. For \'initiateDeleteProduct\' or \'initiateEditProduct\', it could be \'{"productName": "Camisa Azul"}\' or \'{"productCode": "CA001"}\'. For \'initiateDeleteTransaction\', it could be \'{"description": "aluguel"}\'.'
     ),
 });
 export type InterpretTextCommandsOutput = z.infer<typeof InterpretTextCommandsOutputSchema>;
@@ -77,12 +77,16 @@ const prompt = ai.definePrompt({
   - "Quantos fiados estão pendentes?", "Número de fiados pendentes": action: queryPendingFiadosCount
   - "Quais produtos estão com estoque baixo?", "Contar produtos com estoque baixo": action: queryLowStockProductsCount
 
-  Initiate Actions (Add):
+  Initiate Actions (Add - try to extract ALL parameters from the command):
   - "Adicionar novo cliente [nome] telefone [telefone] email [email] endereço [endereco]", "Cadastrar cliente [nome] com telefone [telefone] e email [email] e endereco [endereco]": action: initiateAddCustomer. Extract: customerName (required), phone (required), email (optional), address (optional).
   - "Adicionar novo fiado para [cliente] valor [valor] vencimento [data] whatsapp [numero] observacoes [texto]", "Registrar fiado para [cliente] de [valor] vencendo em [data] com whatsapp [numero] e notas [texto]": action: initiateAddCreditEntry. Extract: customerName (required), amount (required), dueDate (optional, YYYY-MM-DD format), whatsappNumber (optional), notes (optional). Sale date defaults to today if not specified by user.
   - "Adicionar nova transação", "Lançar receita [descrição] [valor]", "Registrar despesa [descrição] [valor]": action: initiateAddTransaction. Extract: type (required: 'income' or 'expense'), description (required), amount (required). Date defaults to today if not specified by user.
   - "Adicionar novo produto [nome] código [código] preço [preço] categoria [categoria] estoque [estoque]", "Cadastrar produto [nome] com código [código] e preço [preço], categoria [categoria] e estoque [quantidade]": action: initiateAddProduct. Extract: productName (required), productCode (required), productPrice (required), category (optional), stock (optional).
   - "Enviar relatório mensal", "Gerar relatório para [whatsapp]": action: initiateSendMonthlyReport (extract whatsapp if provided)
+
+  Initiate Actions (Edit - guide user to page):
+  - "Editar cliente [nome]": action: initiateEditCustomer (extract customerName)
+  - "Editar produto [nome/código]": action: initiateEditProduct (extract productName or productCode)
 
   Initiate Actions (Delete - guide user to page):
   - "Excluir cliente [nome]", "Remover cliente [nome]": action: initiateDeleteCustomer (extract customerName)
@@ -98,14 +102,14 @@ const prompt = ai.definePrompt({
   Output should be a JSON object with "action" and "parameters" fields.
   - If a command can be interpreted as a data query, prefer the query action.
   - If a command is a general request for information typically found on the dashboard (like KPIs), use action: displayKPIs.
-  - If the command is to start a process like adding or deleting something, use the 'initiate...' actions.
+  - If the command is to start a process like adding, editing, or deleting something, use the 'initiate...' actions.
   - For 'initiateAdd...' actions:
     - Extract ALL relevant entities from the user's command as specified above.
     - Provide these extracted entities as a valid JSON string in the 'parameters' field.
-  - For 'initiateDelete...' actions, extract the primary identifier and provide it in the 'parameters' field as a JSON string.
+  - For 'initiateEdit...' or 'initiateDelete...' actions, extract the primary identifier and provide it in the 'parameters' field as a JSON string.
   - For 'initiateAddTransaction', 'type' should be 'income' for receita/entrada and 'expense' for despesa/saída.
   - For 'initiateAddCreditEntry', if dueDate is provided, ensure it is in YYYY-MM-DD format. SaleDate is not needed as it defaults to today.
-  - If no parameters are extracted for an 'initiate...' action where parameters are expected for direct addition (e.g., adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string, and the client will handle guiding the user.
+  - If no parameters are extracted for an 'initiateAdd...' action where parameters are expected for direct addition (e.g., adding a customer without a name), the 'parameters' field can be omitted or be an empty JSON string, and the client will handle guiding the user.
   - If the command is ambiguous, too vague, or not understood, return action: 'unknown'.
   Ensure that the output is valid JSON conforming to the InterpretTextCommandsOutputSchema schema.`,
 });
@@ -121,3 +125,4 @@ const interpretTextCommandsFlow = ai.defineFlow(
     return output!;
   }
 );
+

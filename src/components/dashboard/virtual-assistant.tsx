@@ -19,7 +19,7 @@ import { interpretVoiceCommand, type InterpretVoiceCommandOutput, type Interpret
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { useAuth } from '@/hooks/use-auth'; 
 import { 
   STORAGE_KEY_NOTEBOOK_BASE, 
   STORAGE_KEY_PRODUCTS_BASE, 
@@ -67,7 +67,24 @@ function getStoredData<T>(key: string | null, defaultValue: T[], toastInstance?:
 function saveStoredData<T>(key: string | null, data: T[], toastInstance?: ReturnType<typeof useToast>['toast'], companyName?: string | null): boolean {
   if (typeof window === 'undefined' || !key) return false;
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    // Ensure dates are ISO strings before saving
+    const dataToSave = data.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        const newItem = { ...item } as any;
+        if (newItem.date && newItem.date instanceof Date) {
+          newItem.date = newItem.date.toISOString();
+        }
+        if (newItem.saleDate && newItem.saleDate instanceof Date) {
+          newItem.saleDate = newItem.saleDate.toISOString();
+        }
+        if (newItem.dueDate && newItem.dueDate instanceof Date) {
+          newItem.dueDate = newItem.dueDate.toISOString();
+        }
+        return newItem;
+      }
+      return item;
+    });
+    localStorage.setItem(key, JSON.stringify(dataToSave));
     return true;
   } catch (error) {
     console.error(`Error saving data to localStorage for key ${key} (Company: ${companyName || 'N/A'}):`, error);
@@ -85,7 +102,7 @@ export function VirtualAssistant() {
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { currentCompany } = useAuth(); // Get currentCompany from auth context
+  const { currentCompany } = useAuth(); 
 
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -193,7 +210,7 @@ export function VirtualAssistant() {
     if (!currentCompany) {
       messageForChat = "Por favor, faça login primeiro para usar o assistente com os dados da sua empresa.";
       addMessage('assistant', messageForChat);
-      return messageForChat; // Early return if no company context
+      return messageForChat; 
     }
 
     if (paramsString) {
@@ -203,7 +220,6 @@ export function VirtualAssistant() {
         console.error("Failed to parse parameters JSON string:", paramsString, e);
         messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando. Verifique o formato dos parâmetros.";
         addMessage('assistant', messageForChat);
-        // speak(messageForChat); // Already handled by caller
         return messageForChat;
       }
     }
@@ -271,8 +287,9 @@ export function VirtualAssistant() {
 
       case 'querytotalrevenue':
         try {
-          const transactionsData = getStoredData<Transaction>(notebookStorageKey, [], toast, currentCompany);
-          const totalIncome = transactionsData.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+          const transactionsDataRaw = getStoredData<any>(notebookStorageKey, [], toast, currentCompany);
+          const transactionsData: Transaction[] = transactionsDataRaw.map(t => ({...t, date: parseISO(t.date)}));
+          const totalIncome = transactionsData.filter(t => t.type === 'income' && isValidDate(t.date)).reduce((sum, t) => sum + t.amount, 0);
           messageForChat = `Sua receita total registrada na caderneta digital é de R$ ${totalIncome.toFixed(2)}.`;
         } catch (e) {
           console.error("Error processing queryTotalRevenue for", currentCompany, e);
@@ -296,7 +313,7 @@ export function VirtualAssistant() {
             saleDate: parseISO(entry.saleDate),
             dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
           }));
-          const totalDue = creditEntriesData.filter(entry => !entry.paid).reduce((sum, entry) => sum + entry.amount, 0);
+          const totalDue = creditEntriesData.filter(entry => !entry.paid && isValidDate(entry.saleDate)).reduce((sum, entry) => sum + entry.amount, 0);
           messageForChat = `O total pendente na caderneta de fiados é de R$ ${totalDue.toFixed(2)}.`;
         } catch (e) {
           console.error("Error processing queryTotalDueFiados for", currentCompany, e);
@@ -311,7 +328,7 @@ export function VirtualAssistant() {
             saleDate: parseISO(entry.saleDate),
             dueDate: entry.dueDate ? parseISO(entry.dueDate) : undefined,
           }));
-          const pendingCount = creditEntriesData.filter(entry => !entry.paid).length;
+          const pendingCount = creditEntriesData.filter(entry => !entry.paid && isValidDate(entry.saleDate)).length;
           messageForChat = `Você tem ${pendingCount} fiados pendentes de pagamento.`;
         } catch (e) {
           console.error("Error processing queryPendingFiadosCount for", currentCompany, e);
@@ -338,7 +355,7 @@ export function VirtualAssistant() {
           const newCustomer: CustomerEntry = {
             id: `CUST${String(Date.now()).slice(-6)}`,
             name: customerNameParam,
-            phone: customerPhoneParam,
+            phone: customerPhoneParam, // O schema de clientes espera 'phone'
             email: customerEmailParam || "",
             address: customerAddressParam || "",
           };
@@ -387,14 +404,8 @@ export function VirtualAssistant() {
                 notes: creditNotesParam || "",
                 paid: false,
             };
-            const entriesToSave = [...creditEntries, newEntry].sort((a,b) => ((b.saleDate instanceof Date) ? b.saleDate.getTime() : 0) - ((a.saleDate instanceof Date) ? a.saleDate.getTime() : 0));
-            const entriesForStorage = entriesToSave.map(entry => ({
-              ...entry,
-              saleDate: (entry.saleDate instanceof Date) ? entry.saleDate.toISOString() : new Date().toISOString(), 
-              dueDate: (entry.dueDate instanceof Date) ? entry.dueDate.toISOString() : undefined,
-            }));
-
-            if(saveStoredData<any>(creditNotebookStorageKey, entriesForStorage, toast, currentCompany)) {
+            
+            if(saveStoredData<CreditEntry>(creditNotebookStorageKey, [...creditEntries, newEntry].sort((a,b) => ((b.saleDate instanceof Date) ? b.saleDate.getTime() : 0) - ((a.saleDate instanceof Date) ? a.saleDate.getTime() : 0)), toast, currentCompany)) {
                 messageForChat = `Fiado de R$ ${Number(creditAmountParam).toFixed(2)} para '${customerNameParam}' adicionado com sucesso! ${dateWarning} Vou te mostrar na caderneta de fiados.`;
             } else {
                 messageForChat = `Não foi possível salvar o fiado para '${customerNameParam}' diretamente. Por favor, tente adicioná-lo na página de fiados.`;
@@ -421,10 +432,8 @@ export function VirtualAssistant() {
                 type: transactionTypeParam as "income" | "expense",
                 date: new Date(), 
             };
-            const transactionsToSave = [...transactions, newTransaction].sort((a,b) => ((b.date instanceof Date) ? b.date.getTime() : 0) - ((a.date instanceof Date) ? a.date.getTime() : 0));
-            const transactionsForStorage = transactionsToSave.map(t => ({ ...t, date: (t.date instanceof Date) ? t.date.toISOString() : new Date().toISOString() }));
 
-            if(saveStoredData<any>(notebookStorageKey, transactionsForStorage, toast, currentCompany)) {
+            if(saveStoredData<Transaction>(notebookStorageKey, [...transactions, newTransaction].sort((a,b) => ((b.date instanceof Date) ? b.date.getTime() : 0) - ((a.date instanceof Date) ? a.date.getTime() : 0)), toast, currentCompany)) {
                 messageForChat = `${transactionTypeParam === 'income' ? 'Receita' : 'Despesa'} de '${transactionDescParam}' no valor de R$ ${Number(transactionAmountParam).toFixed(2)} registrada com sucesso! Vou te mostrar na caderneta.`;
             } else {
                  messageForChat = `Não foi possível salvar a transação diretamente. Por favor, tente adicioná-la na caderneta digital.`;
@@ -476,6 +485,19 @@ export function VirtualAssistant() {
         }
         break;
       
+      case 'initiateeditcustomer': {
+        const customerNameToEdit = parsedParameters?.customerName;
+        messageForChat = `Para editar o cliente ${customerNameToEdit ? `'${customerNameToEdit}'` : 'desejado'}, estou te levando para a página de Clientes. Lá você poderá encontrar o cliente e usar o botão de editar.`;
+        navigationPath = '/dashboard/customers';
+        break;
+      }
+      case 'initiateeditproduct': {
+        const productIdentifier = parsedParameters?.productName || parsedParameters?.productCode;
+        messageForChat = `Para editar o produto ${productIdentifier ? `'${productIdentifier}'` : 'desejado'}, estou te levando para a página de Produtos. Lá você poderá encontrar o produto e usar a funcionalidade de edição (que será implementada).`;
+        navigationPath = '/dashboard/products';
+        break;
+      }
+
       case 'initiatedeletecustomer': {
         const customerNameToDelete = parsedParameters?.customerName;
         if (customerNameToDelete) {
@@ -581,7 +603,7 @@ export function VirtualAssistant() {
       
       case 'unknown':
       case 'unknowncommand':
-        messageForChat = "Desculpe, não consegui entender o seu comando. Você poderia tentar reformular? Por exemplo, diga 'Abrir painel', 'Adicionar cliente João telefone (11) 99999-8888', 'Qual minha receita?', 'Excluir cliente João', ou 'Registrar despesa Aluguel valor 500'.";
+        messageForChat = "Desculpe, não consegui entender o seu comando. Você poderia tentar reformular? Por exemplo, diga 'Abrir painel', 'Adicionar cliente João telefone (11) 99999-8888', 'Qual minha receita?', 'Excluir cliente João', ou 'Registrar despesa Aluguel valor 500'. Para editar, diga 'Editar cliente Maria'.";
         break;
       default:
         messageForChat = `Recebi a ação '${action}', mas ainda não sei como executá-la.`;
@@ -595,10 +617,10 @@ export function VirtualAssistant() {
 
     if (navigationPath) {
       router.push(navigationPath);
-      // Don't close dialog for queries, only for direct actions or navigation
       const actionsThatCloseDialog = [
         'initiateaddcustomer', 'initiateaddcreditentry', 'initiateaddtransaction', 'initiateaddproduct', 
         'initiatedeletecustomer', 'initiatedeleteproduct', 'initiatedeletetransaction', 'initiatedeletecreditentry',
+        'initiateeditcustomer', 'initiateeditproduct',
         'navigatetodashboard', 'navigatetocustomers', 'navigatetosales', 'navigatetoproducts', 
         'navigatetocreditnotebook', 'navigatetosalesrecord', 'navigatetomonthlyreport', 
         'navigatetosettings', 'navigatetotonotebook', 'displaykpis', 'showsakes', 'showsales', 
@@ -728,7 +750,7 @@ export function VirtualAssistant() {
             <Bot className="h-6 w-6 text-primary" /> Assistente Virtual MoneyWise
           </DialogTitle>
           <DialogDescription>
-            Use comandos de texto ou voz. Ex: 'Abrir painel', 'Adicionar cliente Maria telefone (11)9...', 'Qual minha receita?', 'Excluir cliente João'.
+            Use comandos de texto ou voz. Ex: 'Abrir painel', 'Adicionar cliente Maria telefone (11)9...', 'Qual minha receita?', 'Excluir cliente João', 'Editar cliente Maria'.
             {!supportedFeatures.speechRecognition && <span className="text-destructive block text-xs mt-1"><AlertTriangle className="inline h-3 w-3 mr-1"/>Reconhecimento de voz não suportado neste navegador.</span>}
             {!supportedFeatures.speechSynthesis && <span className="text-destructive block text-xs mt-1"><AlertTriangle className="inline h-3 w-3 mr-1"/>Síntese de voz não suportada neste navegador.</span>}
           </DialogDescription>
