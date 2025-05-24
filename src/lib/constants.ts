@@ -2,7 +2,7 @@
 export const ACCOUNT_DETAILS_BASE_STORAGE_KEY = "moneywise-accountDetails";
 // Agora armazena um array de objetos: { companyName: string, email: string, password?: string, phone?: string, status?: string }
 export const SIMULATED_CREDENTIALS_STORAGE_KEY = "moneywise-simulatedCredentials";
-export const REMEMBERED_COMPANY_NAME_KEY = "moneywise-rememberedCompanyName";
+export const REMEMBERED_CREDENTIALS_KEY = "moneywise-rememberedCredentials"; // Modificado
 export const AUTH_STATUS_KEY = "moneywise-auth";
 export const CURRENT_COMPANY_KEY = "moneywise-currentCompany";
 

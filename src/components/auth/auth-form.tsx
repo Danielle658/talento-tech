@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { LogIn, Loader2, Building2, KeyRound } from 'lucide-react';
 import { Logo } from '@/components/shared/logo';
-import { SIMULATED_CREDENTIALS_STORAGE_KEY, REMEMBERED_COMPANY_NAME_KEY } from '@/lib/constants';
+import { SIMULATED_CREDENTIALS_STORAGE_KEY, REMEMBERED_CREDENTIALS_KEY } from '@/lib/constants';
 
 const loginSchema = z.object({
   companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
@@ -40,10 +40,21 @@ export function AuthForm() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const rememberedCompanyName = localStorage.getItem(REMEMBERED_COMPANY_NAME_KEY);
-      if (rememberedCompanyName) {
-        loginForm.setValue("companyName", rememberedCompanyName);
-        loginForm.setValue("rememberMe", true);
+      const rememberedCredentialsRaw = localStorage.getItem(REMEMBERED_CREDENTIALS_KEY);
+      if (rememberedCredentialsRaw) {
+        try {
+          const rememberedCredentials = JSON.parse(rememberedCredentialsRaw);
+          if (rememberedCredentials.companyName) {
+            loginForm.setValue("companyName", rememberedCredentials.companyName);
+          }
+          if (rememberedCredentials.password) {
+            loginForm.setValue("password", rememberedCredentials.password);
+          }
+          loginForm.setValue("rememberMe", true);
+        } catch (error) {
+          console.error("Erro ao carregar credenciais lembradas:", error);
+          localStorage.removeItem(REMEMBERED_CREDENTIALS_KEY); // Limpa se estiver corrompido
+        }
       }
     }
   }, [loginForm]);
@@ -53,12 +64,16 @@ export function AuthForm() {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     let companyCredential = null;
+    let isAuthenticatedUser = false;
+
     try {
       const storedCredentialsRaw = localStorage.getItem(SIMULATED_CREDENTIALS_STORAGE_KEY);
       if (storedCredentialsRaw) {
         const allSimulatedCredentials: any[] = JSON.parse(storedCredentialsRaw);
         if (Array.isArray(allSimulatedCredentials)) {
-            companyCredential = allSimulatedCredentials.find(cred => cred && cred.companyName === data.companyName);
+          companyCredential = allSimulatedCredentials.find(
+            (cred) => cred && cred.companyName === data.companyName
+          );
         }
       }
     } catch (error) {
@@ -73,13 +88,19 @@ export function AuthForm() {
     }
 
     if (companyCredential && companyCredential.password === data.password) {
-      login(data.companyName);
+      isAuthenticatedUser = true;
+    }
+
+    if (isAuthenticatedUser) {
+      login(data.companyName); // Define a empresa atual no AuthContext
       toast({ title: "Acesso Permitido!", description: `Acessando dados da empresa ${data.companyName}.` });
 
       if (data.rememberMe) {
-        localStorage.setItem(REMEMBERED_COMPANY_NAME_KEY, data.companyName);
+        // ATENÇÃO: Salvar senhas no localStorage é um risco de segurança em aplicações reais.
+        // Isto é feito aqui apenas para fins de prototipagem da funcionalidade "Lembrar-me".
+        localStorage.setItem(REMEMBERED_CREDENTIALS_KEY, JSON.stringify({ companyName: data.companyName, password: data.password }));
       } else {
-        localStorage.removeItem(REMEMBERED_COMPANY_NAME_KEY);
+        localStorage.removeItem(REMEMBERED_CREDENTIALS_KEY);
       }
       router.push('/dashboard');
     } else {
@@ -88,7 +109,7 @@ export function AuthForm() {
         description: "Nome da empresa ou senha incorretos. Verifique os dados ou cadastre sua empresa.",
         variant: "destructive",
       });
-      loginForm.setValue("password", ""); // Limpa o campo de senha
+      loginForm.setValue("password", ""); // Limpa apenas o campo de senha
     }
     setIsLoading(false);
   };
@@ -144,11 +165,10 @@ export function AuthForm() {
                     <FormControl>
                       <Checkbox checked={field.value} onCheckedChange={field.onChange} id="rememberMe-login" />
                     </FormControl>
-                    <Label htmlFor="rememberMe-login" className="font-normal">Lembrar nome da empresa</Label>
+                    <Label htmlFor="rememberMe-login" className="font-normal">Lembrar-me</Label>
                   </FormItem>
                 )}
               />
-              {/* Link "Esqueceu a senha?" removido */}
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
@@ -163,8 +183,8 @@ export function AuthForm() {
           </Link>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-center text-center text-sm text-muted-foreground pt-4">
-        <p>Precisa de ajuda? <Link href="/support" className="text-primary hover:underline">Contate o Suporte</Link>.</p>
+      <CardFooter className="flex flex-col items-center space-y-2 text-sm text-muted-foreground pt-4">
+         {/* Links para "Esqueceu a senha?" e Suporte foram removidos conforme solicitações anteriores */}
       </CardFooter>
     </Card>
   );
