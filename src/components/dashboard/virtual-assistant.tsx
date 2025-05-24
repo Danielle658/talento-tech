@@ -21,6 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import {
+  ACCOUNT_DETAILS_BASE_STORAGE_KEY,
   STORAGE_KEY_NOTEBOOK_BASE,
   STORAGE_KEY_PRODUCTS_BASE,
   STORAGE_KEY_CREDIT_NOTEBOOK_BASE,
@@ -176,32 +177,42 @@ export function VirtualAssistant() {
   }, []);
   
   const speak = useCallback((textToSpeak: string) => {
-    if (!supportedFeatures.speechSynthesis || !textToSpeak || typeof window.speechSynthesis === 'undefined') return;
-    
-    // Cancel any ongoing speech first
-    if (isSpeaking || window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
+    if (!supportedFeatures.speechSynthesis || !textToSpeak || typeof window.speechSynthesis === 'undefined') {
+      setIsSpeaking(false); // Ensure state is reset
+      return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.lang = 'pt-BR';
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = (event) => {
-      console.error("Speech synthesis error:", event);
-      setIsSpeaking(false);
-      toast({ title: "Erro na Fala", description: "Não foi possível reproduzir a resposta.", variant: "destructive" });
-    };
-    window.speechSynthesis.speak(utterance);
-  }, [supportedFeatures.speechSynthesis, toast, isSpeaking]); // Added isSpeaking to dependencies
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel(); // Cancel if already speaking
+    }
+    
+    // Using a very short timeout to ensure cancel() has time to process
+    // This can help with issues where a new speak call is made too quickly
+    // after a cancel, especially in some browsers.
+    setTimeout(() => {
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.lang = 'pt-BR';
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => {
+          setIsSpeaking(false);
+        };
+        utterance.onerror = (event) => {
+          console.error("Speech synthesis error:", event);
+          setIsSpeaking(false);
+          toast({ title: "Erro na Fala", description: "Não foi possível reproduzir a resposta.", variant: "destructive" });
+        };
+        window.speechSynthesis.speak(utterance);
+    }, 50); // Small delay
+
+  }, [supportedFeatures.speechSynthesis, toast]);
 
   useEffect(() => {
     if (isDialogOpen && supportedFeatures.speechSynthesis && chatMessages.length === 0 && !isSpeaking) {
       const initialGreeting = "Olá! Sou seu assistente virtual MoneyWise. Como posso te ajudar hoje?";
-      speak(initialGreeting);
       addMessage('assistant', initialGreeting);
+      speak(initialGreeting);
     }
-  }, [isDialogOpen, supportedFeatures.speechSynthesis, chatMessages.length, speak, addMessage, isSpeaking]);
+  }, [isDialogOpen, supportedFeatures.speechSynthesis, chatMessages.length, isSpeaking, addMessage, speak]);
 
 
   useEffect(() => {
@@ -231,18 +242,18 @@ export function VirtualAssistant() {
       } catch (e) {
         console.error("Failed to parse parameters JSON string:", paramsString, e);
         messageForChat = "Desculpe, houve um problema ao entender os detalhes do seu comando. Verifique o formato dos parâmetros.";
-        addMessage('assistant', messageForChat);
+        addMessage('assistant', messageForChat); // This message will be spoken
         return messageForChat;
       }
     }
-
+    
     const customerNameParam = parsedParameters?.customerName;
     const customerPhoneParam = parsedParameters?.phone;
     const customerEmailParam = parsedParameters?.email;
     const customerAddressParam = parsedParameters?.address;
 
     const creditAmountParam = parsedParameters?.amount;
-    const creditDueDateParam = parsedParameters?.dueDate;
+    const creditDueDateParam = parsedParameters?.dueDate; // Expected YYYY-MM-DD from Genkit
     const creditWhatsappParam = parsedParameters?.whatsappNumber;
     const creditNotesParam = parsedParameters?.notes;
 
@@ -362,7 +373,7 @@ export function VirtualAssistant() {
         break;
 
       case 'initiateaddcustomer':
-        if (customerNameParam && customerPhoneParam) {
+        if (customerNameParam && customerPhoneParam) { // Phone is now mandatory for customers
           const customers = getStoredData<CustomerEntry>(customersStorageKey, [], toast, currentCompany);
           const newCustomer: CustomerEntry = {
             id: `CUST${String(Date.now()).slice(-6)}`,
@@ -380,7 +391,7 @@ export function VirtualAssistant() {
         } else {
           let missingFields = [];
           if (!customerNameParam) missingFields.push("nome");
-          if (!customerPhoneParam) missingFields.push("telefone");
+          if (!customerPhoneParam) missingFields.push("telefone"); // Phone is mandatory
           messageForChat = `Para adicionar um cliente diretamente, preciso pelo menos do ${missingFields.join(' e do ')}. Exemplo: 'Adicionar cliente João Silva telefone (11) 91234-5678'. Você pode adicionar na página de Clientes.`;
           navigationPath = '/dashboard/customers';
         }
@@ -398,7 +409,7 @@ export function VirtualAssistant() {
             let parsedDueDate: Date | undefined = undefined;
             let dateWarning = "";
             if (creditDueDateParam) {
-                const date = parseISO(creditDueDateParam);
+                const date = parseISO(creditDueDateParam); // Assumes YYYY-MM-DD from Genkit
                 if(isValidDate(date)) parsedDueDate = date;
                 else {
                     console.warn(`Assistente: Data de vencimento inválida recebida: ${creditDueDateParam}`);
@@ -410,7 +421,7 @@ export function VirtualAssistant() {
                 id: `CF${String(Date.now()).slice(-6)}`,
                 customerName: customerNameParam,
                 amount: Number(creditAmountParam),
-                saleDate: new Date(),
+                saleDate: new Date(), // Sale date is today
                 dueDate: parsedDueDate,
                 whatsappNumber: creditWhatsappParam || "",
                 notes: creditNotesParam || "",
@@ -419,6 +430,20 @@ export function VirtualAssistant() {
 
             if(saveStoredData<CreditEntry>(creditNotebookStorageKey, [...creditEntries, newEntry].sort((a,b) => ((b.saleDate instanceof Date) ? b.saleDate.getTime() : 0) - ((a.saleDate instanceof Date) ? a.saleDate.getTime() : 0)), toast, currentCompany)) {
                 messageForChat = `Fiado de R$ ${Number(creditAmountParam).toFixed(2)} para '${customerNameParam}' adicionado com sucesso!${dateWarning} Vou te mostrar na caderneta de fiados.`;
+                 // Auto-add customer to main list if not exists
+                const customers = getStoredData<CustomerEntry>(customersStorageKey, [], toast, currentCompany);
+                const customerExists = customers.some(c => c.name.toLowerCase() === customerNameParam.toLowerCase());
+                if (!customerExists) {
+                    const newCustomer: CustomerEntry = {
+                        id: `CUST_ASSIST_${String(Date.now()).slice(-6)}`,
+                        name: customerNameParam,
+                        phone: creditWhatsappParam || "", // Use WhatsApp number if available
+                        email: "", address: ""
+                    };
+                    saveStoredData<CustomerEntry>(customersStorageKey, [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name)), toast, currentCompany);
+                    messageForChat += ` Cliente ${customerNameParam} também adicionado à lista geral de clientes.`;
+                }
+
             } else {
                 messageForChat = `Não foi possível salvar o fiado para '${customerNameParam}' diretamente. Por favor, tente adicioná-lo na página de fiados.`;
             }
@@ -442,7 +467,7 @@ export function VirtualAssistant() {
                 description: transactionDescParam,
                 amount: Number(transactionAmountParam),
                 type: transactionTypeParam as "income" | "expense",
-                date: new Date(),
+                date: new Date(), // Transaction date is today
             };
 
             if(saveStoredData<Transaction>(notebookStorageKey, [...transactions, newTransaction].sort((a,b) => ((b.date instanceof Date) ? b.date.getTime() : 0) - ((a.date instanceof Date) ? a.date.getTime() : 0)), toast, currentCompany)) {
@@ -455,8 +480,8 @@ export function VirtualAssistant() {
             let missingFields = [];
             if(!transactionDescParam) missingFields.push("descrição");
             if(!transactionAmountParam) missingFields.push("valor");
-            if(!transactionTypeParam) missingFields.push("tipo (receita ou despesa)");
-            messageForChat = `Para adicionar uma transação diretamente, preciso da ${missingFields.join(', da ')}, do tipo (receita ou despesa) e do valor. Exemplo: 'Lançar despesa aluguel valor 500'. Você pode adicionar na Caderneta Digital.`;
+            if(!transactionTypeParam || (transactionTypeParam !== 'income' && transactionTypeParam !== 'expense')) missingFields.push("tipo (receita ou despesa)");
+            messageForChat = `Para adicionar uma transação diretamente, preciso da ${missingFields.join(', da ')}. Exemplo: 'Lançar despesa aluguel valor 500'. Você pode adicionar na Caderneta Digital.`;
             navigationPath = '/dashboard/notebook';
         }
         break;
@@ -464,6 +489,14 @@ export function VirtualAssistant() {
       case 'initiateaddproduct':
         if (productNameParam && productCodeParam && productPriceParam !== undefined) {
             const products = getStoredData<ProductEntry>(productsStorageKey, [], toast, currentCompany);
+            // Check if product code already exists
+            const codeExists = products.some(p => p.code.toLowerCase() === productCodeParam.toLowerCase());
+            if (codeExists) {
+                messageForChat = `Já existe um produto com o código '${productCodeParam}'. Por favor, use um código diferente ou edite o produto existente. Indo para a página de Produtos.`;
+                navigationPath = '/dashboard/products';
+                break;
+            }
+
             const newProduct: ProductEntry = {
                 id: `PROD${String(Date.now()).slice(-6)}`,
                 name: productNameParam,
@@ -608,6 +641,8 @@ export function VirtualAssistant() {
 
     if (navigationPath) {
       router.push(navigationPath);
+      // Não fechar o diálogo automaticamente ao navegar, para que o usuário veja a resposta.
+      // setIsDialogOpen(false);
     }
     return messageForChat;
   };
@@ -721,6 +756,7 @@ export function VirtualAssistant() {
           window.speechSynthesis.cancel();
           setIsSpeaking(false); 
         }
+        setChatMessages([]); // Limpa o chat ao fechar
       }
     }}>
       <DialogTrigger asChild>
@@ -822,5 +858,3 @@ export function VirtualAssistant() {
     </Dialog>
   );
 }
-
-    
