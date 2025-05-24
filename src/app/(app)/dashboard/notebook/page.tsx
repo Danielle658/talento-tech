@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -14,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign, Loader2, Trash2 } from "lucide-react";
+import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign, Loader2, Trash2, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { cn } from "@/lib/utils";
 import { format, parseISO, startOfMonth, subMonths, endOfMonth, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -53,6 +54,7 @@ const chartConfig = {
 export default function NotebookPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -175,7 +177,7 @@ export default function NotebookPage() {
   if (!isMounted || (isMounted && !currentCompany && !notebookStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
-  
+
   if (isMounted && !currentCompany) {
     return (
       <div className="flex flex-col justify-center items-center h-screen text-center">
@@ -194,113 +196,118 @@ export default function NotebookPage() {
               <FileText className="h-7 w-7 text-primary" />
               <CardTitle className="text-2xl">Caderneta Digital</CardTitle>
             </div>
-            <Dialog open={isAddTransactionDialogOpen} onOpenChange={setIsAddTransactionDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => form.reset({ date: new Date(), amount: 0, description: "", type: undefined })}>
-                  <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Transação
+            <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => router.back()}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Nova Transação</DialogTitle>
-                  <DialogDescription>Registre uma nova receita ou despesa.</DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmitTransaction)} className="space-y-4 py-2">
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Descrição</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ex: Venda de Produto X" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Valor (R$)</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-10" />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
+                <Dialog open={isAddTransactionDialogOpen} onOpenChange={setIsAddTransactionDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button onClick={() => form.reset({ date: new Date(), amount: 0, description: "", type: undefined })}>
+                    <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Transação
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                    <DialogTitle>Adicionar Nova Transação</DialogTitle>
+                    <DialogDescription>Registre uma nova receita ou despesa.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmitTransaction)} className="space-y-4 py-2">
+                        <FormField
                         control={form.control}
-                        name="type"
+                        name="description"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tipo</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione o tipo" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="income">
-                                  <span className="flex items-center"><ArrowUpCircle className="mr-2 h-4 w-4 text-green-500" /> Receita</span>
-                                </SelectItem>
-                                <SelectItem value="expense">
-                                  <span className="flex items-center"><ArrowDownCircle className="mr-2 h-4 w-4 text-red-500" /> Despesa</span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormItem>
+                            <FormLabel>Descrição</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Ex: Venda de Produto X" {...field} />
+                            </FormControl>
                             <FormMessage />
-                          </FormItem>
+                            </FormItem>
                         )}
-                      />
-                      <FormField
+                        />
+                        <FormField
                         control={form.control}
-                        name="date"
+                        name="amount"
                         render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>Data</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
+                            <FormItem>
+                            <FormLabel>Valor (R$)</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                    <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input type="number" step="0.01" placeholder="0.00" {...field} className="pl-10" />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="type"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Tipo</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                                 <FormControl>
-                                  <Button
-                                    variant={"outline"}
-                                    className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                  >
-                                    {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                  </Button>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Selecione o tipo" />
+                                    </SelectTrigger>
                                 </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={ptBR} />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button type="button" variant="outline">Cancelar</Button>
-                        </DialogClose>
-                        <Button type="submit" disabled={form.formState.isSubmitting}>
-                            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Transação"}
-                        </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+                                <SelectContent>
+                                    <SelectItem value="income">
+                                    <span className="flex items-center"><ArrowUpCircle className="mr-2 h-4 w-4 text-green-500" /> Receita</span>
+                                    </SelectItem>
+                                    <SelectItem value="expense">
+                                    <span className="flex items-center"><ArrowDownCircle className="mr-2 h-4 w-4 text-red-500" /> Despesa</span>
+                                    </SelectItem>
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="date"
+                            render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                                <FormLabel>Data</FormLabel>
+                                <Popover>
+                                <PopoverTrigger asChild>
+                                    <FormControl>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                                    >
+                                        {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                    </Button>
+                                    </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={ptBR} />
+                                </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline">Cancelar</Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={form.formState.isSubmitting}>
+                                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Transação"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                    </Form>
+                </DialogContent>
+                </Dialog>
+            </div>
           </div>
           <CardDescription>Gerencie suas receitas e despesas. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
@@ -434,5 +441,3 @@ export default function NotebookPage() {
       </Card>
     </div>;
 }
-
-    

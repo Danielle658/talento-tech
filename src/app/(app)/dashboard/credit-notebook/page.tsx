@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -15,21 +16,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2, Trash2 } from "lucide-react";
+import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2, Trash2, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { cn } from "@/lib/utils";
 import { format, parseISO, isValid, isToday, isPast, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
-import { 
-  ACCOUNT_DETAILS_BASE_STORAGE_KEY, 
-  STORAGE_KEY_CUSTOMERS_BASE, 
-  STORAGE_KEY_NOTEBOOK_BASE, 
-  STORAGE_KEY_CREDIT_NOTEBOOK_BASE, 
-  getCompanySpecificKey 
+import {
+  ACCOUNT_DETAILS_BASE_STORAGE_KEY,
+  STORAGE_KEY_CUSTOMERS_BASE,
+  STORAGE_KEY_NOTEBOOK_BASE,
+  STORAGE_KEY_CREDIT_NOTEBOOK_BASE,
+  getCompanySpecificKey
 } from '@/lib/constants';
 import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
-import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page"; 
+import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page";
 
 
@@ -47,12 +48,13 @@ export type CreditEntryFormValues = z.infer<typeof creditEntrySchema>;
 export interface CreditEntry extends CreditEntryFormValues {
   id: string;
   paid: boolean;
-  paymentDate?: string; 
+  paymentDate?: string;
 }
 
 export default function CreditNotebookPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [creditEntries, setCreditEntries] = useState<CreditEntry[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -86,7 +88,7 @@ export default function CreditNotebookPage() {
         setCreditEntries([]);
       }
     } else if (currentCompany === null && isMounted) {
-      setCreditEntries([]); 
+      setCreditEntries([]);
     }
 
     if (accountDetailsStorageKey) {
@@ -178,16 +180,16 @@ export default function CreditNotebookPage() {
                  toast({ title: "Erro ao Carregar Clientes", description: "Dados de clientes corrompidos, foram resetados.", variant: "destructive", toastId: "creditCustomerLoadErrorOnSubmit"});
             }
         }
-        
+
         const customerExists = customers.some(c => c.name.toLowerCase() === data.customerName.toLowerCase());
 
         if (!customerExists) {
             const newCustomer: CustomerEntry = {
                 id: `CUST${String(Date.now()).slice(-6)}`,
                 name: data.customerName,
-                phone: data.whatsappNumber || "", 
-                email: "", 
-                address: "", 
+                phone: data.whatsappNumber || "",
+                email: "",
+                address: "",
             };
             customers = [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name));
             localStorage.setItem(customersStorageKey, JSON.stringify(customers));
@@ -208,12 +210,12 @@ export default function CreditNotebookPage() {
       paid: false,
     };
     setCreditEntries(prev => [newEntry, ...prev].sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
-    
+
     let toastDescription = `Nova venda a prazo para ${data.customerName} no valor de R$ ${data.amount.toFixed(2)} registrada.`;
     if (customerAddedToMainList) {
         toastDescription += ` O cliente ${data.customerName} também foi adicionado à sua lista de clientes.`;
     }
-    
+
     toast({
       title: "Fiado Registrado!",
       description: toastDescription,
@@ -240,7 +242,7 @@ export default function CreditNotebookPage() {
       )
     );
 
-    if (newPaidStatus) { 
+    if (newPaidStatus) {
       try {
         const existingNotebookTransactionsRaw = localStorage.getItem(notebookStorageKey);
         let notebookTransactions: Transaction[] = [];
@@ -253,17 +255,17 @@ export default function CreditNotebookPage() {
                  toast({ title: "Erro ao Carregar Caderneta", description: "Dados da caderneta digital corrompidos, foram resetados.", variant: "destructive", toastId: "creditNotebookLoadErrorOnPaid"});
             }
         }
-        
+
         const incomeTransaction: Transaction = {
           id: `T-FIADO-${entry.id}-${Date.now().toString().slice(-4)}`,
           description: `Recebimento Fiado - ${entry.customerName} (Ref Venda: ${format(entry.saleDate, "dd/MM/yy")})`,
           amount: entry.amount,
           type: "income",
-          date: new Date(), 
+          date: new Date(),
         };
         notebookTransactions = [...notebookTransactions, incomeTransaction].sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0));
         localStorage.setItem(notebookStorageKey, JSON.stringify(notebookTransactions.map(t => ({...t, date: t.date.toISOString()}))));
-        
+
         toast({
           title: `Status Alterado!`,
           description: `Fiado de ${entry.customerName} marcado como pago. Receita registrada na Caderneta Digital.`,
@@ -277,7 +279,7 @@ export default function CreditNotebookPage() {
           variant: "destructive"
         });
       }
-    } else { 
+    } else {
       toast({
         title: `Status Alterado!`,
         description: `Fiado de ${entry.customerName} marcado como pendente. Se uma receita foi registrada, ajuste a Caderneta Digital manualmente se necessário.`,
@@ -405,7 +407,7 @@ export default function CreditNotebookPage() {
   if (!isMounted || (isMounted && !currentCompany && !creditStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
-  
+
   if (isMounted && !currentCompany) {
     return (
       <div className="flex flex-col justify-center items-center h-screen text-center">
@@ -426,137 +428,142 @@ export default function CreditNotebookPage() {
               <BookUser className="h-7 w-7 text-primary" />
               <CardTitle className="text-2xl">Caderneta de Fiados</CardTitle>
             </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => form.reset({ customerName: "", amount: 0, saleDate: new Date(), dueDate: undefined, whatsappNumber: "", notes: "" })}>
-                  <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Fiado
+            <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => router.back()}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Novo Fiado</DialogTitle>
-                  <DialogDescription>Preencha os dados da venda a prazo.</DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
-                    <FormField
-                      control={form.control}
-                      name="customerName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nome do Cliente</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ex: Carlos Alberto" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Valor (R$)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button onClick={() => form.reset({ customerName: "", amount: 0, saleDate: new Date(), dueDate: undefined, whatsappNumber: "", notes: "" })}>
+                    <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Fiado
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                    <DialogTitle>Adicionar Novo Fiado</DialogTitle>
+                    <DialogDescription>Preencha os dados da venda a prazo.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
                         <FormField
                         control={form.control}
-                        name="saleDate"
+                        name="customerName"
                         render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                            <FormLabel>Data da Venda</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <FormControl>
-                                    <Button
-                                    variant={"outline"}
-                                    className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                    >
-                                    {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={ptBR} />
-                                </PopoverContent>
-                            </Popover>
+                            <FormItem>
+                            <FormLabel>Nome do Cliente</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Ex: Carlos Alberto" {...field} />
+                            </FormControl>
                             <FormMessage />
                             </FormItem>
                         )}
                         />
                         <FormField
                         control={form.control}
-                        name="dueDate"
+                        name="amount"
                         render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                            <FormLabel>Data de Vencimento (Opcional)</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <FormControl>
-                                    <Button
-                                    variant={"outline"}
-                                    className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                    >
-                                    {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} locale={ptBR} />
-                                </PopoverContent>
-                            </Popover>
+                            <FormItem>
+                            <FormLabel>Valor (R$)</FormLabel>
+                            <FormControl>
+                                <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                            </FormControl>
                             <FormMessage />
                             </FormItem>
                         )}
                         />
-                    </div>
-                    <FormField
-                      control={form.control}
-                      name="whatsappNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>WhatsApp do Cliente (com DDD, ex: 55119...)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Ex: 5511912345678" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Observações</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="Alguma anotação sobre a venda..." {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button type="button" variant="outline">Cancelar</Button>
-                        </DialogClose>
-                        <Button type="submit" disabled={form.formState.isSubmitting}>
-                            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Fiado"}
-                        </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                            control={form.control}
+                            name="saleDate"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                <FormLabel>Data da Venda</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <FormControl>
+                                        <Button
+                                        variant={"outline"}
+                                        className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                                        >
+                                        {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={ptBR} />
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                            />
+                            <FormField
+                            control={form.control}
+                            name="dueDate"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                <FormLabel>Data de Vencimento (Opcional)</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <FormControl>
+                                        <Button
+                                        variant={"outline"}
+                                        className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                                        >
+                                        {field.value && isValid(field.value) ? format(field.value, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} locale={ptBR} />
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                            />
+                        </div>
+                        <FormField
+                        control={form.control}
+                        name="whatsappNumber"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>WhatsApp do Cliente (com DDD, ex: 55119...)</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Ex: 5511912345678" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Observações</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Alguma anotação sobre a venda..." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline">Cancelar</Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={form.formState.isSubmitting}>
+                                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Fiado"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                    </Form>
+                </DialogContent>
+                </Dialog>
+            </div>
           </div>
           <CardDescription>Gerencie os registros de vendas a prazo e fiados. Os dados são salvos localmente para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
@@ -651,5 +658,3 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
-
-    

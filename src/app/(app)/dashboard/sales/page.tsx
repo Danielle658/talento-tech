@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo, ChangeEvent, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,21 +11,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2, User, BookOpenCheck } from "lucide-react";
+import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2, User, BookOpenCheck, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { isValid as isValidDate, parseISO } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
-import { 
+import {
   STORAGE_KEY_NOTEBOOK_BASE,
   STORAGE_KEY_SALES_RECORD_BASE,
   STORAGE_KEY_PRODUCTS_BASE,
   STORAGE_KEY_CUSTOMERS_BASE,
   STORAGE_KEY_CREDIT_NOTEBOOK_BASE,
-  getCompanySpecificKey 
+  getCompanySpecificKey
 } from '@/lib/constants';
-import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
-import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
+import type { Transaction } from "@/app/(app)/dashboard/notebook/page";
+import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page";
 import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
 import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
 import type { CreditEntry } from "@/app/(app)/dashboard/credit-notebook/page";
@@ -44,6 +45,7 @@ interface CartItem extends PDVProduct {
 export default function SalesPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [productCodeInput, setProductCodeInput] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [amountPaidInput, setAmountPaidInput] = useState("");
@@ -56,7 +58,7 @@ export default function SalesPage() {
   const [availableProducts, setAvailableProducts] = useState<ProductEntry[]>([]);
   const [availableCustomers, setAvailableCustomers] = useState<CustomerEntry[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
-  
+
   const [productSuggestions, setProductSuggestions] = useState<ProductEntry[]>([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
 
@@ -77,11 +79,11 @@ export default function SalesPage() {
         } catch (error) {
           console.error("Failed to parse products from localStorage for PDV for", currentCompany, error);
           if (productsStorageKey) localStorage.removeItem(productsStorageKey);
-          setAvailableProducts([]); 
+          setAvailableProducts([]);
           toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os produtos para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvProductLoadError" });
         }
       } else {
-          setAvailableProducts([]); 
+          setAvailableProducts([]);
       }
     } else if (currentCompany === null && isMounted) {
       setAvailableProducts([]);
@@ -95,11 +97,11 @@ export default function SalesPage() {
         } catch (error) {
           console.error("Failed to parse customers from localStorage for PDV for", currentCompany, error);
           if (customersStorageKey) localStorage.removeItem(customersStorageKey);
-          setAvailableCustomers([]); 
+          setAvailableCustomers([]);
           toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os clientes para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvCustomerLoadError" });
         }
       } else {
-          setAvailableCustomers([]); 
+          setAvailableCustomers([]);
       }
     } else if (currentCompany === null && isMounted) {
       setAvailableCustomers([]);
@@ -112,7 +114,7 @@ export default function SalesPage() {
       toast({ title: "Código Inválido", description: "Por favor, insira um código de produto.", variant: "destructive" });
       return false;
     }
-    
+
     const product = availableProducts.find(p => p.code === code.trim());
     if (product) {
       setCart(prevCart => {
@@ -140,11 +142,11 @@ export default function SalesPage() {
       setIsSuggestionsVisible(false);
     }
   };
-  
+
   const handleAddProductFromCameraDialog = () => {
     if (addProductToCartByCode(cameraScannedCode)) {
       setCameraScannedCode("");
-      setIsCameraScanDialogOpen(false); 
+      setIsCameraScanDialogOpen(false);
     }
   };
 
@@ -207,12 +209,12 @@ export default function SalesPage() {
     const parsedAmount = parseFloat(amountPaidInput.replace(",","."));
     return isNaN(parsedAmount) ? 0 : parsedAmount;
   }, [amountPaidInput]);
-  
+
   const changeDue = useMemo(() => {
     if (paymentMethod === "Dinheiro" && amountPaid >= cartTotal && cart.length > 0) {
       return amountPaid - cartTotal;
     }
-    return 0; 
+    return 0;
   }, [amountPaid, cartTotal, cart.length, paymentMethod]);
 
   const handleFinalizeSale = () => {
@@ -236,7 +238,7 @@ export default function SalesPage() {
       toast({ title: "Cliente Necessário para Fiado", description: "Por favor, selecione um cliente cadastrado para registrar uma venda como fiado.", variant: "destructive" });
       return;
     }
-    
+
     if (paymentMethod === "Dinheiro" && amountPaid < cartTotal) {
       toast({ title: "Valor Insuficiente", description: "O valor pago é menor que o total da compra.", variant: "destructive" });
       return;
@@ -280,7 +282,7 @@ export default function SalesPage() {
         customerName: selectedCustomer.name,
         amount: cartTotal,
         saleDate: saleDate,
-        dueDate: undefined, 
+        dueDate: undefined,
         whatsappNumber: selectedCustomer.phone || "",
         notes: `Venda PDV: ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`,
         paid: false,
@@ -307,7 +309,7 @@ export default function SalesPage() {
         console.error("Error updating credit notebook in localStorage for", currentCompany, e);
         toast({title: "Erro ao salvar na Caderneta de Fiados", description: "Não foi possível atualizar a caderneta de fiados.", variant: "destructive", toastId: "pdvCreditNotebookSaveError"})
       }
-    } else { 
+    } else {
       const incomeTransactionDescription = `Venda PDV ${customerNameForRecord ? `(${customerNameForRecord})` : ''} - ${cart.map(item => `${item.quantity}x ${item.name}`).join(', ')}`;
       const incomeTransaction: Transaction = {
         id: `T-SALE-${Date.now().toString().slice(-6)}`,
@@ -316,7 +318,7 @@ export default function SalesPage() {
         type: "income",
         date: saleDate,
       };
-      
+
       try {
           const existingNotebookTransactionsRaw = localStorage.getItem(notebookStorageKey);
           let existingNotebookTransactions: Transaction[] = [];
@@ -366,7 +368,7 @@ export default function SalesPage() {
         product.code.toLowerCase().includes(lowercasedValue) ||
         product.name.toLowerCase().includes(lowercasedValue)
     );
-    setProductSuggestions(filtered.slice(0, 5)); 
+    setProductSuggestions(filtered.slice(0, 5));
     setIsSuggestionsVisible(true);
   };
 
@@ -389,9 +391,14 @@ export default function SalesPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="h-7 w-7 text-primary" />
-            <CardTitle className="text-2xl">Ponto de Venda (PDV)</CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-2">
+                <ShoppingCart className="h-7 w-7 text-primary" />
+                <CardTitle className="text-2xl">Ponto de Venda (PDV)</CardTitle>
+            </div>
+            <Button variant="outline" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+            </Button>
           </div>
           <CardDescription>Registre vendas rapidamente. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
@@ -452,7 +459,7 @@ export default function SalesPage() {
                       onBlur={() => {
                         setTimeout(() => {
                           setIsSuggestionsVisible(false);
-                        }, 150); 
+                        }, 150);
                       }}
                       autoComplete="off"
                     />
@@ -465,7 +472,7 @@ export default function SalesPage() {
                                 <Button
                                   variant="ghost"
                                   className="w-full justify-start h-auto py-1.5 px-2 text-left"
-                                  onClick={() => { 
+                                  onClick={() => {
                                     addProductToCartByCode(product.code);
                                     setProductCodeInput('');
                                     setProductSuggestions([]);
@@ -574,11 +581,11 @@ export default function SalesPage() {
                                 <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}>
                                   <MinusCircle className="h-4 w-4" />
                                 </Button>
-                                <Input 
-                                  type="number" 
-                                  value={item.quantity} 
-                                  onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)} 
-                                  className="w-12 h-7 text-center px-1" 
+                                <Input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                                  className="w-12 h-7 text-center px-1"
                                   min="1"
                                 />
                                 <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}>
@@ -613,7 +620,7 @@ export default function SalesPage() {
                   <Label className="text-sm text-muted-foreground">Total da Compra</Label>
                   <p className="text-3xl font-bold text-primary">R$ {cartTotal.toFixed(2)}</p>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="paymentMethod">Forma de Pagamento</Label>
                   <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={cart.length === 0}>
@@ -659,13 +666,13 @@ export default function SalesPage() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button 
-                    onClick={handleFinalizeSale} 
-                    className="w-full text-lg py-6" 
+                <Button
+                    onClick={handleFinalizeSale}
+                    className="w-full text-lg py-6"
                     size="lg"
                     disabled={
-                        cart.length === 0 || 
-                        !paymentMethod || 
+                        cart.length === 0 ||
+                        !paymentMethod ||
                         (paymentMethod === "Dinheiro" && amountPaidInput !== "" && amountPaid < cartTotal) ||
                         (paymentMethod === "Fiado" && (!selectedCustomerId || selectedCustomerId === 'default_consumer'))
                     }
@@ -680,6 +687,3 @@ export default function SalesPage() {
     </div>
   );
 }
-    
-
-    

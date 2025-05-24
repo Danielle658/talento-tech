@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, ChangeEvent, useMemo } from 'react';
+import { useRouter } from "next/navigation"; // Import useRouter
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -10,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, Save, Loader2, Building2, User, Mail, Phone, ScanLine, Image as ImageIcon } from "lucide-react";
+import { Settings as SettingsIcon, Save, Loader2, Building2, User, Mail, Phone, ScanLine, Image as ImageIcon, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants'; 
+import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
 import { useAuth } from '@/hooks/use-auth';
 
 const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
@@ -54,6 +55,7 @@ export type AccountDetailsFormValues = z.infer<typeof accountDetailsSchema>;
 export default function SettingsPage() {
   const { toast } = useToast();
   const { currentCompany, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [isSaving, setIsSaving] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export default function SettingsPage() {
   const form = useForm<AccountDetailsFormValues>({
     resolver: zodResolver(accountDetailsSchema),
     defaultValues: {
-      companyName: currentCompany || "", 
+      companyName: currentCompany || "",
       ownerName: "",
       email: "",
       phone: "",
@@ -85,7 +87,7 @@ export default function SettingsPage() {
           }
         } catch (error) {
           console.error("Failed to parse account details from localStorage for", currentCompany, error);
-          if (accountDetailsStorageKey) localStorage.removeItem(accountDetailsStorageKey); 
+          if (accountDetailsStorageKey) localStorage.removeItem(accountDetailsStorageKey);
           form.reset({ companyName: currentCompany || "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
           toast({
             title: "Erro ao Carregar Dados da Conta",
@@ -105,13 +107,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (currentCompany && isMounted) {
-      form.setValue("companyName", currentCompany); 
+      form.setValue("companyName", currentCompany);
       if (accountDetailsStorageKey) {
         const storedDetails = localStorage.getItem(accountDetailsStorageKey);
         if (storedDetails) {
           try {
             const parsedDetails = JSON.parse(storedDetails);
-            form.reset(parsedDetails); 
+            form.reset(parsedDetails);
             if (parsedDetails.profilePictureDataUri) {
               setImagePreview(parsedDetails.profilePictureDataUri);
             } else {
@@ -140,13 +142,13 @@ export default function SettingsPage() {
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { 
+      if (file.size > 2 * 1024 * 1024) {
         toast({
           title: "Arquivo Muito Grande",
           description: "Por favor, selecione uma imagem menor que 2MB.",
           variant: "destructive",
         });
-        event.target.value = ""; 
+        event.target.value = "";
         return;
       }
       const reader = new FileReader();
@@ -213,9 +215,14 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <SettingsIcon className="h-6 w-6 text-primary" />
-            <CardTitle className="text-2xl">Configurações da Conta</CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-2">
+                <SettingsIcon className="h-6 w-6 text-primary" />
+                <CardTitle className="text-2xl">Configurações da Conta</CardTitle>
+            </div>
+            <Button variant="outline" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+            </Button>
           </div>
           <CardDescription>Gerencie as informações da sua empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
@@ -252,7 +259,7 @@ export default function SettingsPage() {
                     <FormControl>
                       <div className="relative">
                         <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="Sua Empresa LTDA" {...field} className="pl-10" disabled/> 
+                        <Input placeholder="Sua Empresa LTDA" {...field} className="pl-10" disabled/>
                       </div>
                     </FormControl>
                     <FormDescription>O nome da empresa é definido no login e não pode ser alterado aqui.</FormDescription>
@@ -342,5 +349,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

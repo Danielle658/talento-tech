@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -11,12 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, Loader2 } from "lucide-react";
+import { Users, PlusCircle, Edit3, Trash2, Building, Mail, Phone, MapPin, Loader2, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { STORAGE_KEY_CUSTOMERS_BASE, getCompanySpecificKey } from '@/lib/constants';
 
-const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/; 
+const phoneRegex = /^\(?([1-9]{2})\)?[\s-]?9?(\d{4})[\s-]?(\d{4})$/;
 
 const customerSchema = z.object({
   name: z.string().min(2, { message: "Nome do cliente é obrigatório." }),
@@ -34,6 +35,7 @@ export interface CustomerEntry extends CustomerFormValues {
 export default function CustomersPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [customers, setCustomers] = useState<CustomerEntry[]>([]);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<CustomerEntry | null>(null);
@@ -135,10 +137,10 @@ export default function CustomersPage() {
     setEditingCustomer(null);
   };
 
-  if (!isMounted || (isMounted && !currentCompany && !customersStorageKey)) { 
+  if (!isMounted || (isMounted && !currentCompany && !customersStorageKey)) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
-  
+
   if (isMounted && !currentCompany) {
     return (
       <div className="flex flex-col justify-center items-center h-screen text-center">
@@ -154,105 +156,110 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-2">
               <Users className="h-6 w-6 text-primary" />
               <CardTitle className="text-2xl">Contas de Clientes</CardTitle>
             </div>
-            <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
-                if (!isOpen) closeFormDialog();
-                else setIsFormDialogOpen(true);
-            }}>
-              <DialogTrigger asChild>
-                <Button onClick={handleAddNewCustomer}>
-                  <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Cliente
+            <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => router.back()}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>{editingCustomer ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
-                  <DialogDescription>
-                    {editingCustomer ? "Atualize os dados do cliente." : "Preencha os dados do novo cliente."}
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nome do Cliente / Empresa</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                              <Input placeholder="Ex: Empresa Alpha" {...field} className="pl-10" />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>E-mail (Opcional)</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                              <Input type="email" placeholder="contato@cliente.com" {...field} className="pl-10" />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Telefone</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                              <Input placeholder="(XX) XXXXX-XXXX" {...field} className="pl-10" />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Endereço (Opcional)</FormLabel>
-                          <FormControl>
-                             <div className="relative">
-                              <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                              <Input placeholder="Rua Exemplo, 123, Cidade - UF" {...field} className="pl-10" />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">Cancelar</Button>
-                      </DialogClose>
-                      <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingCustomer ? "Salvar Alterações" : "Adicionar Cliente")}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+                <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
+                    if (!isOpen) closeFormDialog();
+                    else setIsFormDialogOpen(true);
+                }}>
+                <DialogTrigger asChild>
+                    <Button onClick={handleAddNewCustomer}>
+                    <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Cliente
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                    <DialogTitle>{editingCustomer ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
+                    <DialogDescription>
+                        {editingCustomer ? "Atualize os dados do cliente." : "Preencha os dados do novo cliente."}
+                    </DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
+                        <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Nome do Cliente / Empresa</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                <Building className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input placeholder="Ex: Empresa Alpha" {...field} className="pl-10" />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>E-mail (Opcional)</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input type="email" placeholder="contato@cliente.com" {...field} className="pl-10" />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Telefone</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input placeholder="(XX) XXXXX-XXXX" {...field} className="pl-10" />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="address"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Endereço (Opcional)</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input placeholder="Rua Exemplo, 123, Cidade - UF" {...field} className="pl-10" />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <DialogFooter>
+                        <DialogClose asChild>
+                            <Button type="button" variant="outline">Cancelar</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={form.formState.isSubmitting}>
+                            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingCustomer ? "Salvar Alterações" : "Adicionar Cliente")}
+                        </Button>
+                        </DialogFooter>
+                    </form>
+                    </Form>
+                </DialogContent>
+                </Dialog>
+            </div>
           </div>
           <CardDescription>Gerencie as informações dos seus clientes. Dados salvos para a empresa: {currentCompany || "Nenhuma"}.</CardDescription>
         </CardHeader>
@@ -301,5 +308,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-
-    

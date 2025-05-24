@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { BarChart3, Send, Loader2, FileDown } from "lucide-react"; 
+import { BarChart3, Send, Loader2, FileDown, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from '@/hooks/use-auth';
@@ -17,6 +18,7 @@ import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/pa
 export default function MonthlyReportPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -33,7 +35,7 @@ export default function MonthlyReportPage() {
               const parsedDetails: AccountDetailsFormValues = JSON.parse(storedAccountDetails);
               setAccountDetails(parsedDetails);
               if (parsedDetails.phone) {
-                  setWhatsappNumber(parsedDetails.phone.replace(/\D/g, '')); 
+                  setWhatsappNumber(parsedDetails.phone.replace(/\D/g, ''));
               }
           } catch (error) {
               console.error("Failed to parse account details from localStorage for monthly report for", currentCompany, error);
@@ -43,7 +45,7 @@ export default function MonthlyReportPage() {
           }
       } else {
         setAccountDetails(null);
-        setWhatsappNumber(""); 
+        setWhatsappNumber("");
       }
     } else if (currentCompany === null && isMounted) {
       setAccountDetails(null);
@@ -63,12 +65,12 @@ export default function MonthlyReportPage() {
     }
 
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); 
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const currentMonthYear = format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
     const companyNameToUse = accountDetails?.companyName || currentCompany || "Sua Empresa";
     const reportMessage = `Olá! Segue o resumo do seu relatório mensal da MoneyWise (${companyNameToUse}) para ${currentMonthYear}. Em breve, este relatório incluirá dados financeiros detalhados da sua empresa.\\n\\nVocê pode gerar uma versão em PDF do relatório exemplo através da opção 'Baixar/Imprimir Relatório (PDF)' no app.`;
-    
+
     const whatsappUrl = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(reportMessage)}`;
 
     window.open(whatsappUrl, "_blank");
@@ -80,14 +82,14 @@ export default function MonthlyReportPage() {
 
     setIsProcessing(false);
   };
-  
+
   const handleDownloadPdfReport = async () => {
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); 
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const currentMonthYear = format(new Date(), "MMMM 'de' yyyy", { locale: ptBR });
     const companyNameToUse = accountDetails?.companyName || currentCompany || "Sua Empresa";
-    
+
     const reportData = {
         totalRevenue: "R$ 1.234,56",
         totalExpenses: "R$ 789,01",
@@ -95,10 +97,10 @@ export default function MonthlyReportPage() {
         topProduct: "Produto X (15 unidades)",
     };
 
-    const reportHtml = `
+    const reportHtml = \`
       <html>
         <head>
-          <title>Relatório Mensal - ${companyNameToUse} - ${currentMonthYear}</title>
+          <title>Relatório Mensal - \${companyNameToUse} - \${currentMonthYear}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 20px; color: #333; line-height: 1.6; }
             .report-container { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
@@ -123,25 +125,25 @@ export default function MonthlyReportPage() {
           <div class="report-container">
             <div class="report-header">
               <h1>Relatório Mensal</h1>
-              <h2>${companyNameToUse}</h2>
-              <p>Período: ${currentMonthYear}</p>
+              <h2>\${companyNameToUse}</h2>
+              <p>Período: \${currentMonthYear}</p>
             </div>
 
             <div class="report-section">
               <h3>Resumo Financeiro (Exemplo)</h3>
-              <p><strong>Receita Total:</strong> ${reportData.totalRevenue}</p>
-              <p><strong>Despesas Totais:</strong> ${reportData.totalExpenses}</p>
-              <p><strong>Lucro Líquido:</strong> ${reportData.netProfit}</p>
+              <p><strong>Receita Total:</strong> \${reportData.totalRevenue}</p>
+              <p><strong>Despesas Totais:</strong> \${reportData.totalExpenses}</p>
+              <p><strong>Lucro Líquido:</strong> \${reportData.netProfit}</p>
             </div>
-            
+
             <div class="report-section">
               <h3>Destaques (Exemplo)</h3>
-              <p><strong>Produto Mais Vendido:</strong> ${reportData.topProduct}</p>
+              <p><strong>Produto Mais Vendido:</strong> \${reportData.topProduct}</p>
               <p><strong>Novos Clientes:</strong> 5</p>
             </div>
-            
+
             <div class="report-footer">
-              Gerado por MoneyWise em ${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+              Gerado por MoneyWise em \${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
             </div>
           </div>
           <script>
@@ -152,7 +154,7 @@ export default function MonthlyReportPage() {
           </script>
         </body>
       </html>
-    `;
+    \`;
 
     const reportWindow = window.open('', '_blank');
     if (reportWindow) {
@@ -187,9 +189,14 @@ export default function MonthlyReportPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" />
-            <CardTitle className="text-2xl">Relatório Mensal</CardTitle>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-primary" />
+                <CardTitle className="text-2xl">Relatório Mensal</CardTitle>
+            </div>
+            <Button variant="outline" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+            </Button>
           </div>
           <CardDescription>
             Gere um resumo mensal (exemplo) e envie-o para seu WhatsApp ou baixe uma versão para impressão (PDF). Empresa: {currentCompany || "Nenhuma"}
@@ -205,7 +212,7 @@ export default function MonthlyReportPage() {
                 id="whatsappNumberReport"
                 placeholder="Ex: 5511912345678"
                 value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))} 
+                onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))}
                 disabled={isProcessing}
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -231,7 +238,7 @@ export default function MonthlyReportPage() {
                 </Button>
             </div>
           </div>
-          
+
           <p className="text-muted-foreground text-sm">
             Atualmente, o "relatório" para download/impressão é um exemplo com dados fictícios. Em futuras atualizações, esta seção permitirá visualizar gráficos de desempenho detalhados, principais KPIs do mês, comparativos com períodos anteriores e muito mais, usando seus dados reais.
           </p>
@@ -243,5 +250,3 @@ export default function MonthlyReportPage() {
     </div>
   );
 }
-
-    

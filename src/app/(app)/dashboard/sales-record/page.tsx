@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { History, Search, Download, Trash2, Loader2, ListFilter, Eye } from "lucide-react";
+import { History, Search, Download, Trash2, Loader2, ListFilter, Eye, ArrowLeft } from "lucide-react"; // Added ArrowLeft
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ export interface SalesRecordEntry {
 export default function SalesRecordPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [salesHistory, setSalesHistory] = useState<SalesRecordEntry[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -180,6 +182,9 @@ export default function SalesRecordPage() {
               <CardTitle className="text-2xl">Histórico de Vendas</CardTitle>
             </div>
             <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => router.back()}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+                </Button>
                 <Button onClick={handleExportData} variant="outline" disabled={filteredSales.length === 0}>
                     <Download className="mr-2 h-4 w-4" /> Exportar CSV
                 </Button>
@@ -278,14 +283,14 @@ export default function SalesRecordPage() {
                         <Badge variant={
                             sale.paymentMethod === "Dinheiro" ? "secondary" :
                             sale.paymentMethod === "PIX" ? "default" :
-                            sale.paymentMethod === "Fiado" ? "outline" : 
+                            sale.paymentMethod === "Fiado" ? "outline" :
                             "outline"
                         }
                         className={cn(
                             sale.paymentMethod === "PIX" && "bg-green-600 hover:bg-green-700 text-white",
                             sale.paymentMethod === "Cartão de Crédito" && "bg-blue-500 hover:bg-blue-600 text-white",
                             sale.paymentMethod === "Cartão de Débito" && "bg-sky-500 hover:bg-sky-600 text-white",
-                            sale.paymentMethod === "Fiado" && "border-orange-500 text-orange-600 bg-orange-500/10 hover:bg-orange-500/20" 
+                            sale.paymentMethod === "Fiado" && "border-orange-500 text-orange-600 bg-orange-500/10 hover:bg-orange-500/20"
                         )}
                         >{sale.paymentMethod}</Badge>
                       </TableCell>
@@ -349,5 +354,3 @@ export default function SalesRecordPage() {
     </div>
   );
 }
-
-    
