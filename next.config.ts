@@ -19,8 +19,13 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // A seção experimental foi removida.
-  // A seção rewrites foi removida pois a email-api não está mais em uso.
+  experimental: {
+    allowedDevOrigins: [
+      "http://localhost:9006",
+      "https://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
+      "http://9006-firebase-studio-1747837393667.cluster-duylic2g3fbzerqpzxxbw6helm.cloudworkstations.dev",
+    ],
+  },
 };
 
 export default nextConfig;
