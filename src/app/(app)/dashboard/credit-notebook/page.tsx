@@ -258,7 +258,7 @@ export default function CreditNotebookPage() {
 
         const incomeTransaction: Transaction = {
           id: `T-FIADO-${entry.id}-${Date.now().toString().slice(-4)}`,
-          description: `Recebimento Fiado - ${entry.customerName} (Ref Venda: ${format(entry.saleDate, "dd/MM/yy")})`,
+          description: `Recebimento Fiado - ${entry.customerName} (Ref Venda: ${isValid(entry.saleDate) ? format(entry.saleDate, "dd/MM/yy", { locale: ptBR }) : 'Inválida'})`,
           amount: entry.amount,
           type: "income",
           date: new Date(),
@@ -323,10 +323,10 @@ export default function CreditNotebookPage() {
 
     const receiptWindow = window.open('', '_blank');
     if (receiptWindow) {
-      receiptWindow.document.write(\`
+      receiptWindow.document.write(`
         <html>
           <head>
-            <title>Comprovante de Pagamento - \${companyNameToUse}</title>
+            <title>Comprovante de Pagamento - ${companyNameToUse}</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; color: #333; line-height: 1.6; }
               .container { max-width: 480px; margin: auto; border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 0 0 12px rgba(0,0,0,0.1); }
@@ -354,18 +354,18 @@ export default function CreditNotebookPage() {
             <div class="container">
               <div class="header">
                 <h1>Comprovante de Pagamento</h1>
-                <p>\${companyNameToUse}</p>
+                <p>${companyNameToUse}</p>
               </div>
               <div class="details">
-                <p><strong>Cliente:</strong> \${entry.customerName}</p>
-                <p><strong>Valor Pago:</strong> R$ \${entry.amount.toFixed(2)}</p>
-                <p><strong>Data do Pagamento:</strong> \${paymentDateFormatted}</p>
-                <p><strong>Referente à Venda de:</strong> \${saleDateFormatted}</p>
-                \${entry.notes ? \`<p><strong>Observações da Venda:</strong> \${entry.notes}</p>\` : ''}
+                <p><strong>Cliente:</strong> ${entry.customerName}</p>
+                <p><strong>Valor Pago:</strong> R$ ${entry.amount.toFixed(2)}</p>
+                <p><strong>Data do Pagamento:</strong> ${paymentDateFormatted}</p>
+                <p><strong>Referente à Venda de:</strong> ${saleDateFormatted}</p>
+                ${entry.notes ? `<p><strong>Observações da Venda:</strong> ${entry.notes}</p>` : ''}
               </div>
               <div class="footer">
                 <p>Obrigado pela preferência!</p>
-                <p>Gerado em: \${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</p>
+                <p>Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}</p>
               </div>
             </div>
             <script>
@@ -376,7 +376,7 @@ export default function CreditNotebookPage() {
             </script>
           </body>
         </html>
-      \`);
+      `);
       receiptWindow.document.close();
     } else {
       toast({ title: "Erro ao Abrir Comprovante", description: "Não foi possível abrir a janela para impressão. Verifique as configurações do seu navegador.", variant: "destructive" });
@@ -393,8 +393,8 @@ export default function CreditNotebookPage() {
     const paymentDateFormatted = isValid(paymentDate) ? format(paymentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : "Data Inválida";
     const companyNameToUse = accountDetails?.companyName || 'Sua Empresa';
 
-    const message = \`🧾 *Comprovante de Pagamento - \${companyNameToUse}*\\n\\nOlá \${entry.customerName},\\nConfirmamos o recebimento de *R$\${entry.amount.toFixed(2)}* referente à sua compra de \${saleDateFormatted}.\\n\\nPagamento confirmado em: \${paymentDateFormatted}\\n\\n\${entry.notes ? \`Obs. da Venda: \${entry.notes}\\n\\n\` : ''}Obrigado!\\n\\nPara um comprovante detalhado em PDF, você pode usar a opção 'Imprimir Comprovante' no app.\`;
-    const whatsappUrl = \`https://wa.me/\${entry.whatsappNumber.replace(/\D/g, '')}?text=\${encodeURIComponent(message)}\`;
+    const message = `🧾 *Comprovante de Pagamento - ${companyNameToUse}*\\n\\nOlá ${entry.customerName},\\nConfirmamos o recebimento de *R$${entry.amount.toFixed(2)}* referente à sua compra de ${saleDateFormatted}.\\n\\nPagamento confirmado em: ${paymentDateFormatted}\\n\\n${entry.notes ? `Obs. da Venda: ${entry.notes}\\n\\n` : ''}Obrigado!\\n\\nPara um comprovante detalhado em PDF, você pode usar a opção 'Imprimir Comprovante' no app.`;
+    const whatsappUrl = `https://wa.me/${entry.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
      toast({ title: "Redirecionando para WhatsApp", description: "O comprovante de pagamento está pronto para ser enviado."});
   };
