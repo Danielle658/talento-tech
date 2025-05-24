@@ -9,6 +9,7 @@ console.log("[email-api emailRoutes.js] Script de rotas carregado.");
 // Rota para envio de notificações gerais
 router.post('/notify', async (req, res, next) => {
   console.log("[email-api] Rota /notify chamada.");
+  console.log("[email-api] Cabeçalhos da requisição para /notify:", JSON.stringify(req.headers, null, 2));
   try {
     const { to, subject, message } = req.body;
     console.log("[email-api] Corpo da requisição recebido para /notify:", JSON.stringify(req.body, null, 2));
@@ -26,7 +27,8 @@ router.post('/notify', async (req, res, next) => {
     console.error(err.stack);
     // Passa o erro para o próximo manipulador de erro (o global no server.js)
     // ou envia uma resposta de erro JSON diretamente.
-    res.status(500).json({ 
+    // next(err); // Passa para o manipulador global
+     res.status(500).json({ 
         error: 'Erro ao enviar notificação.',
         details: err.message 
     });
