@@ -27,13 +27,6 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    return [
-      {
-        source: '/api/internal-email/:path*',
-        destination: 'http://localhost:5001/api/email/:path*', // Proxy para API de E-mail
-      },
-    ]
+    return []
   },
 };
-
-export default nextConfig;

@@ -1,4 +1,3 @@
-
 // Esta API Route não é mais utilizada e pode ser removida.
 // A funcionalidade de redefinição de senha via frontend/Next.js API foi desabilitada.
 
