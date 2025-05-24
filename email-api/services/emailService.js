@@ -1,70 +1,40 @@
 
 const nodemailer = require('nodemailer');
-// const jwt = require('jsonwebtoken'); // JWT é usado em generateResetToken
-const { generateResetToken } = require('../utils/generateResetToken');
+// const jwt = require('jsonwebtoken'); // JWT não é mais usado aqui
+// const { generateResetToken } = require('../utils/generateResetToken'); // generateResetToken não é mais usado
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT),
-  secure: false, // false para TLS (porta 587), true para SSL (porta 465)
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS, // Aqui vai a senha de aplicativo gerada
-  },
-  // Descomente a seção tls abaixo se estiver enfrentando problemas com certificados autoassinados em desenvolvimento
-  // tls: {
-  //   rejectUnauthorized: false
-  // }
-});
+let transporter;
 
-async function sendPasswordResetEmail(email) {
-  try {
-    // Mover a geração do token para dentro do try...catch
-    const token = generateResetToken(email); // Pode lançar erro se JWT_SECRET não estiver definido
-
-    // Ajustado para corresponder à rota do frontend do Next.js
-    // Adiciona o e-mail ao link para que a página de reset possa pré-preenchê-lo
-    const resetLink = `${process.env.CLIENT_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-
-    const mailOptions = {
-      from: `"Suporte MoneyWise" <${process.env.SMTP_USER}>`, // Mantido o nome mais descritivo
-      to: email,
-      subject: 'Recuperação de Senha - MoneyWise', // Mantido o assunto mais descritivo
-      html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2 style="color: #556B2F;">Recuperação de Senha</h2>
-        <p>Olá,</p>
-        <p>Você solicitou a recuperação da sua senha para o MoneyWise.</p>
-        <p>Por favor, clique no link abaixo para criar uma nova senha:</p>
-        <p style="margin: 20px 0;">
-          <a href="${resetLink}" 
-             style="background-color: #6B8E23; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-            Redefinir Senha
-          </a>
-        </p>
-        <p>Se você não solicitou esta redefinição, por favor, ignore este e-mail. Sua senha permanecerá inalterada.</p>
-        <p>O link de redefinição é válido por 1 hora.</p>
-        <br>
-        <p>Obrigado,</p>
-        <p>Equipe MoneyWise</p>
-      </div>
-    `, // Mantido o HTML mais rico
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log('[emailService] E-mail de redefinição enviado: %s para %s', info.messageId, email);
-  } catch (error) {
-    console.error('[emailService] Erro ao enviar e-mail de redefinição:', error.message, error.stack);
-    // Relançar o erro para que a rota possa tratá-lo e enviar uma resposta JSON
-    throw new Error(error.message || 'Não foi possível enviar o e-mail de redefinição.');
-  }
+try {
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT),
+    secure: process.env.SMTP_PORT === '465', // true para SSL (porta 465), false para TLS (porta 587)
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+  console.log('[emailService] Transporter do Nodemailer configurado com sucesso.');
+} catch (error) {
+  console.error('[emailService] ERRO CRÍTICO ao configurar o transporter do Nodemailer:', error.message, error.stack);
+  // Em uma aplicação real, você pode querer impedir o início do servidor se o transporter falhar.
+  // Por agora, apenas logamos o erro. As funções de envio falharão se o transporter não estiver definido.
 }
 
+// Função sendPasswordResetEmail removida
+// async function sendPasswordResetEmail(email) { ... }
+
 async function sendNotificationEmail(to, subject, message) {
+  if (!transporter) {
+    console.error('[emailService] Tentativa de enviar e-mail de notificação, mas o transporter não está configurado.');
+    throw new Error('Serviço de e-mail não está configurado corretamente.');
+  }
+
   const mailOptions = {
-    from: `"Notificações MoneyWise" <${process.env.SMTP_USER}>`, // Mantido o nome mais descritivo
+    from: `"Notificações MoneyWise" <${process.env.SMTP_USER}>`,
     to,
-    subject: subject || 'Notificação de MoneyWise', // Mantido o assunto padrão
+    subject: subject || 'Notificação de MoneyWise',
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2 style="color: #556B2F;">Notificação de MoneyWise</h2>
@@ -73,7 +43,7 @@ async function sendNotificationEmail(to, subject, message) {
         <p>Atenciosamente,</p>
         <p>Equipe MoneyWise</p>
       </div>
-    `, // Mantido o HTML mais rico
+    `,
   };
 
   try {
@@ -85,4 +55,4 @@ async function sendNotificationEmail(to, subject, message) {
   }
 }
 
-module.exports = { sendPasswordResetEmail, sendNotificationEmail };
+module.exports = { sendNotificationEmail }; // Exporta apenas a função restante

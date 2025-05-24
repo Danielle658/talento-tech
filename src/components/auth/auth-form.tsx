@@ -21,7 +21,7 @@ import { SIMULATED_CREDENTIALS_STORAGE_KEY, REMEMBERED_COMPANY_NAME_KEY } from '
 
 const loginSchema = z.object({
   companyName: z.string().min(2, { message: "Nome da empresa é obrigatório." }),
-  password: z.string().min(1, { message: "Senha é obrigatória." }),
+  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   rememberMe: z.boolean().default(false).optional(),
 });
 
@@ -50,7 +50,7 @@ export function AuthForm() {
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); 
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     let companyCredential = null;
     try {
@@ -73,7 +73,7 @@ export function AuthForm() {
     }
 
     if (companyCredential && companyCredential.password === data.password) {
-      login(data.companyName); 
+      login(data.companyName);
       toast({ title: "Acesso Permitido!", description: `Acessando dados da empresa ${data.companyName}.` });
 
       if (data.rememberMe) {
@@ -144,15 +144,11 @@ export function AuthForm() {
                     <FormControl>
                       <Checkbox checked={field.value} onCheckedChange={field.onChange} id="rememberMe-login" />
                     </FormControl>
-                    <FormLabel htmlFor="rememberMe-login" className="font-normal">Lembrar nome da empresa</FormLabel>
+                    <Label htmlFor="rememberMe-login" className="font-normal">Lembrar nome da empresa</Label>
                   </FormItem>
                 )}
               />
-              <Link href="/auth/forgot-password"
-                className="text-sm text-primary hover:underline"
-              >
-                Esqueceu a senha?
-              </Link>
+              {/* Link "Esqueceu a senha?" removido */}
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}

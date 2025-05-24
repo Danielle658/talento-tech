@@ -1,27 +1,14 @@
 
-const jwt = require('jsonwebtoken');
+// Este arquivo não é mais utilizado e pode ser removido.
+// A funcionalidade de gerar token para redefinição de senha foi desabilitada.
 
-function generateResetToken(email) {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('A variável de ambiente JWT_SECRET não está definida.');
-  }
-  // Considerar adicionar mais informações se necessário, como um ID de usuário.
-  return jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
-}
+// const jwt = require('jsonwebtoken');
 
-// Função verifyResetToken não está no código fornecido pelo usuário para esta versão,
-// mas seria útil em uma implementação completa de redefinição de senha.
-// function verifyResetToken(token) {
+// function generateResetToken(email) {
 //   if (!process.env.JWT_SECRET) {
-//     console.error('A variável de ambiente JWT_SECRET não está definida para verificação.');
-//     return null;
+//     throw new Error('A variável de ambiente JWT_SECRET não está definida.');
 //   }
-//   try {
-//     return jwt.verify(token, process.env.JWT_SECRET);
-//   } catch (err) {
-//     console.error('Erro ao verificar o token:', err.message);
-//     return null; // Token inválido ou expirado
-//   }
+//   return jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 // }
 
-module.exports = { generateResetToken };
+// module.exports = { generateResetToken };
