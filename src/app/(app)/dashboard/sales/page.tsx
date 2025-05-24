@@ -14,18 +14,20 @@ import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, Cre
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
-import { STORAGE_KEY_NOTEBOOK_BASE } from "@/app/(app)/dashboard/notebook/page";
 import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
-import { STORAGE_KEY_SALES_RECORD_BASE } from "@/app/(app)/dashboard/sales-record/page";
 import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
-import { STORAGE_KEY_PRODUCTS_BASE } from "@/app/(app)/dashboard/products/page";
 import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
-import { STORAGE_KEY_CUSTOMERS_BASE } from "@/app/(app)/dashboard/customers/page";
 import type { CreditEntry } from "@/app/(app)/dashboard/credit-notebook/page";
-import { STORAGE_KEY_CREDIT_NOTEBOOK_BASE } from "@/app/(app)/dashboard/credit-notebook/page";
 import { isValid as isValidDate, parseISO } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
-import { getCompanySpecificKey } from '@/lib/constants';
+import { 
+  STORAGE_KEY_NOTEBOOK_BASE,
+  STORAGE_KEY_SALES_RECORD_BASE,
+  STORAGE_KEY_PRODUCTS_BASE,
+  STORAGE_KEY_CUSTOMERS_BASE,
+  STORAGE_KEY_CREDIT_NOTEBOOK_BASE,
+  getCompanySpecificKey 
+} from '@/lib/constants';
 
 
 interface PDVProduct {
@@ -644,3 +646,6 @@ export default function SalesPage() {
     </div>
   );
 }
+
+
+    
