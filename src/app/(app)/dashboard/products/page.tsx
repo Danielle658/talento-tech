@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Briefcase, PlusCircle, Trash2, DollarSign, Package, Tag, Barcode, Loader2, ArrowLeft } from "lucide-react"; // Added ArrowLeft
+import { Briefcase, PlusCircle, Trash2, DollarSign, Package, Tag, Barcode, Loader2, ArrowLeft, Edit3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { STORAGE_KEY_PRODUCTS_BASE, getCompanySpecificKey } from '@/lib/constants';
@@ -35,9 +35,10 @@ export interface ProductEntry extends ProductFormValues {
 export default function ProductsPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
   const [products, setProducts] = useState<ProductEntry[]>([]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductEntry | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   const productsStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_PRODUCTS_BASE, currentCompany), [currentCompany]);
@@ -84,22 +85,52 @@ export default function ProductsPage() {
     },
   });
 
+  useEffect(() => {
+    if (isFormDialogOpen) {
+      if (editingProduct) {
+        form.reset(editingProduct);
+      } else {
+        form.reset({ name: "", code: "", price: 0, category: "", stock: "" });
+      }
+    }
+  }, [isFormDialogOpen, editingProduct, form]);
+
   const onSubmit = (data: ProductFormValues) => {
     if (!productsStorageKey) {
        toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar o produto.", variant: "destructive"});
        return;
     }
-    const newProduct: ProductEntry = {
-      ...data,
-      id: `PROD${String(Date.now()).slice(-6)}`,
-    };
-    setProducts(prev => [newProduct, ...prev].sort((a,b) => a.name.localeCompare(b.name)));
-    toast({
-      title: "Produto Adicionado!",
-      description: `${data.name} foi adicionado ao catálogo.`,
-    });
-    form.reset();
-    setIsAddDialogOpen(false);
+
+    if (editingProduct) {
+      setProducts(prev =>
+        prev.map(p =>
+          p.id === editingProduct.id ? { ...editingProduct, ...data } : p
+        ).sort((a,b) => a.name.localeCompare(b.name))
+      );
+      toast({
+        title: "Produto Atualizado!",
+        description: `${data.name} foi atualizado com sucesso.`,
+      });
+    } else {
+      const newProduct: ProductEntry = {
+        ...data,
+        id: `PROD${String(Date.now()).slice(-6)}`,
+      };
+      // Check if product code already exists
+      const codeExists = products.some(p => p.code.toLowerCase() === newProduct.code.toLowerCase());
+      if (codeExists) {
+        form.setError("code", { type: "manual", message: "Este código de produto já existe."});
+        toast({ title: "Código Duplicado", description: "Este código de produto já está em uso. Por favor, insira um código diferente.", variant: "destructive"});
+        return;
+      }
+      setProducts(prev => [newProduct, ...prev].sort((a,b) => a.name.localeCompare(b.name)));
+      toast({
+        title: "Produto Adicionado!",
+        description: `${data.name} foi adicionado ao catálogo.`,
+      });
+    }
+    setEditingProduct(null);
+    setIsFormDialogOpen(false);
   };
 
   const handleDeleteProduct = (id: string) => {
@@ -115,6 +146,11 @@ export default function ProductsPage() {
       description: `${productToDelete.name} foi removido do catálogo.`,
       variant: "destructive"
     });
+  };
+  
+  const handleOpenFormDialog = (product: ProductEntry | null = null) => {
+    setEditingProduct(product);
+    setIsFormDialogOpen(true);
   };
 
   if (!isMounted || (isMounted && !currentCompany && !productsStorageKey)) {
@@ -144,16 +180,19 @@ export default function ProductsPage() {
                 <Button variant="outline" onClick={() => router.back()}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
+                  if (!isOpen) setEditingProduct(null);
+                  setIsFormDialogOpen(isOpen);
+                }}>
                 <DialogTrigger asChild>
-                    <Button onClick={() => form.reset()}>
+                    <Button onClick={() => handleOpenFormDialog()}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                    <DialogTitle>Adicionar Novo Produto/Serviço</DialogTitle>
-                    <DialogDescription>Preencha os dados do novo item do catálogo.</DialogDescription>
+                    <DialogTitle>{editingProduct ? "Editar Produto/Serviço" : "Adicionar Novo Produto/Serviço"}</DialogTitle>
+                    <DialogDescription>{editingProduct ? "Atualize os dados do item." : "Preencha os dados do novo item do catálogo."}</DialogDescription>
                     </DialogHeader>
                     <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
@@ -239,7 +278,7 @@ export default function ProductsPage() {
                             <Button type="button" variant="outline">Cancelar</Button>
                         </DialogClose>
                         <Button type="submit" disabled={form.formState.isSubmitting}>
-                            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Produto"}
+                            {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingProduct ? "Salvar Alterações" : "Adicionar Item")}
                         </Button>
                         </DialogFooter>
                     </form>
@@ -278,7 +317,10 @@ export default function ProductsPage() {
                       <TableCell className="text-right">{product.price.toFixed(2)}</TableCell>
                       <TableCell>{product.category || "-"}</TableCell>
                       <TableCell>{product.stock || "-"}</TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center space-x-1">
+                        <Button variant="outline" size="sm" onClick={() => handleOpenFormDialog(product)} title="Editar Produto">
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
                         <Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(product.id)} title="Excluir Produto">
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -294,3 +336,6 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+
+    
