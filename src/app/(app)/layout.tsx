@@ -45,7 +45,8 @@ import {
   PanelLeft,
   BookUser,
   FilePlus2,
-  BarChart3
+  BarChart3,
+  ArrowLeft // Keep ArrowLeft if used elsewhere, or it can be removed from here if not
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
 import dynamic from 'next/dynamic'; // Import dynamic
@@ -55,7 +56,7 @@ import type { AccountDetailsFormValues } from '@/app/(app)/dashboard/settings/pa
 const VirtualAssistant = dynamic(() => 
   import('@/components/dashboard/virtual-assistant').then(mod => mod.VirtualAssistant),
   { 
-    ssr: false, // Usually good for client-side heavy components
+    ssr: false, 
     loading: () => <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" disabled><Loader2 className="h-5 w-5 animate-spin"/></Button> 
   }
 );
@@ -68,14 +69,14 @@ const navItems = [
   { href: "/dashboard/sales", icon: ShoppingCart, label: "Vendas", tooltip: "Vendas" },
   { href: "/dashboard/products", icon: Briefcase, label: "Produtos", tooltip: "Produtos" },
   { href: "/dashboard/credit-notebook", icon: BookUser, label: "Caderneta de Fiados", tooltip: "Fiados" },
-  { href: "/dashboard/sales-record", icon: FilePlus2, label: "Registro de Vendas", tooltip: "Hist. Vendas" }, // Shorter tooltip
+  { href: "/dashboard/sales-record", icon: FilePlus2, label: "Registro de Vendas", tooltip: "Hist. Vendas" }, 
   { href: "/dashboard/monthly-report", icon: BarChart3, label: "Relatório Mensal", tooltip: "Relatório" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, logout, currentCompany } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname(); 
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | undefined>(undefined);
   const [ownerInitials, setOwnerInitials] = useState<string>("MW");
 
@@ -118,7 +119,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadProfileData();
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === accountDetailsStorageKey || (event.key === null && !accountDetailsStorageKey)) { // Handle clear all or specific key change
+      if (event.key === accountDetailsStorageKey || (event.key === null && !accountDetailsStorageKey)) { 
         loadProfileData();
       }
     };
@@ -157,7 +158,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <Link href={item.href} passHref>
+                  <Link href={item.href}>
                     <SidebarMenuButton tooltip={item.tooltip} isActive={pathname === item.href}>
                       <item.icon />
                       <span>{item.label}</span>
@@ -170,7 +171,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarFooter className="p-4">
             <SidebarMenu>
               <SidebarMenuItem>
-                  <Link href="/dashboard/settings" passHref>
+                  <Link href="/dashboard/settings">
                     <SidebarMenuButton tooltip="Configurações da Conta" isActive={pathname === "/dashboard/settings"}>
                       <Settings />
                       <span>Configurações</span>
@@ -206,13 +207,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>{currentCompany || "Minha Conta"}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <Link href="/dashboard/settings" passHref>
+                  <Link href="/dashboard/settings">
                     <DropdownMenuItem>
                        <UserCircle className="mr-2 h-4 w-4" />
                         <span>Perfil</span>
                     </DropdownMenuItem>
                   </Link>
-                  <Link href="/support" passHref>
+                  <Link href="/support">
                     <DropdownMenuItem>
                        <LifeBuoy className="mr-2 h-4 w-4" />
                         <span>Suporte</span>
