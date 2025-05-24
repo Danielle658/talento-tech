@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent, useMemo } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -63,7 +63,7 @@ export default function SettingsPage() {
   const form = useForm<AccountDetailsFormValues>({
     resolver: zodResolver(accountDetailsSchema),
     defaultValues: {
-      companyName: currentCompany || "", // Initialize with currentCompany from auth context
+      companyName: currentCompany || "", 
       ownerName: "",
       email: "",
       phone: "",
@@ -85,16 +85,16 @@ export default function SettingsPage() {
           }
         } catch (error) {
           console.error("Failed to parse account details from localStorage for", currentCompany, error);
-          localStorage.removeItem(accountDetailsStorageKey); 
+          if (accountDetailsStorageKey) localStorage.removeItem(accountDetailsStorageKey); 
           form.reset({ companyName: currentCompany || "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
           toast({
             title: "Erro ao Carregar Dados da Conta",
             description: "Não foi possível carregar os dados da conta salvos. As informações podem ter sido redefinidas.",
             variant: "destructive",
+            toastId: 'settingsLoadError'
           });
         }
       } else {
-        // Se não houver dados salvos, mas há uma empresa logada, preencha o nome da empresa
         form.reset({ companyName: currentCompany || "", ownerName: "", email: "", phone: "", cpf: "", profilePictureDataUri: ""});
       }
     } else if (currentCompany === null && isMounted) {
@@ -103,17 +103,15 @@ export default function SettingsPage() {
     }
   }, [form, toast, accountDetailsStorageKey, currentCompany, isMounted]);
 
-  // Reset form if company changes
   useEffect(() => {
     if (currentCompany && isMounted) {
-      form.setValue("companyName", currentCompany); // Ensure companyName is updated if context changes
-      // Reload other details for the new company
+      form.setValue("companyName", currentCompany); 
       if (accountDetailsStorageKey) {
         const storedDetails = localStorage.getItem(accountDetailsStorageKey);
         if (storedDetails) {
           try {
             const parsedDetails = JSON.parse(storedDetails);
-            form.reset(parsedDetails); // This will set companyName from storage if it exists
+            form.reset(parsedDetails); 
             if (parsedDetails.profilePictureDataUri) {
               setImagePreview(parsedDetails.profilePictureDataUri);
             } else {
@@ -121,7 +119,6 @@ export default function SettingsPage() {
             }
           } catch (e) { /* already handled by main load effect */ }
         } else {
-          // Reset other fields if no details found for this company, but keep companyName
           form.reset({
             companyName: currentCompany,
             ownerName: "",
@@ -176,7 +173,6 @@ export default function SettingsPage() {
     }
     setIsSaving(true);
     try {
-      // Ensure companyName from form (which should match currentCompany) is used
       const dataToSave = { ...data, companyName: currentCompany || data.companyName };
       localStorage.setItem(accountDetailsStorageKey, JSON.stringify(dataToSave));
       toast({
@@ -346,3 +342,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

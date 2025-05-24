@@ -278,14 +278,14 @@ export default function SalesRecordPage() {
                         <Badge variant={
                             sale.paymentMethod === "Dinheiro" ? "secondary" :
                             sale.paymentMethod === "PIX" ? "default" :
-                            sale.paymentMethod === "Fiado" ? "outline" : // Added style for Fiado
+                            sale.paymentMethod === "Fiado" ? "outline" : 
                             "outline"
                         }
                         className={cn(
                             sale.paymentMethod === "PIX" && "bg-green-600 hover:bg-green-700 text-white",
                             sale.paymentMethod === "Cartão de Crédito" && "bg-blue-500 hover:bg-blue-600 text-white",
                             sale.paymentMethod === "Cartão de Débito" && "bg-sky-500 hover:bg-sky-600 text-white",
-                            sale.paymentMethod === "Fiado" && "border-orange-500 text-orange-600 bg-orange-500/10 hover:bg-orange-500/20" // Fiado badge style
+                            sale.paymentMethod === "Fiado" && "border-orange-500 text-orange-600 bg-orange-500/10 hover:bg-orange-500/20" 
                         )}
                         >{sale.paymentMethod}</Badge>
                       </TableCell>
@@ -349,3 +349,5 @@ export default function SalesRecordPage() {
     </div>
   );
 }
+
+    

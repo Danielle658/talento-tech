@@ -135,7 +135,7 @@ export default function CustomersPage() {
     setEditingCustomer(null);
   };
 
-  if (!isMounted || (isMounted && !currentCompany && !customersStorageKey)) { // Check if storage key is also ready (derived from currentCompany)
+  if (!isMounted || (isMounted && !currentCompany && !customersStorageKey)) { 
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
   
@@ -185,7 +185,7 @@ export default function CustomersPage() {
                           <FormLabel>Nome do Cliente / Empresa</FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Building className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input placeholder="Ex: Empresa Alpha" {...field} className="pl-10" />
                             </div>
                           </FormControl>
@@ -301,3 +301,5 @@ export default function CustomersPage() {
     </div>
   );
 }
+
+    

@@ -2,32 +2,37 @@
 const express = require('express');
 const router = express.Router();
 const { sendNotificationEmail } = require('../services/emailService');
+// A funcionalidade de redefinição de senha foi removida, então sendPasswordResetEmail não é mais necessário aqui.
 
-// Rota /reset-password removida
-// router.post('/reset-password', async (req, res) => { ... });
+console.log("[email-api emailRoutes.js] Script de rotas carregado.");
 
-router.post('/notify', async (req, res) => {
-  console.log('[email-api] Rota /notify chamada.');
-  const { to, subject, message } = req.body;
-
-  if (!to || !subject || !message) {
-    console.error('[email-api] Erro: Destinatário, assunto ou mensagem não fornecidos para notificação.');
-    return res.status(400).json({ error: 'Destinatário, assunto e mensagem são obrigatórios para notificação.' });
-  }
-  console.log(`[email-api] Corpo da requisição recebido para /notify: ${JSON.stringify(req.body, null, 2)}`);
-
+// Rota para envio de notificações gerais
+router.post('/notify', async (req, res, next) => {
+  console.log("[email-api] Rota /notify chamada.");
   try {
+    const { to, subject, message } = req.body;
+    console.log("[email-api] Corpo da requisição recebido para /notify:", JSON.stringify(req.body, null, 2));
+
+    if (!to || !subject || !message) {
+      console.warn("[email-api] Requisição para /notify com campos faltando:", { to, subject, message });
+      return res.status(400).json({ error: 'Campos "to", "subject", e "message" são obrigatórios.' });
+    }
+
     await sendNotificationEmail(to, subject, message);
-    console.log(`[email-api] Notificação enviada para: ${to} com assunto: ${subject} - Processamento bem-sucedido.`);
+    console.log(`[email-api] Notificação enviada com sucesso para: ${to}`);
     res.status(200).json({ message: 'Notificação enviada com sucesso.' });
   } catch (err) {
-    console.error('[email-api] ERRO CAPTURADO na rota /notify:', err.message, err.stack, err);
-    res.status(500).json({ error: 'Erro interno ao tentar enviar notificação. Por favor, verifique os logs do servidor email-api.' });
+    console.error('[email-api] Erro na rota /notify:', err.message);
+    console.error(err.stack);
+    // Passa o erro para o próximo manipulador de erro (o global no server.js)
+    // ou envia uma resposta de erro JSON diretamente.
+    res.status(500).json({ 
+        error: 'Erro ao enviar notificação.',
+        details: err.message 
+    });
   }
 });
 
-// Rotas SMS removidas
-// router.post('/request-sms-code', async (req, res) => { ... });
-// router.post('/verify-sms-code', async (req, res) => { ... });
+// As rotas relacionadas à redefinição de senha foram removidas.
 
 module.exports = router;

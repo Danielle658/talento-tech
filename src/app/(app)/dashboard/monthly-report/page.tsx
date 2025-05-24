@@ -9,9 +9,10 @@ import { useToast } from "@/hooks/use-toast";
 import { BarChart3, Send, Loader2, FileDown } from "lucide-react"; 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
-import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
 import { useAuth } from '@/hooks/use-auth';
+import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
+import type { AccountDetailsFormValues } from "@/app/(app)/dashboard/settings/page";
+
 
 export default function MonthlyReportPage() {
   const { toast } = useToast();
@@ -42,7 +43,7 @@ export default function MonthlyReportPage() {
           }
       } else {
         setAccountDetails(null);
-        setWhatsappNumber(""); // Clear if no details found
+        setWhatsappNumber(""); 
       }
     } else if (currentCompany === null && isMounted) {
       setAccountDetails(null);
@@ -242,3 +243,5 @@ export default function MonthlyReportPage() {
     </div>
   );
 }
+
+    

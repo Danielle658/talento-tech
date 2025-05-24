@@ -13,11 +13,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShoppingCart, Barcode, Trash2, PlusCircle, MinusCircle, DollarSign, CreditCard, Smartphone, Coins, AlertTriangle, CheckCircle, Camera, Loader2, User, BookOpenCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
-import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
-import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
-import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
-import type { CreditEntry } from "@/app/(app)/dashboard/credit-notebook/page";
 import { isValid as isValidDate, parseISO } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { 
@@ -28,6 +23,11 @@ import {
   STORAGE_KEY_CREDIT_NOTEBOOK_BASE,
   getCompanySpecificKey 
 } from '@/lib/constants';
+import type { Transaction } from "@/app/(app)/dashboard/notebook/page"; 
+import type { SalesRecordEntry } from "@/app/(app)/dashboard/sales-record/page"; 
+import type { ProductEntry } from "@/app/(app)/dashboard/products/page";
+import type { CustomerEntry } from "@/app/(app)/dashboard/customers/page";
+import type { CreditEntry } from "@/app/(app)/dashboard/credit-notebook/page";
 
 
 interface PDVProduct {
@@ -76,7 +76,7 @@ export default function SalesPage() {
           setAvailableProducts(JSON.parse(storedProducts));
         } catch (error) {
           console.error("Failed to parse products from localStorage for PDV for", currentCompany, error);
-          localStorage.removeItem(productsStorageKey);
+          if (productsStorageKey) localStorage.removeItem(productsStorageKey);
           setAvailableProducts([]); 
           toast({ title: "Erro ao Carregar Produtos", description: "Não foi possível carregar os produtos para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvProductLoadError" });
         }
@@ -94,7 +94,7 @@ export default function SalesPage() {
           setAvailableCustomers(JSON.parse(storedCustomers));
         } catch (error) {
           console.error("Failed to parse customers from localStorage for PDV for", currentCompany, error);
-          localStorage.removeItem(customersStorageKey);
+          if (customersStorageKey) localStorage.removeItem(customersStorageKey);
           setAvailableCustomers([]); 
           toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível carregar os clientes para o PDV. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvCustomerLoadError" });
         }
@@ -258,11 +258,20 @@ export default function SalesPage() {
 
     try {
         const existingSalesRecordsRaw = localStorage.getItem(salesRecordStorageKey);
-        const existingSalesRecords: SalesRecordEntry[] = existingSalesRecordsRaw ? JSON.parse(existingSalesRecordsRaw) : [];
+        let existingSalesRecords: SalesRecordEntry[] = [];
+        if (existingSalesRecordsRaw) {
+            try {
+                existingSalesRecords = JSON.parse(existingSalesRecordsRaw);
+            } catch (parseError) {
+                console.error("Error parsing existing sales records for", currentCompany, parseError);
+                if (salesRecordStorageKey) localStorage.removeItem(salesRecordStorageKey);
+                toast({title: "Erro ao Carregar Histórico de Vendas", description: "Dados do histórico corrompidos, foram resetados.", variant: "destructive", toastId: "pdvSalesLoadErrorOnSave"});
+            }
+        }
         localStorage.setItem(salesRecordStorageKey, JSON.stringify([...existingSalesRecords, salesRecordEntry]));
     } catch (e) {
         console.error("Error updating sales records in localStorage for", currentCompany, e);
-        toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvSalesRecordSaveError"})
+        toast({title: "Erro ao salvar no Histórico de Vendas", description: "Não foi possível atualizar o histórico de vendas.", variant: "destructive", toastId: "pdvSalesRecordSaveError"})
     }
 
     if (paymentMethod === "Fiado" && selectedCustomer) {
@@ -278,10 +287,17 @@ export default function SalesPage() {
       };
       try {
         const existingCreditEntriesRaw = localStorage.getItem(creditNotebookStorageKey);
-        const existingCreditEntries: CreditEntry[] = existingCreditEntriesRaw 
-          ? JSON.parse(existingCreditEntriesRaw).map((e:any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate): undefined})) 
-          : [];
-        localStorage.setItem(creditNotebookStorageKey, JSON.stringify([...existingCreditEntries, {...creditEntry, saleDate: creditEntry.saleDate.toISOString()}]));
+        let existingCreditEntries: CreditEntry[] = [];
+        if (existingCreditEntriesRaw) {
+            try {
+                existingCreditEntries = JSON.parse(existingCreditEntriesRaw).map((e:any) => ({...e, saleDate: parseISO(e.saleDate), dueDate: e.dueDate ? parseISO(e.dueDate): undefined}));
+            } catch (parseError) {
+                console.error("Error parsing existing credit entries for", currentCompany, parseError);
+                if (creditNotebookStorageKey) localStorage.removeItem(creditNotebookStorageKey);
+                toast({title: "Erro ao Carregar Fiados", description: "Dados de fiados corrompidos, foram resetados.", variant: "destructive", toastId: "pdvCreditLoadErrorOnSave"});
+            }
+        }
+        localStorage.setItem(creditNotebookStorageKey, JSON.stringify([...existingCreditEntries, {...creditEntry, saleDate: creditEntry.saleDate.toISOString(), dueDate: creditEntry.dueDate ? creditEntry.dueDate.toISOString() : undefined }]));
         toast({
           title: "Venda Registrada como Fiado!",
           description: `Venda de R$ ${cartTotal.toFixed(2)} para ${selectedCustomer.name} adicionada à Caderneta de Fiados.`,
@@ -303,7 +319,16 @@ export default function SalesPage() {
       
       try {
           const existingNotebookTransactionsRaw = localStorage.getItem(notebookStorageKey);
-          const existingNotebookTransactions: Transaction[] = existingNotebookTransactionsRaw ? JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: new Date(t.date)})) : [];
+          let existingNotebookTransactions: Transaction[] = [];
+          if (existingNotebookTransactionsRaw) {
+              try {
+                existingNotebookTransactions = JSON.parse(existingNotebookTransactionsRaw).map((t: any) => ({...t, date: new Date(t.date)}));
+              } catch (parseError) {
+                console.error("Error parsing existing notebook transactions for", currentCompany, parseError);
+                if (notebookStorageKey) localStorage.removeItem(notebookStorageKey);
+                toast({title: "Erro ao Carregar Caderneta Digital", description: "Dados da caderneta corrompidos, foram resetados.", variant: "destructive", toastId: "pdvNotebookLoadErrorOnSave"});
+              }
+          }
           localStorage.setItem(notebookStorageKey, JSON.stringify([...existingNotebookTransactions, {...incomeTransaction, date: incomeTransaction.date.toISOString()}]));
           toast({
             title: "Venda Finalizada!",
@@ -312,7 +337,7 @@ export default function SalesPage() {
           });
       } catch (e) {
           console.error("Error updating notebook transactions in localStorage for", currentCompany, e);
-          toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital. Os dados podem ter sido redefinidos.", variant: "destructive", toastId: "pdvNotebookSaveError"})
+          toast({title: "Erro ao salvar na Caderneta Digital", description: "Não foi possível atualizar a caderneta digital.", variant: "destructive", toastId: "pdvNotebookSaveError"})
       }
     }
 
@@ -488,6 +513,15 @@ export default function SalesPage() {
                                   </AlertDescription>
                               </Alert>
                           )}
+                           {hasCameraPermission === null && (
+                              <Alert variant="default">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <AlertTitle>Aguardando Permissão da Câmera</AlertTitle>
+                                  <AlertDescription>
+                                    Por favor, permita o acesso à câmera para usar esta funcionalidade.
+                                  </AlertDescription>
+                              </Alert>
+                          )}
                           <Input
                               placeholder="Digite o código do produto aqui..."
                               value={cameraScannedCode}
@@ -646,6 +680,6 @@ export default function SalesPage() {
     </div>
   );
 }
-
+    
 
     
