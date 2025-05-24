@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -57,7 +57,7 @@ function getStoredData<T>(key: string | null, defaultValue: T[], toastInstance?:
     return Array.isArray(parsed) ? parsed : defaultValue;
   } catch (error) {
     console.error(`Error parsing data from localStorage for key ${key} (Company: ${companyName || 'N/A'}):`, error);
-    localStorage.removeItem(key);
+    if (key) localStorage.removeItem(key); // Remove corrupted data
     toastInstance?.({ title: `Erro de Dados (${key.replace('moneywise-','').replace(`_${companyName}`, '')})`, description: `Dados locais para ${key.replace('moneywise-','').replace(`_${companyName}`, '')} parecem corrompidos e foram resetados.`, variant: "destructive", duration: 7000, toastId: `loadError-${key}` });
     return defaultValue;
   }
@@ -67,7 +67,6 @@ function getStoredData<T>(key: string | null, defaultValue: T[], toastInstance?:
 function saveStoredData<T>(key: string | null, data: T[], toastInstance?: ReturnType<typeof useToast>['toast'], companyName?: string | null): boolean {
   if (typeof window === 'undefined' || !key) return false;
   try {
-    // Ensure dates are ISO strings before saving
     const dataToSave = data.map(item => {
       if (typeof item === 'object' && item !== null) {
         const newItem = { ...item } as any;
@@ -113,7 +112,6 @@ export function VirtualAssistant() {
   });
   const [userInputForVoice, setUserInputForVoice] = useState("");
 
-  // Memoize storage keys
   const notebookStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_NOTEBOOK_BASE, currentCompany), [currentCompany]);
   const productsStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_PRODUCTS_BASE, currentCompany), [currentCompany]);
   const creditNotebookStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_CREDIT_NOTEBOOK_BASE, currentCompany), [currentCompany]);
@@ -173,18 +171,17 @@ export function VirtualAssistant() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const viewportElement = scrollAreaRef.current.querySelector('div[style*="overflow: scroll"]');
-      if (viewportElement) {
-        viewportElement.scrollTop = viewportElement.scrollHeight;
-      }
+  const addMessage = useCallback((sender: ChatMessage['sender'], text?: string) => {
+    setChatMessages(prev => [...prev, { id: Date.now().toString(), sender, text, timestamp: new Date() }]);
+  }, []);
+  
+  const speak = useCallback((textToSpeak: string) => {
+    if (!supportedFeatures.speechSynthesis || !textToSpeak || typeof window.speechSynthesis === 'undefined') return;
+    
+    // Cancel any ongoing speech first
+    if (isSpeaking || window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
     }
-  }, [chatMessages]);
-
-  const speak = (textToSpeak: string) => {
-    if (!supportedFeatures.speechSynthesis || !textToSpeak) return;
-    if (isSpeaking) speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'pt-BR';
@@ -195,12 +192,27 @@ export function VirtualAssistant() {
       setIsSpeaking(false);
       toast({ title: "Erro na Fala", description: "Não foi possível reproduzir a resposta.", variant: "destructive" });
     };
-    speechSynthesis.speak(utterance);
-  };
+    window.speechSynthesis.speak(utterance);
+  }, [supportedFeatures.speechSynthesis, toast, isSpeaking]); // Added isSpeaking to dependencies
 
-  const addMessage = (sender: ChatMessage['sender'], text?: string) => {
-    setChatMessages(prev => [...prev, { id: Date.now().toString(), sender, text, timestamp: new Date() }]);
-  };
+  useEffect(() => {
+    if (isDialogOpen && supportedFeatures.speechSynthesis && chatMessages.length === 0 && !isSpeaking) {
+      const initialGreeting = "Olá! Sou seu assistente virtual MoneyWise. Como posso te ajudar hoje?";
+      speak(initialGreeting);
+      addMessage('assistant', initialGreeting);
+    }
+  }, [isDialogOpen, supportedFeatures.speechSynthesis, chatMessages.length, speak, addMessage, isSpeaking]);
+
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const viewportElement = scrollAreaRef.current.querySelector('div[style*="overflow: scroll"]');
+      if (viewportElement) {
+        viewportElement.scrollTop = viewportElement.scrollHeight;
+      }
+    }
+  }, [chatMessages]);
+
 
   const executeActionAndSpeak = (action: string, paramsString?: string): string => {
     let navigationPath: string | null = null;
@@ -243,7 +255,7 @@ export function VirtualAssistant() {
     const productPriceParam = parsedParameters?.productPrice;
     const productCategoryParam = parsedParameters?.category;
     const productStockParam = parsedParameters?.stock;
-
+    
     const whatsappNumberParam = parsedParameters?.whatsapp;
 
 
@@ -369,7 +381,7 @@ export function VirtualAssistant() {
           let missingFields = [];
           if (!customerNameParam) missingFields.push("nome");
           if (!customerPhoneParam) missingFields.push("telefone");
-          messageForChat = `Para adicionar um cliente diretamente, preciso pelo menos do ${missingFields.join(' e do ')}. Exemplo: 'Adicionar cliente João Silva telefone (11) 91234-5678'. Por favor, tente novamente com os detalhes completos ou vá para a página de Clientes para preencher o formulário.`;
+          messageForChat = `Para adicionar um cliente diretamente, preciso pelo menos do ${missingFields.join(' e do ')}. Exemplo: 'Adicionar cliente João Silva telefone (11) 91234-5678'. Você pode adicionar na página de Clientes.`;
           navigationPath = '/dashboard/customers';
         }
         break;
@@ -390,7 +402,7 @@ export function VirtualAssistant() {
                 if(isValidDate(date)) parsedDueDate = date;
                 else {
                     console.warn(`Assistente: Data de vencimento inválida recebida: ${creditDueDateParam}`);
-                    dateWarning = `A data de vencimento '${creditDueDateParam}' não é válida (use AAAA-MM-DD). O fiado será adicionado sem data de vencimento.`;
+                    dateWarning = ` A data de vencimento '${creditDueDateParam}' não é válida (use AAAA-MM-DD). O fiado será adicionado sem data de vencimento.`;
                 }
             }
 
@@ -406,7 +418,7 @@ export function VirtualAssistant() {
             };
 
             if(saveStoredData<CreditEntry>(creditNotebookStorageKey, [...creditEntries, newEntry].sort((a,b) => ((b.saleDate instanceof Date) ? b.saleDate.getTime() : 0) - ((a.saleDate instanceof Date) ? a.saleDate.getTime() : 0)), toast, currentCompany)) {
-                messageForChat = `Fiado de R$ ${Number(creditAmountParam).toFixed(2)} para '${customerNameParam}' adicionado com sucesso! ${dateWarning} Vou te mostrar na caderneta de fiados.`;
+                messageForChat = `Fiado de R$ ${Number(creditAmountParam).toFixed(2)} para '${customerNameParam}' adicionado com sucesso!${dateWarning} Vou te mostrar na caderneta de fiados.`;
             } else {
                 messageForChat = `Não foi possível salvar o fiado para '${customerNameParam}' diretamente. Por favor, tente adicioná-lo na página de fiados.`;
             }
@@ -415,7 +427,7 @@ export function VirtualAssistant() {
             let missingFields = [];
             if (!customerNameParam) missingFields.push("nome do cliente");
             if (!creditAmountParam) missingFields.push("valor");
-            messageForChat = `Para registrar um fiado diretamente, preciso do ${missingFields.join(' e do ')}. Exemplo: 'Registrar fiado para Maria Silva de 50 reais'. Complete na página de Fiados se preferir.`;
+            messageForChat = `Para registrar um fiado diretamente, preciso do ${missingFields.join(' e do ')}. Exemplo: 'Registrar fiado para Maria Silva de 50 reais'. Você pode adicionar na página de Fiados.`;
             navigationPath = '/dashboard/credit-notebook';
         }
         break;
@@ -444,7 +456,7 @@ export function VirtualAssistant() {
             if(!transactionDescParam) missingFields.push("descrição");
             if(!transactionAmountParam) missingFields.push("valor");
             if(!transactionTypeParam) missingFields.push("tipo (receita ou despesa)");
-            messageForChat = `Para adicionar uma transação diretamente, preciso da ${missingFields.join(', da ')}. Exemplo: 'Lançar despesa aluguel valor 500'. Tente novamente ou adicione na Caderneta Digital.`;
+            messageForChat = `Para adicionar uma transação diretamente, preciso da ${missingFields.join(', da ')}, do tipo (receita ou despesa) e do valor. Exemplo: 'Lançar despesa aluguel valor 500'. Você pode adicionar na Caderneta Digital.`;
             navigationPath = '/dashboard/notebook';
         }
         break;
@@ -493,8 +505,8 @@ export function VirtualAssistant() {
       }
       case 'initiateeditproduct': {
         const productIdentifier = parsedParameters?.productName || parsedParameters?.productCode;
-        messageForChat = `Para editar o produto ${productIdentifier ? `'${productIdentifier}'` : 'desejado'}, estou te levando para a página de Produtos. Lá você poderá encontrar o produto e usar a funcionalidade de edição (que será implementada).`;
-        navigationPath = '/dashboard/products';
+        messageForChat = `Para editar o produto ${productIdentifier ? `'${productIdentifier}'` : 'desejado'}, estou te levando para a página de Produtos. Lá você poderá encontrar o produto e usar a funcionalidade de edição (que ainda não foi implementada).`;
+        navigationPath = '/dashboard/products'; // Edição de produto ainda não implementada na UI.
         break;
       }
 
@@ -540,14 +552,14 @@ export function VirtualAssistant() {
         if (descriptionToDelete) {
             const transactionsRaw = getStoredData<any>(notebookStorageKey, [], toast, currentCompany);
             const transactions: Transaction[] = transactionsRaw.map((t: any) => ({...t, date: isValidDate(parseISO(t.date)) ? parseISO(t.date) : new Date() }));
-            const transactionExists = transactions.some(t => t.description.toLowerCase() === descriptionToDelete.toLowerCase());
+            const transactionExists = transactions.some(t => t.description.toLowerCase().includes(descriptionToDelete.toLowerCase()));
             if (transactionExists) {
-                messageForChat = `Entendi que você quer excluir a transação com descrição '${descriptionToDelete}'. Para confirmar, vou te levar para a Caderneta Digital. Lá você poderá encontrar a transação e usar o botão de lixeira.`;
+                messageForChat = `Entendi que você quer excluir a transação com descrição contendo '${descriptionToDelete}'. Para confirmar, vou te levar para a Caderneta Digital. Lá você poderá encontrar a transação e usar o botão de lixeira.`;
             } else {
-                messageForChat = `Não encontrei uma transação com a descrição '${descriptionToDelete}'. Verifique a descrição ou vá para a Caderneta Digital para excluir manualmente.`;
+                messageForChat = `Não encontrei uma transação com a descrição contendo '${descriptionToDelete}'. Verifique a descrição ou vá para a Caderneta Digital para excluir manualmente.`;
             }
         } else {
-            messageForChat = "Para excluir uma transação, por favor, me diga a descrição. Ou, estou te levando para a Caderneta Digital.";
+            messageForChat = "Para excluir uma transação, por favor, me diga parte da descrição. Ou, estou te levando para a Caderneta Digital.";
         }
         navigationPath = '/dashboard/notebook';
         break;
@@ -579,27 +591,6 @@ export function VirtualAssistant() {
         messageForChat = "Os principais indicadores (KPIs) são exibidos no Painel Central. Estou te levando para lá!";
         navigationPath = '/dashboard';
         break;
-      case 'showsakes':
-      case 'showsales':
-        navigationPath = '/dashboard/sales-record';
-        messageForChat = "Ok, abrindo o histórico de vendas.";
-        break;
-      case 'gotocustomeraccounts':
-        navigationPath = '/dashboard/customers';
-        messageForChat = "Certo, indo para as contas de clientes.";
-        break;
-      case 'createnewinvoice':
-        messageForChat = "Entendido! A funcionalidade de criar nova fatura ainda está em desenvolvimento.";
-        break;
-      case 'viewcustomerdetails':
-        messageForChat = `Para ver detalhes do cliente ${customerNameParam || 'específico'}, por favor, vá para a seção Contas de Clientes e utilize a busca. Estou te direcionando para lá.`;
-        navigationPath = '/dashboard/customers';
-        break;
-      case 'searchtransactions':
-        const searchTerm = parsedParameters?.term || 'algo específico';
-        messageForChat = `Para buscar transações por '${searchTerm}', por favor, vá para a Caderneta Digital. A busca detalhada lá ainda está em desenvolvimento. Vou te levar para a Caderneta.`;
-        navigationPath = '/dashboard/notebook';
-        break;
 
       case 'unknown':
       case 'unknowncommand':
@@ -617,21 +608,13 @@ export function VirtualAssistant() {
 
     if (navigationPath) {
       router.push(navigationPath);
-      // Decidimos não fechar o diálogo automaticamente para a maioria das ações
-      // Apenas se a ação for especificamente para fechar, ou o usuário o fizer manualmente.
-      // const actionsThatCloseDialog = [
-      //   // ... (lista reduzida ou vazia)
-      // ];
-      // if (actionsThatCloseDialog.includes(action?.toLowerCase())) {
-      //   setIsDialogOpen(false);
-      // }
     }
     return messageForChat;
   };
 
   const handleTextCommand = async () => {
     if (!inputText.trim()) return;
-    if (isSpeaking) speechSynthesis.cancel();
+    if (isSpeaking && window.speechSynthesis) window.speechSynthesis.cancel();
 
     const commandText = inputText;
     addMessage('user', commandText);
@@ -654,7 +637,7 @@ export function VirtualAssistant() {
 
   const processSpokenCommand = async (commandText: string) => {
     if (!commandText.trim()) return;
-    if (isSpeaking) speechSynthesis.cancel();
+    if (isSpeaking && window.speechSynthesis) window.speechSynthesis.cancel();
 
     addMessage('user', `🎤: ${commandText}`);
     setUserInputForVoice("");
@@ -675,8 +658,8 @@ export function VirtualAssistant() {
   };
 
   const handleVoiceControlButtonClick = () => {
-    if (isSpeaking) {
-      speechSynthesis.cancel();
+    if (isSpeaking && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
       setIsSpeaking(false);
       return;
     }
@@ -685,6 +668,7 @@ export function VirtualAssistant() {
       if (recognition) {
         recognition.stop();
       }
+      // setIsListening(false); // recognition.onend will set this
     } else {
       if (!supportedFeatures.speechRecognition || !recognition) {
         toast({ title: "Recurso Indisponível", description: "O reconhecimento de voz não é suportado pelo seu navegador.", variant: "destructive" });
@@ -697,8 +681,12 @@ export function VirtualAssistant() {
         toast({ title: "Ouvindo...", description: "Fale agora." });
       } catch (e) {
         console.error("Error starting recognition:", e);
-        toast({ title: "Erro ao Iniciar", description: "Não foi possível iniciar o reconhecimento de voz. Verifique as permissões do microfone.", variant: "destructive" });
-        setIsListening(false);
+        if ((e as Error).name === 'InvalidStateError') {
+            // Already started, do nothing or handle appropriately
+        } else {
+            toast({ title: "Erro ao Iniciar", description: "Não foi possível iniciar o reconhecimento de voz. Verifique as permissões do microfone.", variant: "destructive" });
+            setIsListening(false);
+        }
       }
     }
   };
@@ -727,15 +715,16 @@ export function VirtualAssistant() {
       if (!open) {
         if (recognition && isListening) {
           recognition.stop();
+          setIsListening(false); 
         }
         if (window.speechSynthesis && isSpeaking) {
           window.speechSynthesis.cancel();
-          setIsSpeaking(false);
+          setIsSpeaking(false); 
         }
       }
     }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full">
+        <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
           <Bot className="h-5 w-5" />
           <span className="sr-only">Assistente Virtual</span>
         </Button>
@@ -833,3 +822,5 @@ export function VirtualAssistant() {
     </Dialog>
   );
 }
+
+    
