@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2, Trash2, ArrowLeft } from "lucide-react"; // Added ArrowLeft
+import { BookUser, PlusCircle, CalendarIcon, CheckCircle, MessageSquare, AlertTriangle, Printer, Share2, Loader2, Trash2, ArrowLeft, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, isValid, isToday, isPast, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -54,9 +54,10 @@ export interface CreditEntry extends CreditEntryFormValues {
 export default function CreditNotebookPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
   const [creditEntries, setCreditEntries] = useState<CreditEntry[]>([]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [editingCreditEntry, setEditingCreditEntry] = useState<CreditEntry | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [accountDetails, setAccountDetails] = useState<AccountDetailsFormValues | null>(null);
 
@@ -162,67 +163,95 @@ export default function CreditNotebookPage() {
     },
   });
 
+  useEffect(() => {
+    if (isFormDialogOpen) {
+      if (editingCreditEntry) {
+        form.reset({
+          ...editingCreditEntry,
+          saleDate: isValid(editingCreditEntry.saleDate) ? editingCreditEntry.saleDate : new Date(),
+          dueDate: editingCreditEntry.dueDate && isValid(editingCreditEntry.dueDate) ? editingCreditEntry.dueDate : undefined,
+        });
+      } else {
+        form.reset({ customerName: "", amount: 0, saleDate: new Date(), dueDate: undefined, whatsappNumber: "", notes: "" });
+      }
+    }
+  }, [isFormDialogOpen, editingCreditEntry, form]);
+
   const onSubmit = (data: CreditEntryFormValues) => {
-    if (!customersStorageKey || !creditStorageKey) {
+    if (!creditStorageKey) {
       toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar o fiado.", variant: "destructive"});
       return;
     }
-    let customerAddedToMainList = false;
-    try {
-        const storedCustomers = localStorage.getItem(customersStorageKey);
-        let customers: CustomerEntry[] = [];
-        if (storedCustomers) {
-            try {
-                customers = JSON.parse(storedCustomers);
-            } catch (parseError) {
-                 console.error("Error parsing customers for auto-register for", currentCompany, parseError);
-                 if (customersStorageKey) localStorage.removeItem(customersStorageKey);
-                 toast({ title: "Erro ao Carregar Clientes", description: "Dados de clientes corrompidos, foram resetados.", variant: "destructive", toastId: "creditCustomerLoadErrorOnSubmit"});
+
+    if (editingCreditEntry) {
+      setCreditEntries(prev =>
+        prev.map(e =>
+          e.id === editingCreditEntry.id ? { ...editingCreditEntry, ...data } : e
+        ).sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0))
+      );
+      toast({
+        title: "Fiado Atualizado!",
+        description: `Os dados do fiado para ${data.customerName} foram atualizados.`,
+      });
+    } else {
+      let customerAddedToMainList = false;
+      try {
+          if (customersStorageKey) {
+            const storedCustomers = localStorage.getItem(customersStorageKey);
+            let customers: CustomerEntry[] = [];
+            if (storedCustomers) {
+                try {
+                    customers = JSON.parse(storedCustomers);
+                } catch (parseError) {
+                    console.error("Error parsing customers for auto-register for", currentCompany, parseError);
+                    localStorage.removeItem(customersStorageKey);
+                    toast({ title: "Erro ao Carregar Clientes", description: "Dados de clientes corrompidos, foram resetados.", variant: "destructive", toastId: "creditCustomerLoadErrorOnSubmit"});
+                }
             }
-        }
 
-        const customerExists = customers.some(c => c.name.toLowerCase() === data.customerName.toLowerCase());
+            const customerExists = customers.some(c => c.name.toLowerCase() === data.customerName.toLowerCase());
 
-        if (!customerExists) {
-            const newCustomer: CustomerEntry = {
-                id: `CUST${String(Date.now()).slice(-6)}`,
-                name: data.customerName,
-                phone: data.whatsappNumber || "",
-                email: "",
-                address: "",
-            };
-            customers = [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name));
-            localStorage.setItem(customersStorageKey, JSON.stringify(customers));
-            customerAddedToMainList = true;
-        }
-    } catch (error) {
-        console.error("Error auto-registering customer for", currentCompany, error);
-        toast({
-            title: "Erro ao Registrar Cliente Automaticamente",
-            description: "Não foi possível adicionar o novo cliente à lista principal de clientes.",
-            variant: "destructive"
-        });
+            if (!customerExists) {
+                const newCustomer: CustomerEntry = {
+                    id: `CUST${String(Date.now()).slice(-6)}`,
+                    name: data.customerName,
+                    phone: data.whatsappNumber || "",
+                    email: "",
+                    address: "",
+                };
+                customers = [...customers, newCustomer].sort((a,b) => a.name.localeCompare(b.name));
+                localStorage.setItem(customersStorageKey, JSON.stringify(customers));
+                customerAddedToMainList = true;
+            }
+          }
+      } catch (error) {
+          console.error("Error auto-registering customer for", currentCompany, error);
+          toast({
+              title: "Erro ao Registrar Cliente Automaticamente",
+              description: "Não foi possível adicionar o novo cliente à lista principal de clientes.",
+              variant: "destructive"
+          });
+      }
+
+      const newEntry: CreditEntry = {
+        ...data,
+        id: `CF${String(Date.now()).slice(-6)}`,
+        paid: false,
+      };
+      setCreditEntries(prev => [newEntry, ...prev].sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
+
+      let toastDescription = `Nova venda a prazo para ${data.customerName} no valor de R$ ${data.amount.toFixed(2)} registrada.`;
+      if (customerAddedToMainList) {
+          toastDescription += ` O cliente ${data.customerName} também foi adicionado à sua lista de clientes.`;
+      }
+      toast({
+        title: "Fiado Registrado!",
+        description: toastDescription,
+      });
     }
-
-    const newEntry: CreditEntry = {
-      ...data,
-      id: `CF${String(Date.now()).slice(-6)}`,
-      paid: false,
-    };
-    setCreditEntries(prev => [newEntry, ...prev].sort((a,b) => (isValid(b.saleDate) ? b.saleDate.getTime() : 0) - (isValid(a.saleDate) ? a.saleDate.getTime() : 0)));
-
-    let toastDescription = `Nova venda a prazo para ${data.customerName} no valor de R$ ${data.amount.toFixed(2)} registrada.`;
-    if (customerAddedToMainList) {
-        toastDescription += ` O cliente ${data.customerName} também foi adicionado à sua lista de clientes.`;
-    }
-
-    toast({
-      title: "Fiado Registrado!",
-      description: toastDescription,
-    });
-
-    form.reset({ customerName: "", amount: 0, saleDate: new Date(), dueDate: undefined, whatsappNumber: "", notes: "" });
-    setIsAddDialogOpen(false);
+    
+    setEditingCreditEntry(null);
+    setIsFormDialogOpen(false);
   };
 
   const handleMarkAsPaid = (id: string) => {
@@ -299,6 +328,11 @@ export default function CreditNotebookPage() {
         variant: "destructive"
       });
     }
+  };
+
+  const handleOpenFormDialog = (entry: CreditEntry | null = null) => {
+    setEditingCreditEntry(entry);
+    setIsFormDialogOpen(true);
   };
 
   const handleSendWhatsAppReminder = (entry: CreditEntry) => {
@@ -432,16 +466,19 @@ export default function CreditNotebookPage() {
                 <Button variant="outline" onClick={() => router.back()}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
+                  if (!isOpen) setEditingCreditEntry(null);
+                  setIsFormDialogOpen(isOpen);
+                }}>
                 <DialogTrigger asChild>
-                    <Button onClick={() => form.reset({ customerName: "", amount: 0, saleDate: new Date(), dueDate: undefined, whatsappNumber: "", notes: "" })}>
-                    <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Novo Fiado
+                    <Button onClick={() => handleOpenFormDialog()}>
+                    <PlusCircle className="mr-2 h-5 w-5" /> {editingCreditEntry ? "Editar Fiado" : "Adicionar Novo Fiado"}
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                    <DialogTitle>Adicionar Novo Fiado</DialogTitle>
-                    <DialogDescription>Preencha os dados da venda a prazo.</DialogDescription>
+                    <DialogTitle>{editingCreditEntry ? "Editar Fiado" : "Adicionar Novo Fiado"}</DialogTitle>
+                    <DialogDescription>{editingCreditEntry ? "Atualize os dados do fiado." : "Preencha os dados da venda a prazo."}</DialogDescription>
                     </DialogHeader>
                     <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
@@ -556,7 +593,7 @@ export default function CreditNotebookPage() {
                                 <Button type="button" variant="outline">Cancelar</Button>
                             </DialogClose>
                             <Button type="submit" disabled={form.formState.isSubmitting}>
-                                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Fiado"}
+                                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingCreditEntry ? "Salvar Alterações" : "Salvar Fiado")}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -617,6 +654,9 @@ export default function CreditNotebookPage() {
                       <TableCell className="max-w-xs truncate" title={entry.notes || undefined}>{entry.notes || "-"}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex justify-center items-center space-x-1 md:space-x-2">
+                           <Button variant="outline" size="sm" onClick={() => handleOpenFormDialog(entry)} title="Editar Fiado">
+                                <Edit3 className="h-4 w-4" />
+                           </Button>
                           <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(entry.id)} title={entry.paid ? "Marcar como Pendente" : "Marcar como Pago"}>
                             {entry.paid ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
                           </Button>
@@ -658,3 +698,4 @@ export default function CreditNotebookPage() {
     </div>
   );
 }
+

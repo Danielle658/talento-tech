@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign, Loader2, Trash2, ArrowLeft } from "lucide-react"; // Added ArrowLeft
+import { FileText, PlusCircle, CalendarIcon, ArrowUpCircle, ArrowDownCircle, BarChart2, DollarSign, Loader2, Trash2, ArrowLeft, Edit3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, startOfMonth, subMonths, endOfMonth, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -54,9 +54,10 @@ const chartConfig = {
 export default function NotebookPage() {
   const { toast } = useToast();
   const { currentCompany } = useAuth();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   const notebookStorageKey = useMemo(() => getCompanySpecificKey(STORAGE_KEY_NOTEBOOK_BASE, currentCompany), [currentCompany]);
@@ -108,22 +109,50 @@ export default function NotebookPage() {
     },
   });
 
+  useEffect(() => {
+    if (isFormDialogOpen) {
+      if (editingTransaction) {
+        form.reset({
+          ...editingTransaction,
+          date: isValid(editingTransaction.date) ? editingTransaction.date : new Date(),
+        });
+      } else {
+        form.reset({ description: "", amount: 0, type: undefined, date: new Date() });
+      }
+    }
+  }, [isFormDialogOpen, editingTransaction, form]);
+
+
   const onSubmitTransaction = (data: TransactionFormValues) => {
     if (!notebookStorageKey) {
        toast({ title: "Erro", description: "Contexto da empresa não encontrado. Não é possível salvar a transação.", variant: "destructive"});
        return;
     }
-    const newTransaction: Transaction = {
-      ...data,
-      id: `T${String(Date.now()).slice(-6)}`,
-    };
-    setTransactions(prev => [newTransaction, ...prev].sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0)));
-    toast({
-      title: "Transação Registrada!",
-      description: `${data.type === "income" ? "Receita" : "Despesa"} de ${data.description} no valor de R$ ${data.amount.toFixed(2)} registrada.`,
-    });
-    form.reset({ date: new Date(), amount: 0, description: "", type: undefined });
-    setIsAddTransactionDialogOpen(false);
+
+    if (editingTransaction) {
+      setTransactions(prev =>
+        prev.map(t =>
+          t.id === editingTransaction.id ? { ...editingTransaction, ...data, date: data.date } : t
+        ).sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0))
+      );
+      toast({
+        title: "Transação Atualizada!",
+        description: `${data.type === "income" ? "Receita" : "Despesa"} de ${data.description} atualizada.`,
+      });
+    } else {
+      const newTransaction: Transaction = {
+        ...data,
+        id: `T${String(Date.now()).slice(-6)}`,
+      };
+      setTransactions(prev => [newTransaction, ...prev].sort((a,b) => (isValid(b.date) ? b.date.getTime() : 0) - (isValid(a.date) ? a.date.getTime() : 0)));
+      toast({
+        title: "Transação Registrada!",
+        description: `${data.type === "income" ? "Receita" : "Despesa"} de ${data.description} no valor de R$ ${data.amount.toFixed(2)} registrada.`,
+      });
+    }
+    
+    setEditingTransaction(null);
+    setIsFormDialogOpen(false);
   };
 
   const handleDeleteTransaction = (id: string) => {
@@ -138,6 +167,11 @@ export default function NotebookPage() {
         variant: "destructive"
       });
     }
+  };
+
+  const handleOpenFormDialog = (transaction: Transaction | null = null) => {
+    setEditingTransaction(transaction);
+    setIsFormDialogOpen(true);
   };
 
   const { totalIncome, totalExpense, balance } = useMemo(() => {
@@ -200,16 +234,19 @@ export default function NotebookPage() {
                 <Button variant="outline" onClick={() => router.back()}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
-                <Dialog open={isAddTransactionDialogOpen} onOpenChange={setIsAddTransactionDialogOpen}>
+                <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
+                  if (!isOpen) setEditingTransaction(null);
+                  setIsFormDialogOpen(isOpen);
+                }}>
                 <DialogTrigger asChild>
-                    <Button onClick={() => form.reset({ date: new Date(), amount: 0, description: "", type: undefined })}>
+                    <Button onClick={() => handleOpenFormDialog()}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Transação
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                    <DialogTitle>Adicionar Nova Transação</DialogTitle>
-                    <DialogDescription>Registre uma nova receita ou despesa.</DialogDescription>
+                    <DialogTitle>{editingTransaction ? "Editar Transação" : "Adicionar Nova Transação"}</DialogTitle>
+                    <DialogDescription>{editingTransaction ? "Atualize os dados da transação." : "Registre uma nova receita ou despesa."}</DialogDescription>
                     </DialogHeader>
                     <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmitTransaction)} className="space-y-4 py-2">
@@ -300,7 +337,7 @@ export default function NotebookPage() {
                                 <Button type="button" variant="outline">Cancelar</Button>
                             </DialogClose>
                             <Button type="submit" disabled={form.formState.isSubmitting}>
-                                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Transação"}
+                                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (editingTransaction ? "Salvar Alterações" : "Salvar Transação")}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -424,7 +461,10 @@ export default function NotebookPage() {
                         )}>
                             {transaction.type === "expense" && "-"}R$ {transaction.amount.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-center space-x-1">
+                            <Button variant="outline" size="sm" onClick={() => handleOpenFormDialog(transaction)} title="Editar Transação">
+                                <Edit3 className="h-4 w-4" />
+                            </Button>
                             <Button variant="destructive" size="sm" onClick={() => handleDeleteTransaction(transaction.id)} title="Excluir Transação">
                                 <Trash2 className="h-4 w-4" />
                             </Button>
@@ -441,3 +481,4 @@ export default function NotebookPage() {
       </Card>
     </div>;
 }
+
