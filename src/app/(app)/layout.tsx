@@ -1,7 +1,8 @@
 
 "use client";
-import { useEffect, useState, useMemo } from 'react'; 
-import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react'; 
+import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import { useAuth } from '@/hooks/use-auth';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+// Input removed as it's not used here directly
 import {
   SidebarProvider,
   Sidebar,
@@ -35,7 +36,7 @@ import {
   ShoppingCart,
   Briefcase,
   Settings,
-  Search,
+  // Search, // Search input removed from header
   Bell,
   LogOut,
   UserCircle,
@@ -47,9 +48,18 @@ import {
   BarChart3
 } from 'lucide-react';
 import { ClientOnly } from '@/components/shared/client-only';
-import { VirtualAssistant } from '@/components/dashboard/virtual-assistant';
+import dynamic from 'next/dynamic'; // Import dynamic
 import { ACCOUNT_DETAILS_BASE_STORAGE_KEY, getCompanySpecificKey } from '@/lib/constants';
 import type { AccountDetailsFormValues } from '@/app/(app)/dashboard/settings/page';
+
+const VirtualAssistant = dynamic(() => 
+  import('@/components/dashboard/virtual-assistant').then(mod => mod.VirtualAssistant),
+  { 
+    ssr: false, // Usually good for client-side heavy components
+    loading: () => <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" disabled><Loader2 className="h-5 w-5 animate-spin"/></Button> 
+  }
+);
+
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Painel Central", tooltip: "Painel" },
@@ -58,13 +68,14 @@ const navItems = [
   { href: "/dashboard/sales", icon: ShoppingCart, label: "Vendas", tooltip: "Vendas" },
   { href: "/dashboard/products", icon: Briefcase, label: "Produtos", tooltip: "Produtos" },
   { href: "/dashboard/credit-notebook", icon: BookUser, label: "Caderneta de Fiados", tooltip: "Fiados" },
-  { href: "/dashboard/sales-record", icon: FilePlus2, label: "Registro de Vendas", tooltip: "Registrar Venda" },
+  { href: "/dashboard/sales-record", icon: FilePlus2, label: "Registro de Vendas", tooltip: "Hist. Vendas" }, // Shorter tooltip
   { href: "/dashboard/monthly-report", icon: BarChart3, label: "Relatório Mensal", tooltip: "Relatório" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, logout, currentCompany } = useAuth();
   const router = useRouter();
+  const pathname = usePathname(); // Get current pathname
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | undefined>(undefined);
   const [ownerInitials, setOwnerInitials] = useState<string>("MW");
 
@@ -92,7 +103,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           setProfilePictureUrl(undefined);
           setOwnerInitials(currentCompany ? currentCompany.substring(0,2).toUpperCase() : "MW");
       }
-    } else if (typeof window !== "undefined" && !currentCompany) { // Clear if no company
+    } else if (typeof window !== "undefined" && !currentCompany) { 
         setProfilePictureUrl(undefined);
         setOwnerInitials("MW");
     }
@@ -106,11 +117,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
     loadProfileData();
-    window.addEventListener('storage', loadProfileData);
-    return () => {
-      window.removeEventListener('storage', loadProfileData);
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === accountDetailsStorageKey || (event.key === null && !accountDetailsStorageKey)) { // Handle clear all or specific key change
+        loadProfileData();
+      }
     };
-  }, [loadProfileData]); // Depend on loadProfileData as it now depends on accountDetailsStorageKey
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [loadProfileData, accountDetailsStorageKey]);
 
 
   if (isLoading) {
@@ -122,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return null; // Or a redirect component if preferred
+    return null; 
   }
   
   const handleLogout = () => {
@@ -142,7 +158,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <Link href={item.href} passHref legacyBehavior>
-                    <SidebarMenuButton tooltip={item.tooltip} isActive={router.pathname === item.href}>
+                    <SidebarMenuButton tooltip={item.tooltip} isActive={pathname === item.href}>
                       <item.icon />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
@@ -155,7 +171,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenu>
               <SidebarMenuItem>
                   <Link href="/dashboard/settings" passHref legacyBehavior>
-                    <SidebarMenuButton tooltip="Configurações da Conta">
+                    <SidebarMenuButton tooltip="Configurações da Conta" isActive={pathname === "/dashboard/settings"}>
                       <Settings />
                       <span>Configurações</span>
                     </SidebarMenuButton>
@@ -172,15 +188,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarTrigger>
             
             <div className="flex flex-1 items-center justify-end gap-1 md:gap-2">
-              {/* Search form can be re-added later if needed */}
-              {/* <form className="relative flex-1 sm:flex-initial max-w-xs md:max-w-sm lg:max-w-md">
-                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Pesquisar..."
-                  className="pl-8 w-full"
-                />
-              </form> */}
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Bell className="h-5 w-5" />
                 <span className="sr-only">Notificações</span>

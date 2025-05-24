@@ -1,3 +1,4 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface LogoProps {
@@ -6,7 +7,7 @@ interface LogoProps {
   height?: string | number;
 }
 
-export function Logo({ className, width = 80, height = 80 }: LogoProps) {
+export const Logo = React.memo(function Logo({ className, width = 80, height = 80 }: LogoProps) {
   return (
     <div className={cn("flex items-center justify-center", className)}>
       <svg width={width} height={height} viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -38,4 +39,5 @@ export function Logo({ className, width = 80, height = 80 }: LogoProps) {
       </svg>
     </div>
   );
-}
+});
+Logo.displayName = "Logo";
